@@ -1,0 +1,4 @@
+DESCRIBE table1;
+DESCRIBE table2;
+SELECT * FROM table1 LIMIT 10;
+SELECT * FROM table2 LIMIT 10;
