@@ -14,7 +14,7 @@ from psycopg2 import sql, errors
 DB_HOST = "localhost"
 DB_PORT = 5432
 DB_USER = "postgres"
-DB_PASSWORD = "7476"
+DB_PASSWORD = "MIDA"
 DB_NAME = "mida"
 # SQLTOOLS_CONNECTION_NAME = "Kagayaku" # Not used in pure Python script
 
