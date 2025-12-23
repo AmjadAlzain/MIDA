@@ -60,10 +60,25 @@ async def root():
 async def health():
     """
     Health check endpoint for container orchestration and load balancers.
-    Returns 200 OK with basic application info.
+    Returns 200 OK with basic application info and optional DB status.
     """
+    from app.db.session import check_db_connection
+
+    db_ok, db_error = check_db_connection()
+
+    if db_error == "unconfigured":
+        db_status = "unconfigured"
+        status = "ok"
+    elif db_ok:
+        db_status = "ok"
+        status = "ok"
+    else:
+        db_status = "error"
+        status = "degraded"
+
     return {
-        "status": "healthy",
+        "status": status,
+        "db": db_status,
         "app_name": settings.app_name,
         "version": settings.app_version,
         "environment": settings.environment,

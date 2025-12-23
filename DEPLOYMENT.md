@@ -101,6 +101,49 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ---
 
+## Database Migrations
+
+**Important:** Migrations are NOT run automatically at startup. You must run them explicitly.
+
+### Before First Deployment
+
+Run migrations to create the database schema:
+
+```bash
+# Using Makefile (from project root)
+make db-up
+
+# Or directly with Alembic (from server/ directory)
+cd server && alembic upgrade head
+```
+
+### Docker / Container Deployment
+
+Run migrations as a one-off command before starting the app:
+
+```bash
+# Run migrations in a temporary container
+docker run --rm \
+    -e DATABASE_URL="postgresql://user:pass@host:5432/mida" \
+    mida-ocr-api:latest \
+    alembic upgrade head
+
+# Then start the application container
+docker run -d ... mida-ocr-api:latest
+```
+
+Or use an init container in Kubernetes/Docker Compose.
+
+### Creating New Migrations
+
+After modifying models:
+
+```bash
+make db-revision MSG="add users table"
+```
+
+---
+
 ## Docker Deployment
 
 ### Dockerfile
