@@ -33,11 +33,20 @@
 - Page-by-page parsing avoids cross-page interference from repeated headers/footers
 
 **4. Table Parser (`table_parser.py`)**
-- Fallback parser using Azure table extraction
-- Scores table headers to find quota table
-- Falls back to text parser if table parsing fails
+- **Parses ALL matching quota tables** across the document (not just one best table)
+- Scores table headers to find quota tables (score >= 2 threshold)
+- **Station sub-header detection**: Finds station column headers (PORT_KLANG, KLIA, BUKIT_KAYU_HITAM) in sub-rows after main header
+- **Continuation row handling**: Merges data from rows without line numbers into previous item
+- **Amended value extraction**: Extracts clean numbers from noisy cells with stamps/crossouts (e.g., `239073.760 <<<<< 239,871.00`)
+- **OCR artifact cleaning**: Removes `:unselected:`, `:selected:` markers from Azure DI
+- **Declaration row filtering**: Skips signature/name rows (Nama/Name, Jawatan/Designation, Tarikh/Date)
+- Merges items from all selected tables, de-duplicates by (line_no, hs_code)
+- Sorts merged items by numeric line_no
+- UOM normalization in table mode: kg→KGM, unit/pcs→UNIT
+- Station split parsing from table columns with amended value support
+- Falls back to text parser if table parsing yields 0 items
 
-**4. Normalize/Validate (`normalize_validate.py`)**
+**5. Normalize/Validate (`normalize_validate.py`)**
 - Validates required fields (HS code, item name)
 - Preserves numeric quantities from text parser
 - Passes through station_split data
@@ -50,12 +59,22 @@
 - `hs_code_indices`: Line indices where HS codes found
 - `full_text_length`: Total extracted text length
 - `parsing_mode`: "table" or "text_fallback"
-- `pages_count`: Number of pages in PDF
+- `pages_count`: Number of pages from Azure DI
 - `page_text_lengths`: Text length per page
 - `page_item_counts`: Items found per page
 - `items_total_after_merge`: Total items after de-duplication
+- `tables_found`: Number of tables detected by Azure DI
+- `table_indices_selected`: Indices of tables used for parsing
+- `tables_selected_count`: Number of tables selected for parsing
+- `table_stats`: Per-table stats (index, page_no, score, items_found)
 - `handwritten_spans_count`: Count of handwritten spans detected
 - `handwritten_text_samples`: Sample text from handwritten spans (max 3)
+- `pdf_page_count_local`: Page count from local PDF parsing (pypdf)
+- `input_pdf_size_bytes`: Size of uploaded PDF in bytes
+- `azure_pages_seen`: Number of pages Azure DI returned
+- `azure_content_length`: Length of Azure content string
+- `first_page_excerpt`: First 200 chars of first page text
+- `last_page_excerpt`: Last 200 chars of last page text
 
 ## Project Goal
 Build the MIDA module for Kagayaku's workflow:
@@ -95,8 +114,17 @@ Build the MIDA module for Kagayaku's workflow:
 
 ## Known Limitations
 - Corrupt OCR text (e.g., "KEM DIRALA MALAYMAT" instead of "kg") results in empty UOM
-- Station split assumes fixed order: PORT_KLANG, KLIA, BUKIT_KAYU_HITAM
-- Handwritten amendments may produce ambiguous OCR; values left empty for manual review
+- Station column order detected from sub-header row (PORT_KLANG, KLIA, BUKIT_KAYU_HITAM)
+- Heavily corrupted handwritten amendments may still need manual review in GUI
+- Multi-row items with complex splits may occasionally miss data
+
+## Recent Improvements (Dec 2025)
+- ✅ Station sub-header detection for correct column mapping
+- ✅ Continuation row merging for items split across table rows
+- ✅ Amended value extraction from noisy cells with stamps/pen crossouts
+- ✅ OCR artifact removal (`:unselected:`, `:selected:` markers)
+- ✅ Declaration/signature row filtering
+- ✅ All 71 items in test PDF now parse correctly with valid station splits
 
 ---
 

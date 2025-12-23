@@ -108,13 +108,19 @@ def parse_mida_certificate_debug(pdf_bytes: bytes) -> Dict[str, Any]:
     parsing_mode = "table"
     text_fallback_stats = None
     page_item_counts = []
-    items_total_after_merge = 0
+    items_total_after_merge = len(raw_items)  # Start with table mode count
 
     # Extract page info
     pages = getattr(result, "pages", None) or []
     pages_count = len(pages)
     page_texts = extract_page_texts(result, full_text)
     page_text_lengths = [len(p["text"]) for p in page_texts]
+    
+    # Additional diagnostics
+    azure_pages_seen = pages_count
+    azure_content_length = len(full_text)
+    first_page_excerpt = page_texts[0]["text"][:200] if page_texts and page_texts[0]["text"] else ""
+    last_page_excerpt = page_texts[-1]["text"][-200:] if page_texts and page_texts[-1]["text"] else ""
 
     # Fallback logic: parse page-by-page and merge
     if table_out["debug"].get("table_mode_failed"):
@@ -200,7 +206,11 @@ def parse_mida_certificate_debug(pdf_bytes: bytes) -> Dict[str, Any]:
             "page_item_counts": page_item_counts,
             "items_total_after_merge": items_total_after_merge,
             "handwritten_spans_count": handwritten_spans_count,
-            "handwritten_text_samples": handwritten_text_samples
+            "handwritten_text_samples": handwritten_text_samples,
+            "azure_pages_seen": azure_pages_seen,
+            "azure_content_length": azure_content_length,
+            "first_page_excerpt": first_page_excerpt,
+            "last_page_excerpt": last_page_excerpt
         },
         "text_sample": full_text[:8000]
     }

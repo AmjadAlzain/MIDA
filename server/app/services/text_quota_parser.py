@@ -297,28 +297,21 @@ def parse_quota_items_from_text(full_text: str) -> Tuple[List[Dict[str, Any]], D
                 break
                 
         # Map stations: PORT_KLANG, KLIA, BUKIT_KAYU_HITAM (in order)
-        # Some stations may be empty (value=0 or missing) meaning quantity goes to others
-        station_split = None
-        if len(station_values) == 3:
-            station_split = {
-                "PORT_KLANG": station_values[0] if station_values[0] else None,
-                "KLIA": station_values[1] if station_values[1] else None,
-                "BUKIT_KAYU_HITAM": station_values[2] if station_values[2] else None
-            }
-        elif len(station_values) == 2:
+        # Always include all 3 keys, even if values are null
+        station_split = {
+            "PORT_KLANG": None,
+            "KLIA": None,
+            "BUKIT_KAYU_HITAM": None
+        }
+        if len(station_values) >= 1:
+            station_split["PORT_KLANG"] = station_values[0] if station_values[0] else None
+        if len(station_values) >= 2:
             # 2 values: PORT_KLANG and BUKIT_KAYU_HITAM (KLIA empty)
-            station_split = {
-                "PORT_KLANG": station_values[0] if station_values[0] else None,
-                "KLIA": None,
-                "BUKIT_KAYU_HITAM": station_values[1] if station_values[1] else None
-            }
-        elif len(station_values) == 1:
-            # 1 value: only PORT_KLANG
-            station_split = {
-                "PORT_KLANG": station_values[0] if station_values[0] else None,
-                "KLIA": None,
-                "BUKIT_KAYU_HITAM": None
-            }
+            station_split["BUKIT_KAYU_HITAM"] = station_values[1] if station_values[1] else None
+        if len(station_values) >= 3:
+            # 3 values: shift BUKIT_KAYU_HITAM to position 3, KLIA at position 2
+            station_split["KLIA"] = station_values[1] if station_values[1] else None
+            station_split["BUKIT_KAYU_HITAM"] = station_values[2] if station_values[2] else None
             
         # 4. Item Name and Line No
         # They are before HS code.

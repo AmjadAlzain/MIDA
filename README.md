@@ -8,13 +8,18 @@ MIDA Certificate OCR + Quota Tracking System.
 
 **Certificate Parsing (TE01 Form)**
 - Azure Document Intelligence integration for PDF text extraction
+- **Multi-table parsing**: Parses ALL matching quota tables across the document, merges and de-duplicates items
 - Text-based fallback parser for multi-page TE01 certificates
 - **Page-by-page parsing**: Extracts text per page using Azure spans, parses each page separately, then merges and de-duplicates items
 - Header extraction: MIDA number, company name, exemption period
 - Item extraction: line number, HS code, item name, approved quantity, UOM
-- Station split parsing: PORT_KLANG, KLIA, BUKIT_KAYU_HITAM
+- **Station split parsing**: PORT_KLANG, KLIA, BUKIT_KAYU_HITAM (always includes all 3 keys)
+  - Sub-header row detection for station column mapping
+  - Continuation row merging for split table rows
+  - Amended value extraction from noisy cells
 - UOM normalization: `kg` → `KGM`, `u`/`unit`/`pcs` → `UNIT`
-- **Handwritten amendment handling**: Conservative parsing for noisy OCR lines with edit markers
+- **Handwritten amendment handling**: Extracts values from cells with pen crossouts and stamps
+- **OCR artifact removal**: Cleans `:unselected:`, `:selected:` markers
 - Debug endpoint with detailed parsing statistics
 
 ### 🔧 Parser Details
@@ -23,21 +28,25 @@ MIDA Certificate OCR + Quota Tracking System.
 - Supports numbers with commas (e.g., `14,844.00`)
 - Extracts UOM suffix (e.g., `14,844.00 kg` → qty=14844.0, uom=KGM)
 - Prefers lines with UOM over numeric-only lines
-- **Handles handwritten amendments**: Prefers last comma-formatted number (for crossed-out values)
-- Leaves ambiguous values empty for manual review
+- **Handles handwritten amendments**: Extracts clean numbers from noisy cells with stamps/crossouts
+- **Amended value extraction**: Recognizes patterns like `239073.760 <<<<< 239,871.00` and extracts the intended value
+- Leaves truly ambiguous values empty for manual review in GUI
 
 **Station Splits:**
-- Parses 1-3 station values after approved quantity
-- Maps to: PORT_KLANG, KLIA, BUKIT_KAYU_HITAM
+- **Station sub-header detection**: Finds PORT_KLANG, KLIA, BUKIT_KAYU_HITAM column headers in sub-rows
+- Maps station columns correctly even when headers span multiple rows
+- **Continuation row handling**: Merges data from rows split across table boundaries
+- Parses station values with amended number extraction
 - Handles empty stations (null values)
-- Smart detection to avoid confusing line numbers with station values
-- **Skips numbered headings** (e.g., "9.") and declaration keywords
+- **OCR artifact cleaning**: Removes `:unselected:`, `:selected:` markers from Azure DI
+- **Declaration row filtering**: Skips signature/declaration rows (Nama/Name, Jawatan/Designation, etc.)
 
 **Multi-Page Support:**
 - Extracts text per page using Azure Document Intelligence spans
 - Parses each page independently (avoids cross-page interference)
 - Merges items across pages, de-duplicates by (line_no, hs_code)
 - Sorts final items by numeric line number
+- **Local PDF page count validation** using pypdf (compares against Azure pages)
 
 ## Project Structure
 
