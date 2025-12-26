@@ -44,6 +44,21 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", description="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL")
     log_format: str = Field(default="json", description="Log format: json or text")
 
+    # === MIDA API Client ===
+    # Used by converter service to fetch certificate data from MIDA backend
+    mida_api_base_url: Optional[str] = Field(
+        default=None,
+        description="MIDA API base URL (e.g., http://mida-service:8000)"
+    )
+    mida_api_timeout_seconds: int = Field(
+        default=10,
+        description="Timeout in seconds for MIDA API requests"
+    )
+    mida_api_cache_ttl_seconds: int = Field(
+        default=60,
+        description="TTL in seconds for MIDA API response caching"
+    )
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins from comma-separated string."""

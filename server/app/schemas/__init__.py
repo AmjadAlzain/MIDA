@@ -10,7 +10,18 @@ from app.schemas.mida_certificate import (
     CertificateListResponse,
 )
 
+from app.schemas.convert import (
+    ConversionWarning,
+    ConvertRequest,
+    ConvertResponse,
+    InvoiceItemBase,
+    MatchMode,
+    MidaMatchedItem,
+    WarningSeverity,
+)
+
 __all__ = [
+    # MIDA Certificate schemas
     "CertificateItemIn",
     "CertificateHeaderIn",
     "CertificateDraftCreateRequest",
@@ -18,4 +29,12 @@ __all__ = [
     "CertificateRead",
     "CertificateItemRead",
     "CertificateListResponse",
+    # Convert schemas
+    "ConversionWarning",
+    "ConvertRequest",
+    "ConvertResponse",
+    "InvoiceItemBase",
+    "MatchMode",
+    "MidaMatchedItem",
+    "WarningSeverity",
 ]

@@ -3,25 +3,640 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIDA Certificate OCR</title>
+    <title>MIDA Certificate OCR & Converter</title>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-        .container { border: 1px solid #ccc; padding: 2rem; border-radius: 8px; }
-        pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; }
-        button { padding: 0.5rem 1rem; cursor: pointer; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            max-width: 1000px; 
+            margin: 2rem auto; 
+            padding: 0 1rem;
+            background: #f5f5f5;
+            color: #333;
+        }
+        h1 { color: #2c3e50; margin-bottom: 0.5rem; }
+        h2 { color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 0.5rem; margin-top: 2rem; }
+        h3 { color: #2c3e50; margin-top: 1.5rem; }
+        
+        .container { 
+            background: white;
+            border: 1px solid #ddd; 
+            padding: 2rem; 
+            border-radius: 8px; 
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #555;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .form-group input[type="file"] {
+            padding: 0.5rem 0;
+        }
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            color: #888;
+            font-style: italic;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .row {
+            display: flex;
+            gap: 1rem;
+        }
+        .row .form-group {
+            flex: 1;
+        }
+        
+        pre { 
+            background: #f8f9fa; 
+            padding: 1rem; 
+            overflow-x: auto; 
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            font-size: 0.85rem;
+        }
+        
+        button { 
+            padding: 0.75rem 1.5rem; 
+            cursor: pointer;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        .btn-secondary:hover { background: #7f8c8d; }
+        
+        /* Results section */
+        .results-section { margin-top: 2rem; }
+        
+        .summary-stats {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .stat-card {
+            flex: 1;
+            background: #ecf0f1;
+            padding: 1rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-card .label {
+            color: #7f8c8d;
+            font-size: 0.85rem;
+        }
+        .stat-card.matched { background: #d5f4e6; }
+        .stat-card.matched .number { color: #27ae60; }
+        .stat-card.unmatched { background: #fdecea; }
+        .stat-card.unmatched .number { color: #e74c3c; }
+        
+        /* Table styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #3498db;
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover { background: #f8f9fa; }
+        tr:nth-child(even) { background: #fafafa; }
+        tr:nth-child(even):hover { background: #f0f0f0; }
+        
+        .match-score {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        .match-score.high { background: #d5f4e6; color: #27ae60; }
+        .match-score.medium { background: #fef3cd; color: #856404; }
+        .match-score.low { background: #fdecea; color: #e74c3c; }
+        
+        /* Warnings section */
+        .warnings-section {
+            margin-top: 1.5rem;
+        }
+        .warning-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+        .warning-item.error {
+            background: #fdecea;
+            border-color: #e74c3c;
+        }
+        .warning-item.warning {
+            background: #fef3cd;
+            border-color: #f39c12;
+        }
+        .warning-item.info {
+            background: #d6eaf8;
+            border-color: #3498db;
+        }
+        .warning-item .invoice-item {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .warning-item .reason {
+            margin-top: 0.25rem;
+            color: #555;
+        }
+        .warning-item .severity-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-left: 0.5rem;
+        }
+        .severity-badge.error { background: #e74c3c; color: white; }
+        .severity-badge.warning { background: #f39c12; color: white; }
+        .severity-badge.info { background: #3498db; color: white; }
+        
+        /* Error message */
+        .error-message {
+            background: #fdecea;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+        .error-message h4 {
+            margin: 0 0 0.5rem 0;
+            color: #721c24;
+        }
+        
+        /* Loading state */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #7f8c8d;
+        }
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #3498db;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0;
+        }
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: #ecf0f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #7f8c8d;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background: white;
+            color: #3498db;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Hidden */
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <h1>MIDA Certificate Parser</h1>
-    <div class="container">
-        <input type="file" id="pdfInput" accept=".pdf">
-        <button onclick="uploadFile()">Parse Certificate</button>
-        
-        <h3>Result:</h3>
-        <pre id="result">No result yet.</pre>
+    <h1>🏭 MIDA Certificate System</h1>
+    
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('converter')">Invoice Converter</div>
+        <div class="tab" onclick="switchTab('parser')">Certificate Parser</div>
+    </div>
+    
+    <!-- Converter Tab -->
+    <div id="converter-tab" class="tab-content active">
+        <div class="container">
+            <h2>📄 Invoice to MIDA Converter</h2>
+            <p>Upload an invoice file (Excel .xls or .xlsx) and optionally match against a MIDA certificate.</p>
+            
+            <div class="form-group">
+                <label for="invoiceFile">Invoice File</label>
+                <input type="file" id="invoiceFile" accept=".xls,.xlsx">
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="midaMode" onchange="toggleMidaMode()">
+                    <label for="midaMode" style="display: inline; margin-bottom: 0;">Enable MIDA Matching Mode</label>
+                </div>
+            </div>
+            
+            <div id="midaOptions" class="hidden">
+                <div class="form-group">
+                    <label for="midaCertNumber">MIDA Certificate Number</label>
+                    <input type="text" id="midaCertNumber" placeholder="e.g., MIDA/2024/001">
+                    <small>📝 Dropdown selection will be added later.</small>
+                </div>
+                
+                <div class="row">
+                    <div class="form-group">
+                        <label for="matchMode">Match Mode</label>
+                        <select id="matchMode">
+                            <option value="fuzzy">Fuzzy (Recommended)</option>
+                            <option value="exact">Exact</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="matchThreshold">Match Threshold</label>
+                        <input type="number" id="matchThreshold" value="0.88" min="0" max="1" step="0.01">
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="convertInvoice()" id="convertBtn">Convert Invoice</button>
+            
+            <!-- Results -->
+            <div id="converterResults" class="results-section hidden">
+                <!-- Summary Stats -->
+                <div id="summaryStats" class="summary-stats"></div>
+                
+                <!-- Matched Items Table -->
+                <div id="matchedItemsSection" class="hidden">
+                    <h3>✅ Matched Items (MIDA-Eligible)</h3>
+                    <div style="overflow-x: auto;">
+                        <table id="matchedItemsTable">
+                            <thead>
+                                <tr>
+                                    <th>Line</th>
+                                    <th>Parts Name</th>
+                                    <th>Qty</th>
+                                    <th>MIDA Line</th>
+                                    <th>MIDA Item</th>
+                                    <th>Remaining</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- All Invoice Items (Normal Mode) -->
+                <div id="allItemsSection" class="hidden">
+                    <h3>📋 All Invoice Items (Non-FORM-D)</h3>
+                    <div style="overflow-x: auto;">
+                        <table id="allItemsTable">
+                            <thead>
+                                <tr>
+                                    <th>Line</th>
+                                    <th>Parts No</th>
+                                    <th>Parts Name</th>
+                                    <th>HS Code</th>
+                                    <th>Qty</th>
+                                    <th>Amount (USD)</th>
+                                    <th>Net Wt (Kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Warnings Section -->
+                <div id="warningsSection" class="warnings-section hidden">
+                    <h3>⚠️ Warnings</h3>
+                    <div id="warningsList"></div>
+                </div>
+                
+                <!-- Raw JSON -->
+                <details style="margin-top: 1.5rem;">
+                    <summary style="cursor: pointer; color: #7f8c8d;">Show Raw JSON Response</summary>
+                    <pre id="rawResult"></pre>
+                </details>
+            </div>
+            
+            <!-- Error Display -->
+            <div id="converterError" class="error-message hidden">
+                <h4>❌ Error</h4>
+                <p id="errorText"></p>
+            </div>
+            
+            <!-- Loading -->
+            <div id="converterLoading" class="loading hidden">Processing invoice...</div>
+        </div>
+    </div>
+    
+    <!-- Parser Tab -->
+    <div id="parser-tab" class="tab-content">
+        <div class="container">
+            <h2>🔍 MIDA Certificate Parser</h2>
+            <p>Upload a MIDA certificate PDF to parse and extract data.</p>
+            
+            <div class="form-group">
+                <label for="pdfInput">Certificate PDF</label>
+                <input type="file" id="pdfInput" accept=".pdf">
+            </div>
+            
+            <button onclick="uploadFile()">Parse Certificate</button>
+            
+            <h3>Result:</h3>
+            <pre id="result">No result yet.</pre>
+        </div>
     </div>
 
     <script>
+        // Use relative URL when served from same origin, or localhost for local file access
+        const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
+        
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            document.querySelector(`.tab-content#${tabName}-tab`).classList.add('active');
+            document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+        }
+        
+        // Toggle MIDA mode options
+        function toggleMidaMode() {
+            const midaMode = document.getElementById('midaMode').checked;
+            const midaOptions = document.getElementById('midaOptions');
+            
+            if (midaMode) {
+                midaOptions.classList.remove('hidden');
+            } else {
+                midaOptions.classList.add('hidden');
+            }
+        }
+        
+        // Convert Invoice
+        async function convertInvoice() {
+            const fileInput = document.getElementById('invoiceFile');
+            const midaMode = document.getElementById('midaMode').checked;
+            const certNumber = document.getElementById('midaCertNumber').value.trim();
+            const matchMode = document.getElementById('matchMode').value;
+            const matchThreshold = document.getElementById('matchThreshold').value;
+            
+            // Reset UI
+            hideElement('converterResults');
+            hideElement('converterError');
+            hideElement('matchedItemsSection');
+            hideElement('allItemsSection');
+            hideElement('warningsSection');
+            
+            // Validation
+            if (!fileInput.files[0]) {
+                showError('Please select an invoice file first.');
+                return;
+            }
+            
+            if (midaMode && !certNumber) {
+                showError('Please enter a MIDA certificate number when MIDA mode is enabled.');
+                return;
+            }
+            
+            // Show loading
+            showElement('converterLoading');
+            document.getElementById('convertBtn').disabled = true;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('match_mode', matchMode);
+            formData.append('match_threshold', matchThreshold);
+            
+            if (midaMode && certNumber) {
+                formData.append('mida_certificate_number', certNumber);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/convert`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    // Handle error responses
+                    const errorDetail = data.detail;
+                    if (typeof errorDetail === 'object') {
+                        if (errorDetail.detail === 'Invalid MIDA certificate number') {
+                            showError(`Certificate not found: "${certNumber}" is not a valid MIDA certificate number. Please check the certificate number and try again.`);
+                        } else {
+                            showError(errorDetail.detail || 'An error occurred');
+                        }
+                    } else {
+                        showError(errorDetail || 'An error occurred');
+                    }
+                    return;
+                }
+                
+                // Display results
+                displayResults(data, midaMode);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error connecting to server: ' + error.message);
+            } finally {
+                hideElement('converterLoading');
+                document.getElementById('convertBtn').disabled = false;
+            }
+        }
+        
+        // Display results
+        function displayResults(data, midaMode) {
+            showElement('converterResults');
+            
+            // Summary stats
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="number">${data.total_invoice_items}</div>
+                    <div class="label">Total Items</div>
+                </div>
+                <div class="stat-card matched">
+                    <div class="number">${data.matched_item_count}</div>
+                    <div class="label">Matched</div>
+                </div>
+                <div class="stat-card unmatched">
+                    <div class="number">${data.unmatched_item_count}</div>
+                    <div class="label">Unmatched</div>
+                </div>
+            `;
+            document.getElementById('summaryStats').innerHTML = statsHtml;
+            
+            // Raw JSON
+            document.getElementById('rawResult').textContent = JSON.stringify(data, null, 2);
+            
+            if (midaMode && data.mida_matched_items && data.mida_matched_items.length > 0) {
+                // Display matched items table
+                displayMatchedItems(data.mida_matched_items);
+            } else if (!midaMode && data.all_invoice_items && data.all_invoice_items.length > 0) {
+                // Display all items table (normal mode)
+                displayAllItems(data.all_invoice_items);
+            }
+            
+            // Display warnings
+            if (data.warnings && data.warnings.length > 0) {
+                displayWarnings(data.warnings);
+            }
+        }
+        
+        // Display matched items table
+        function displayMatchedItems(items) {
+            showElement('matchedItemsSection');
+            const tbody = document.querySelector('#matchedItemsTable tbody');
+            tbody.innerHTML = '';
+            
+            items.forEach(item => {
+                const scoreClass = item.match_score >= 0.95 ? 'high' : 
+                                   item.match_score >= 0.8 ? 'medium' : 'low';
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.line_no}</td>
+                    <td>${escapeHtml(item.description)}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.mida_line_no}</td>
+                    <td>${escapeHtml(item.mida_item_name)}</td>
+                    <td>${item.remaining_qty} ${item.remaining_uom}</td>
+                    <td><span class="match-score ${scoreClass}">${(item.match_score * 100).toFixed(0)}%</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Display all items table (normal mode)
+        function displayAllItems(items) {
+            showElement('allItemsSection');
+            const tbody = document.querySelector('#allItemsTable tbody');
+            tbody.innerHTML = '';
+            
+            items.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.line_no}</td>
+                    <td>${escapeHtml(item.parts_no || '')}</td>
+                    <td>${escapeHtml(item.description)}</td>
+                    <td>${escapeHtml(item.hs_code || '')}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.amount ? '$' + item.amount.toFixed(2) : '-'}</td>
+                    <td>${item.net_weight_kg ? item.net_weight_kg.toFixed(2) : '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Display warnings
+        function displayWarnings(warnings) {
+            showElement('warningsSection');
+            const container = document.getElementById('warningsList');
+            container.innerHTML = '';
+            
+            warnings.forEach(warning => {
+                const div = document.createElement('div');
+                div.className = `warning-item ${warning.severity}`;
+                div.innerHTML = `
+                    <span class="invoice-item">${escapeHtml(warning.invoice_item)}</span>
+                    <span class="severity-badge ${warning.severity}">${warning.severity}</span>
+                    <div class="reason">${escapeHtml(warning.reason)}</div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        // Show error message
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            showElement('converterError');
+        }
+        
+        // Helper functions
+        function showElement(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+        
+        function hideElement(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Certificate Parser (existing functionality)
         async function uploadFile() {
             const fileInput = document.getElementById('pdfInput');
             const resultDisplay = document.getElementById('result');
@@ -37,7 +652,7 @@
             resultDisplay.textContent = 'Uploading and processing...';
 
             try {
-                const response = await fetch('http://localhost:8000/api/mida/certificate/parse', {
+                const response = await fetch(`${API_BASE}/api/mida/certificate/parse`, {
                     method: 'POST',
                     body: formData
                 });

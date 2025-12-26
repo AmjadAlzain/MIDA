@@ -1,12 +1,13 @@
 # MIDA Project – Development Plan (Azure OCR)
 
-## What we have so far (Phase 1 & 2 done)
+## What we have so far (Phase 1, 2, 3 & 4 done)
 - Repo scaffolded similar to Form-D-demo:
   - `server/` FastAPI backend
   - `web/` simple HTML upload page
 - Endpoints:
   - `POST /api/mida/certificate/certificate/parse` - Production parsing
   - `POST /api/mida/certificate/certificate/parse-debug` - Debug parsing with stats
+  - `POST /api/convert` - Invoice conversion with MIDA matching
 
 ## ✅ Phase 2 Completed: Certificate OCR
 
@@ -126,20 +127,70 @@ Build the MIDA module for Kagayaku's workflow:
 - ✅ Declaration/signature row filtering
 - ✅ All 71 items in test PDF now parse correctly with valid station splits
 
+## ✅ Phase 3 Completed: MIDA API Client
+
+### MIDA Client (`mida_client.py`)
+- Production-ready HTTP client for fetching certificate data
+- Uses REST API calls instead of direct database access for portability
+- In-memory TTL caching to reduce API calls
+- Clean error handling with structured exceptions:
+  - `MidaCertificateNotFoundError` (404)
+  - `MidaApiError` (non-2xx responses)
+  - `MidaClientConfigError` (missing configuration)
+- Configurable timeout and base URL via environment variables
+- Singleton pattern for shared client instance
+
+### Environment Variables
+- `MIDA_API_BASE_URL`: Base URL of the MIDA API
+- `MIDA_API_TIMEOUT_SECONDS`: Request timeout (default: 10)
+- `MIDA_API_CACHE_TTL_SECONDS`: Cache TTL (default: 60)
+
+## ✅ Phase 4 Completed: Invoice Matching
+
+### Invoice Matching Service (`mida_matching_service.py`)
+- Parses Excel files (.xls, .xlsx) with automatic format detection
+- Extracts invoice items with column auto-detection
+- Supports Form Flag filtering (skips FORM-D items for MIDA matching)
+- Column candidates for flexible parsing:
+  - Item, Invoice No, Product Title, Model Code, Spec Code
+  - Parts No, Parts Name, Net Weight(Kg), Gross Weight(Kg)
+  - Quantity, Amount(USD), Form Flag, HS Code
+
+### MIDA Matcher (`mida_matcher.py`)
+- Matches invoice items to MIDA certificate items
+- Supports exact and fuzzy matching with configurable threshold
+- Text normalization (casefold, strip punctuation, collapse spaces)
+- UOM normalization and compatibility checking
+- 1-to-1 matching (each MIDA item matched once)
+- Deterministic tie-breaking (higher score wins, prefer exact, lower line_no)
+- Warning generation:
+  - UOM mismatch
+  - Exceeds remaining quantity
+  - Near limit (>=90% usage)
+
+### Convert Endpoint (`/api/convert`)
+- Two modes:
+  1. **Normal Mode**: Returns all invoice items without matching
+  2. **MIDA Mode**: Matches invoice items to certificate, returns matched items
+- Form Flag filtering in MIDA mode (skips FORM-D items)
+- Returns matched items with MIDA details and remaining quantities
+- Comprehensive error handling (422 for invalid input, 404 for missing cert)
+
+### Test Coverage
+- 35 unit tests for mida_matcher.py
+- 13 integration tests for convert endpoint
+- All tests passing
+
 ---
 
 # Part B — Next Steps (TODO)
 
-## Phase 3: Database & Quota Tracking
-- [ ] Database schema for certificates and quota ledgers
-- [ ] API endpoints for CRUD operations
-- [ ] Quota balance calculation per item
+## Phase 5: Database & Quota Tracking
+- [ ] Track consumed quantities per MIDA certificate item
+- [ ] Quota balance calculation per item (approved - consumed)
+- [ ] Historical ledger for quota usage
 
-## Phase 4: Invoice Matching
-- [ ] Upload invoice → detect MIDA items
-- [ ] Generate ALDEC "purple format" rows
-- [ ] Update quota ledgers after approval
-
-## Phase 5: UI Enhancements
+## Phase 6: UI Enhancements
 - [ ] User review/edit interface for parsed data
 - [ ] Certificate + per-item balance sheet views
+- [ ] MIDA certificate dropdown selection (instead of text input)

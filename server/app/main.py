@@ -1,13 +1,16 @@
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.config import get_settings
 from app.logging_config import setup_logging, get_logger
-from app.routers import mida_certificate
+from app.routers import mida_certificate, convert
 
 # Load settings
 settings = get_settings()
@@ -48,11 +51,20 @@ app.add_middleware(
 )
 
 app.include_router(mida_certificate.router, prefix="/api/mida/certificate", tags=["mida"])
+app.include_router(convert.router, prefix="/api", tags=["convert"])
+
+# Serve static files from web directory (for local development)
+WEB_DIR = Path(__file__).parent.parent.parent / "web"
+if WEB_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
+    """Root endpoint - serve the web UI if available."""
+    index_file = WEB_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
     return {"message": settings.app_name}
 
 
