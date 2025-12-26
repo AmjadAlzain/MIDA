@@ -1,0 +1,86 @@
+import logging
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import get_settings
+from app.logging_config import setup_logging, get_logger
+from app.routers import mida_certificate
+
+# Load settings
+settings = get_settings()
+
+# Configure logging
+setup_logging(log_level=settings.log_level, log_format=settings.log_format)
+logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events."""
+    logger.info(
+        "Starting application",
+        extra={
+            "app_name": settings.app_name,
+            "version": settings.app_version,
+            "environment": settings.environment,
+        }
+    )
+    yield
+    logger.info("Shutting down application")
+
+
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    lifespan=lifespan,
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(mida_certificate.router, prefix="/api/mida/certificate", tags=["mida"])
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {"message": settings.app_name}
+
+
+@app.get("/health")
+async def health():
+    """
+    Health check endpoint for container orchestration and load balancers.
+    Returns 200 OK with basic application info and optional DB status.
+    """
+    from app.db.session import check_db_connection
+
+    db_ok, db_error = check_db_connection()
+
+    if db_error == "unconfigured":
+        db_status = "unconfigured"
+        status = "ok"
+    elif db_ok:
+        db_status = "ok"
+        status = "ok"
+    else:
+        db_status = "error"
+        status = "degraded"
+
+    return {
+        "status": status,
+        "db": db_status,
+        "app_name": settings.app_name,
+        "version": settings.app_version,
+        "environment": settings.environment,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }

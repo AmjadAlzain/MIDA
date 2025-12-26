@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDA Certificate OCR</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        .container { border: 1px solid #ccc; padding: 2rem; border-radius: 8px; }
+        pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; }
+        button { padding: 0.5rem 1rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>MIDA Certificate Parser</h1>
+    <div class="container">
+        <input type="file" id="pdfInput" accept=".pdf">
+        <button onclick="uploadFile()">Parse Certificate</button>
+        
+        <h3>Result:</h3>
+        <pre id="result">No result yet.</pre>
+    </div>
+
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('pdfInput');
+            const resultDisplay = document.getElementById('result');
+            
+            if (!fileInput.files[0]) {
+                alert('Please select a PDF file first.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            resultDisplay.textContent = 'Uploading and processing...';
+
+            try {
+                const response = await fetch('http://localhost:8000/api/mida/certificate/parse', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                resultDisplay.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Error:', error);
+                resultDisplay.textContent = 'Error processing request: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
