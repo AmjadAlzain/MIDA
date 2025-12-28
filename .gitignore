@@ -8,6 +8,10 @@ __pycache__/
 uploads/
 .DS_Store
 server/.env
+env/
+.env
+.vscode/
+node_modules/
 
 # OCR sample templates (do not commit)
 Templates/
