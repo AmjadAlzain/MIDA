@@ -272,6 +272,58 @@
         
         /* Hidden */
         .hidden { display: none; }
+        
+        /* View toggle buttons */
+        .view-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .toggle-btn {
+            padding: 0.5rem 1rem;
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .toggle-btn:hover {
+            background: #d5dbdb;
+        }
+        .toggle-btn.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        
+        /* Form flag badge */
+        .form-flag-badge {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .form-flag-badge.form-d {
+            background: #fdecea;
+            color: #e74c3c;
+        }
+        .form-flag-badge.empty {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        /* Total row styling */
+        tr.total-row {
+            background: #f8f9fa !important;
+            font-weight: bold;
+            border-top: 2px solid #3498db;
+        }
+        tr.total-row:hover {
+            background: #f0f0f0 !important;
+        }
     </style>
 </head>
 <body>
@@ -353,10 +405,18 @@
                 
                 <!-- All Invoice Items (Normal Mode) -->
                 <div id="allItemsSection" class="hidden">
-                    <h3>📋 All Invoice Items (Non-FORM-D)</h3>
+                    <div class="view-toggle">
+                        <button id="viewFilteredBtn" class="toggle-btn active" onclick="switchToFilteredView()">
+                            📋 Non-FORM-D Items Only
+                        </button>
+                        <button id="viewFullBtn" class="toggle-btn" onclick="switchToFullView()">
+                            📄 All Items (incl. FORM-D & Total)
+                        </button>
+                    </div>
+                    <h3 id="itemsTableTitle">📋 Invoice Items with Empty Form Flag (Non-FORM-D)</h3>
                     <div style="overflow-x: auto;">
                         <table id="allItemsTable">
-                            <thead>
+                            <thead id="allItemsTableHead">
                                 <tr>
                                     <th>Line</th>
                                     <th>Parts No</th>
@@ -541,14 +601,66 @@
                 // Display matched items table
                 displayMatchedItems(data.mida_matched_items);
             } else if (!midaMode && data.all_invoice_items && data.all_invoice_items.length > 0) {
-                // Display all items table (normal mode)
-                displayAllItems(data.all_invoice_items);
+                // Display all items table (normal mode) - start with filtered view
+                cachedResponseData = data;
+                currentViewMode = 'filtered';
+                updateToggleUI();
+                displayAllItems(data.all_invoice_items, false);
             }
             
-            // Display warnings
+            // Display warnings (only in full view for normal mode, since filtered view won't match totals)
             if (data.warnings && data.warnings.length > 0) {
-                displayWarnings(data.warnings);
+                if (midaMode) {
+                    displayWarnings(data.warnings);
+                }
+                // For normal mode, warnings shown only when switching to full view
             }
+        }
+        
+        // Cache response data for toggle functionality
+        let cachedResponseData = null;
+        let currentViewMode = 'filtered'; // 'filtered' or 'full'
+        
+        // Switch to filtered view (non-FORM-D only)
+        function switchToFilteredView() {
+            if (!cachedResponseData) return;
+            currentViewMode = 'filtered';
+            updateToggleUI();
+            displayAllItems(cachedResponseData.all_invoice_items, false);
+            document.getElementById('itemsTableTitle').textContent = '📋 Invoice Items with Empty Form Flag (Non-FORM-D)';
+            
+            // Hide warnings in filtered view (totals won't match since FORM-D items are excluded)
+            hideElement('warningsSection');
+        }
+        
+        // Switch to full view (all items including FORM-D and Total)
+        function switchToFullView() {
+            if (!cachedResponseData) return;
+            currentViewMode = 'full';
+            updateToggleUI();
+            
+            if (cachedResponseData.full_invoice_items && cachedResponseData.full_invoice_items.length > 0) {
+                displayAllItems(cachedResponseData.full_invoice_items, true);
+            } else {
+                console.warn('full_invoice_items is empty or undefined');
+                // Fallback: show message
+                const tbody = document.querySelector('#allItemsTable tbody');
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #7f8c8d;">No items available in full view</td></tr>';
+            }
+            document.getElementById('itemsTableTitle').textContent = '📄 All Invoice Items (Including FORM-D & Total)';
+            
+            // Show warnings in full view (Total Row Validation)
+            if (cachedResponseData.warnings && cachedResponseData.warnings.length > 0) {
+                displayWarnings(cachedResponseData.warnings);
+            } else {
+                hideElement('warningsSection');
+            }
+        }
+        
+        // Update toggle button UI
+        function updateToggleUI() {
+            document.getElementById('viewFilteredBtn').classList.toggle('active', currentViewMode === 'filtered');
+            document.getElementById('viewFullBtn').classList.toggle('active', currentViewMode === 'full');
         }
         
         // Display matched items table
@@ -576,22 +688,78 @@
         }
         
         // Display all items table (normal mode)
-        function displayAllItems(items) {
+        function displayAllItems(items, showFormFlag = false) {
             showElement('allItemsSection');
+            
+            // Update table header based on view mode
+            const thead = document.getElementById('allItemsTableHead');
+            if (showFormFlag) {
+                thead.innerHTML = `
+                    <tr>
+                        <th>Line</th>
+                        <th>Parts No</th>
+                        <th>Parts Name</th>
+                        <th>HS Code</th>
+                        <th>Form Flag</th>
+                        <th>Qty</th>
+                        <th>Amount (USD)</th>
+                        <th>Net Wt (Kg)</th>
+                    </tr>
+                `;
+            } else {
+                thead.innerHTML = `
+                    <tr>
+                        <th>Line</th>
+                        <th>Parts No</th>
+                        <th>Parts Name</th>
+                        <th>HS Code</th>
+                        <th>Qty</th>
+                        <th>Amount (USD)</th>
+                        <th>Net Wt (Kg)</th>
+                    </tr>
+                `;
+            }
+            
             const tbody = document.querySelector('#allItemsTable tbody');
             tbody.innerHTML = '';
             
             items.forEach(item => {
                 const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${item.line_no}</td>
-                    <td>${escapeHtml(item.parts_no || '')}</td>
-                    <td>${escapeHtml(item.description)}</td>
-                    <td>${escapeHtml(item.hs_code || '')}</td>
-                    <td>${item.quantity}</td>
-                    <td>${item.amount ? '$' + item.amount.toFixed(2) : '-'}</td>
-                    <td>${item.net_weight_kg ? item.net_weight_kg.toFixed(2) : '-'}</td>
-                `;
+                const isTotal = item.is_total_row === true;
+                const isFormD = item.form_flag === 'FORM-D';
+                
+                if (isTotal) {
+                    row.className = 'total-row';
+                }
+                
+                if (showFormFlag) {
+                    // Full view with Form Flag column
+                    const formFlagBadge = isTotal ? '' : 
+                        isFormD ? '<span class="form-flag-badge form-d">FORM-D</span>' :
+                        '<span class="form-flag-badge empty">Non-FORM-D</span>';
+                    
+                    row.innerHTML = `
+                        <td>${isTotal ? '' : item.line_no}</td>
+                        <td>${escapeHtml(item.parts_no || '')}</td>
+                        <td>${isTotal ? '<strong>Total</strong>' : escapeHtml(item.description)}</td>
+                        <td>${escapeHtml(item.hs_code || '')}</td>
+                        <td>${formFlagBadge}</td>
+                        <td>${item.quantity}</td>
+                        <td>${item.amount ? '$' + item.amount.toFixed(2) : '-'}</td>
+                        <td>${item.net_weight_kg ? item.net_weight_kg.toFixed(2) : '-'}</td>
+                    `;
+                } else {
+                    // Filtered view without Form Flag column
+                    row.innerHTML = `
+                        <td>${item.line_no}</td>
+                        <td>${escapeHtml(item.parts_no || '')}</td>
+                        <td>${escapeHtml(item.description)}</td>
+                        <td>${escapeHtml(item.hs_code || '')}</td>
+                        <td>${item.quantity}</td>
+                        <td>${item.amount ? '$' + item.amount.toFixed(2) : '-'}</td>
+                        <td>${item.net_weight_kg ? item.net_weight_kg.toFixed(2) : '-'}</td>
+                    `;
+                }
                 tbody.appendChild(row);
             });
         }

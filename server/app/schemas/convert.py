@@ -154,12 +154,22 @@ class ConvertResponse(BaseModel):
     # Normal mode fields
     all_invoice_items: Optional[list[dict[str, Any]]] = Field(
         default=None,
-        description="All parsed invoice items (normal mode only, not in MIDA mode)"
+        description="Filtered invoice items (non-FORM-D only, normal mode)"
+    )
+    full_invoice_items: Optional[list[dict[str, Any]]] = Field(
+        default=None,
+        description="All invoice items including FORM-D flagged items and Total row"
     )
 
     # Summary statistics
     total_invoice_items: int = Field(
-        default=0, description="Total number of items in the uploaded invoice"
+        default=0, description="Total number of items in the uploaded invoice (including FORM-D)"
+    )
+    filtered_item_count: int = Field(
+        default=0, description="Number of items after filtering (non-FORM-D only)"
+    )
+    form_d_item_count: int = Field(
+        default=0, description="Number of FORM-D items excluded from filtered view"
     )
     matched_item_count: int = Field(
         default=0, description="Number of items successfully matched to MIDA"

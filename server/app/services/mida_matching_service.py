@@ -58,6 +58,32 @@ class MatchResult:
     warning: Optional[ConversionWarning] = None
 
 
+@dataclass
+class InvoiceTotals:
+    """Totals detected from invoice file (from Total row) and calculated from items."""
+    
+    # Detected totals from the "Total" row in the invoice (None if no Total row found)
+    detected_quantity: Optional[Decimal] = None
+    detected_amount: Optional[Decimal] = None
+    detected_net_weight: Optional[Decimal] = None
+    
+    # Calculated totals from summing all parsed items
+    calculated_quantity: Decimal = Decimal(0)
+    calculated_amount: Decimal = Decimal(0)
+    calculated_net_weight: Decimal = Decimal(0)
+    
+    # Whether a Total row was found
+    has_total_row: bool = False
+
+
+@dataclass
+class ParsedInvoice:
+    """Result of parsing an invoice file, including items and totals."""
+    
+    items: list[InvoiceItemBase]
+    totals: InvoiceTotals
+
+
 # Column name variations for parsing invoice files
 # Based on actual invoice format: Item, Invoice No, Product Title, Model Code, Spec Code,
 # Parts No, Parts Name, Net Weight(Kg), Gross Weight(Kg), Quantity, Amount(USD), Form Flag, HS Code
@@ -129,8 +155,8 @@ def _calculate_similarity(text1: str, text2: str) -> float:
 
 def parse_invoice_file(
     file_bytes: bytes,
-    filter_non_flagged: bool = True,
-) -> list[InvoiceItemBase]:
+    exclude_form_d_items: bool = True,
+) -> ParsedInvoice:
     """
     Parse an invoice file (Excel or CSV) and extract items.
 
@@ -150,8 +176,8 @@ def parse_invoice_file(
 
     Args:
         file_bytes: Raw bytes of the uploaded file
-        filter_non_flagged: If True, only return items without "FORM-D" flag
-                           (i.e., MIDA-eligible items). Default True.
+        exclude_form_d_items: If True, exclude items with "FORM-D" flag and only
+                              return items with empty form flags. Default True.
 
     Returns:
         List of InvoiceItemBase objects
@@ -226,20 +252,44 @@ def parse_invoice_file(
         raise ValueError("Missing required column: Quantity")
 
     items: list[InvoiceItemBase] = []
+    totals = InvoiceTotals()
 
     for idx, row in df.iterrows():
+        # First, get description to check for Total row
+        description = str(row.get(desc_col, "") or "").strip()
+        
+        # Detect "Total" row FIRST - skip it entirely, it's not a data entry
+        # Total rows should not be considered when looking for items with empty form flags
+        description_lower = description.lower().strip()
+        if description_lower == "total" or description_lower.startswith("total:") or description_lower.startswith("grand total"):
+            totals.has_total_row = True
+            try:
+                totals.detected_quantity = Decimal(str(row.get(qty_col, 0) or 0))
+            except Exception:
+                pass
+            if amount_col:
+                try:
+                    totals.detected_amount = Decimal(str(row.get(amount_col, 0) or 0))
+                except Exception:
+                    pass
+            if weight_col:
+                try:
+                    totals.detected_net_weight = Decimal(str(row.get(weight_col, 0) or 0))
+                except Exception:
+                    pass
+            continue  # Don't process Total row as an item - skip entirely
+        
         # Get form flag to filter FORM-D items
         form_flag = ""
         if form_flag_col:
             form_flag = str(row.get(form_flag_col, "") or "").strip().upper()
         
         # Skip FORM-D flagged items if filtering is enabled
-        # FORM-D items are handled separately, we want MIDA-eligible items
-        if filter_non_flagged and form_flag == "FORM-D":
+        # We only want items with empty form flags (non-FORM-D items)
+        if exclude_form_d_items and form_flag == "FORM-D":
             continue
 
         hs_code = str(row.get(hs_col, "") or "").strip() if hs_col else ""
-        description = str(row.get(desc_col, "") or "").strip()
         
         # Skip empty rows
         if not hs_code and not description:
@@ -300,11 +350,16 @@ def parse_invoice_file(
         )
 
     if not items:
-        if filter_non_flagged:
-            raise ValueError("No MIDA-eligible items found (all items are FORM-D flagged or empty)")
+        if exclude_form_d_items:
+            raise ValueError("No items with empty form flag found (all items have FORM-D flag or rows are empty)")
         raise ValueError("No valid items found in invoice file")
 
-    return items
+    # Calculate totals from parsed items for validation
+    totals.calculated_quantity = sum((item.quantity for item in items), Decimal(0))
+    totals.calculated_amount = sum((item.amount or Decimal(0) for item in items), Decimal(0))
+    totals.calculated_net_weight = sum((item.net_weight_kg or Decimal(0) for item in items), Decimal(0))
+
+    return ParsedInvoice(items=items, totals=totals)
 
 
 def match_invoice_to_mida(

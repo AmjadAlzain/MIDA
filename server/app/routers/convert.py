@@ -70,7 +70,7 @@ from app.schemas.convert import (
     MidaMatchedItem,
     WarningSeverity,
 )
-from app.services.mida_matching_service import parse_invoice_file
+from app.services.mida_matching_service import parse_invoice_file, ParsedInvoice, InvoiceTotals
 from app.services.mida_matcher import (
     InvoiceItem as MatcherInvoiceItem,
     MidaItem as MatcherMidaItem,
@@ -223,11 +223,19 @@ async def convert_with_mida(
         )
 
     # Parse invoice file
-    # In MIDA mode, filter out FORM-D flagged items (only get MIDA-eligible items)
-    # In normal mode, get all items
+    # Always filter out FORM-D flagged items - we only want items with empty form flags
+    # These are the items that need MIDA certificate matching or review
     try:
-        filter_non_flagged = bool(mida_certificate_number and mida_certificate_number.strip())
-        invoice_items = parse_invoice_file(data, filter_non_flagged=filter_non_flagged)
+        exclude_form_d_items = True  # Always exclude FORM-D items, keep only empty form flag items
+        parsed_invoice = parse_invoice_file(data, exclude_form_d_items=exclude_form_d_items)
+        invoice_items = parsed_invoice.items
+        
+        # Also parse without filtering to get ALL items for toggle view
+        parsed_full = parse_invoice_file(data, exclude_form_d_items=False)
+        full_items = parsed_full.items
+        # Use totals from full parse for validation (calculated from ALL items, not filtered)
+        totals = parsed_full.totals
+        logger.info(f"Parsed {len(invoice_items)} filtered items and {len(full_items)} full items")
     except ValueError as exc:
         raise HTTPException(
             status_code=422,
@@ -238,19 +246,91 @@ async def convert_with_mida(
             },
         ) from exc
 
+    # Generate warnings for total discrepancies if a Total row was detected
+    validation_warnings: list[ConversionWarning] = []
+    if totals.has_total_row:
+        # Check quantity discrepancy
+        if totals.detected_quantity is not None and totals.detected_quantity > 0:
+            diff = abs(totals.calculated_quantity - totals.detected_quantity)
+            if diff > Decimal("0.01"):
+                validation_warnings.append(ConversionWarning(
+                    invoice_item="Total Row Validation",
+                    reason=f"Quantity mismatch: calculated sum of filtered items is {totals.calculated_quantity}, but Total row shows {totals.detected_quantity} (difference: {diff}). Note: This may be expected if some items were filtered out (e.g., FORM-D items).",
+                    severity=WarningSeverity.info,
+                ))
+        
+        # Check amount discrepancy
+        if totals.detected_amount is not None and totals.detected_amount > 0:
+            diff = abs(totals.calculated_amount - totals.detected_amount)
+            if diff > Decimal("0.01"):
+                validation_warnings.append(ConversionWarning(
+                    invoice_item="Total Row Validation",
+                    reason=f"Amount mismatch: calculated sum of filtered items is {totals.calculated_amount:.2f}, but Total row shows {totals.detected_amount:.2f} (difference: {diff:.2f}). Note: This may be expected if some items were filtered out (e.g., FORM-D items).",
+                    severity=WarningSeverity.info,
+                ))
+        
+        # Check net weight discrepancy
+        if totals.detected_net_weight is not None and totals.detected_net_weight > 0:
+            diff = abs(totals.calculated_net_weight - totals.detected_net_weight)
+            if diff > Decimal("0.01"):
+                validation_warnings.append(ConversionWarning(
+                    invoice_item="Total Row Validation",
+                    reason=f"Net weight mismatch: calculated sum of filtered items is {totals.calculated_net_weight:.2f} kg, but Total row shows {totals.detected_net_weight:.2f} kg (difference: {diff:.2f} kg). Note: This may be expected if some items were filtered out (e.g., FORM-D items).",
+                    severity=WarningSeverity.info,
+                ))
+
     # ====================
     # NORMAL MODE (no MIDA certificate number)
     # ====================
     if not mida_certificate_number or not mida_certificate_number.strip():
+        # Create a set of filtered item line numbers for quick lookup
+        filtered_line_nos = {item.line_no for item in invoice_items}
+        
+        # Build full items list including FORM-D items
+        full_items_list = [
+            {
+                "line_no": item.line_no,
+                "parts_no": item.parts_no or "",
+                "invoice_no": item.invoice_no or "",
+                "hs_code": item.hs_code,
+                "description": item.description,
+                "quantity": float(item.quantity),
+                "uom": item.uom,
+                "amount": float(item.amount) if item.amount else None,
+                "net_weight_kg": float(item.net_weight_kg) if item.net_weight_kg else None,
+                "form_flag": "" if item.line_no in filtered_line_nos else "FORM-D",
+                "is_total_row": False,
+            }
+            for item in full_items
+        ]
+        
+        # Add Total row at the end if detected
+        if totals.has_total_row:
+            full_items_list.append({
+                "line_no": None,
+                "parts_no": "",
+                "invoice_no": "",
+                "hs_code": "",
+                "description": "Total",
+                "quantity": float(totals.detected_quantity) if totals.detected_quantity else 0,
+                "uom": "",
+                "amount": float(totals.detected_amount) if totals.detected_amount else None,
+                "net_weight_kg": float(totals.detected_net_weight) if totals.detected_net_weight else None,
+                "form_flag": "",
+                "is_total_row": True,
+            })
+        
         # Return all invoice items without MIDA matching
         return ConvertResponse(
             mida_certificate_number="",
             mida_matched_items=[],
-            warnings=[],
-            total_invoice_items=len(invoice_items),
+            warnings=validation_warnings,
+            total_invoice_items=len(full_items),
+            filtered_item_count=len(invoice_items),
+            form_d_item_count=len(full_items) - len(invoice_items),
             matched_item_count=0,
             unmatched_item_count=len(invoice_items),
-            # Include all invoice items as "all_invoice_items" for normal mode
+            # Filtered items (non-FORM-D only)
             all_invoice_items=[
                 {
                     "line_no": item.line_no,
@@ -265,6 +345,8 @@ async def convert_with_mida(
                 }
                 for item in invoice_items
             ],
+            # Full items list including FORM-D and Total row
+            full_invoice_items=full_items_list,
         )
 
     # ====================
