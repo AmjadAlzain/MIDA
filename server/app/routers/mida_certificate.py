@@ -15,14 +15,14 @@ def get_local_pdf_page_count(pdf_bytes: bytes) -> int:
         return -1  # Indicate failure
 
 
-@router.post("/certificate/parse")
+@router.post("/parse")
 async def certificate_parse(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a PDF")
     pdf_bytes = await file.read()
     return parse_mida_certificate(pdf_bytes)
 
-@router.post("/certificate/parse-debug")
+@router.post("/parse-debug")
 async def certificate_parse_debug(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a PDF")

@@ -324,6 +324,174 @@
         tr.total-row:hover {
             background: #f0f0f0 !important;
         }
+        
+        /* Certificate Parser Styles */
+        .cert-header {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        .cert-header-field {
+            display: flex;
+            flex-direction: column;
+        }
+        .cert-header-field label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+        .cert-header-field .value {
+            font-size: 1rem;
+            color: #2c3e50;
+            padding: 0.5rem;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            min-height: 38px;
+        }
+        .cert-header-field .value.editable {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        .cert-header-field input {
+            font-size: 1rem;
+            padding: 0.5rem;
+            border: 1px solid #3498db;
+            border-radius: 4px;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        
+        /* Editable table cells */
+        .editable-cell {
+            transition: all 0.2s;
+        }
+        .editable-cell.editing {
+            background: #fff3cd !important;
+            border: 2px solid #3498db !important;
+            padding: 0.5rem;
+        }
+        td[contenteditable="true"] {
+            background: #fff3cd;
+            border: 2px solid #3498db;
+            outline: none;
+        }
+        td[contenteditable="true"]:focus {
+            background: #fffef0;
+        }
+        
+        /* Action buttons group */
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        .btn-edit {
+            background: #f39c12;
+        }
+        .btn-edit:hover { background: #e67e22; }
+        .btn-save {
+            background: #27ae60;
+        }
+        .btn-save:hover { background: #219a52; }
+        .btn-cancel {
+            background: #e74c3c;
+        }
+        .btn-cancel:hover { background: #c0392b; }
+        .btn-database {
+            background: #27ae60;
+        }
+        .btn-database:hover { background: #1e8449; }
+        
+        /* Confirmation Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .modal-content p {
+            color: #555;
+            line-height: 1.6;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+        }
+        
+        /* Parser results container */
+        .parser-results {
+            margin-top: 1.5rem;
+        }
+        
+        /* Items table for parser */
+        .items-table-container {
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+        .items-table th {
+            white-space: nowrap;
+        }
+        .items-table td {
+            min-width: 80px;
+        }
+        .items-table td:nth-child(3) {
+            min-width: 200px;
+        }
+        
+        /* Success message */
+        .success-message {
+            background: #d5f4e6;
+            border: 1px solid #27ae60;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+        .success-message h4 {
+            margin: 0 0 0.5rem 0;
+            color: #155724;
+        }
+        
+        /* Warnings badge */
+        .warnings-badge {
+            background: #fef3cd;
+            color: #856404;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            margin-left: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -460,17 +628,97 @@
     <div id="parser-tab" class="tab-content">
         <div class="container">
             <h2>🔍 MIDA Certificate Parser</h2>
-            <p>Upload a MIDA certificate PDF to parse and extract data.</p>
+            <p>Upload a MIDA certificate PDF to parse and extract data into an editable table.</p>
             
             <div class="form-group">
                 <label for="pdfInput">Certificate PDF</label>
                 <input type="file" id="pdfInput" accept=".pdf">
             </div>
             
-            <button onclick="uploadFile()">Parse Certificate</button>
+            <button onclick="parseCertificate()" id="parseBtn">Parse Certificate</button>
             
-            <h3>Result:</h3>
-            <pre id="result">No result yet.</pre>
+            <!-- Loading -->
+            <div id="parserLoading" class="loading hidden">Processing certificate...</div>
+            
+            <!-- Error Display -->
+            <div id="parserError" class="error-message hidden">
+                <h4>❌ Error</h4>
+                <p id="parserErrorText"></p>
+            </div>
+            
+            <!-- Parser Results -->
+            <div id="parserResults" class="parser-results hidden">
+                <h3>📋 Certificate Data 
+                    <span id="warningsBadge" class="warnings-badge hidden"></span>
+                </h3>
+                
+                <!-- Certificate Header Fields -->
+                <div class="cert-header" id="certHeader">
+                    <div class="cert-header-field">
+                        <label>Certificate Number</label>
+                        <div class="value" id="certNumber" data-field="certificate_number">-</div>
+                    </div>
+                    <div class="cert-header-field">
+                        <label>Company Name</label>
+                        <div class="value" id="certCompany" data-field="company_name">-</div>
+                    </div>
+                    <div class="cert-header-field">
+                        <label>Exemption Start Date</label>
+                        <div class="value" id="certStartDate" data-field="exemption_start_date">-</div>
+                    </div>
+                    <div class="cert-header-field">
+                        <label>Exemption End Date</label>
+                        <div class="value" id="certEndDate" data-field="exemption_end_date">-</div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button id="editBtn" class="btn-edit" onclick="toggleEditMode()">✏️ Edit Data</button>
+                    <button id="saveDatabaseBtn" class="btn-database" onclick="showSaveConfirmation()">💾 Save to Database</button>
+                    <button id="saveBtn" class="btn-save hidden" onclick="saveChanges()">✅ Save Changes</button>
+                    <button id="cancelBtn" class="btn-cancel hidden" onclick="cancelEdit()">❌ Cancel</button>
+                </div>
+                
+                <!-- Items Table -->
+                <h3>📦 Certificate Items</h3>
+                <div class="items-table-container">
+                    <table class="items-table" id="certItemsTable">
+                        <thead>
+                            <tr>
+                                <th>Line No</th>
+                                <th>HS Code</th>
+                                <th>Item Name</th>
+                                <th>Approved Qty</th>
+                                <th>UOM</th>
+                                <th>Port Klang</th>
+                                <th>KLIA</th>
+                                <th>Bukit Kayu Hitam</th>
+                            </tr>
+                        </thead>
+                        <tbody id="certItemsBody">
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Success message -->
+                <div id="saveSuccess" class="success-message hidden">
+                    <h4>✅ Changes Saved</h4>
+                    <p>Your edits have been saved successfully.</p>
+                </div>
+                
+                <!-- Warnings Section -->
+                <div id="parserWarnings" class="warnings-section hidden">
+                    <h3>⚠️ OCR Warnings</h3>
+                    <div id="parserWarningsList"></div>
+                </div>
+                
+                <!-- Raw JSON -->
+                <details style="margin-top: 1.5rem;">
+                    <summary style="cursor: pointer; color: #7f8c8d;">Show Raw JSON Response</summary>
+                    <pre id="parserRawResult"></pre>
+                </details>
+            </div>
         </div>
     </div>
 
@@ -832,6 +1080,358 @@
                 resultDisplay.textContent = 'Error processing request: ' + error.message;
             }
         }
+        
+        // ==========================================
+        // Certificate Parser - Interactive Table
+        // ==========================================
+        
+        let parsedCertificateData = null;
+        let originalCertificateData = null;
+        let isEditMode = false;
+        
+        // Parse Certificate
+        async function parseCertificate() {
+            const fileInput = document.getElementById('pdfInput');
+            
+            // Reset UI
+            hideElement('parserResults');
+            hideElement('parserError');
+            hideElement('saveSuccess');
+            hideElement('parserWarnings');
+            
+            if (!fileInput.files[0]) {
+                showParserError('Please select a PDF file first.');
+                return;
+            }
+            
+            // Show loading
+            showElement('parserLoading');
+            document.getElementById('parseBtn').disabled = true;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/mida/certificate/parse`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    showParserError(`Server error: ${text || response.statusText}`);
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    const errorMsg = data.detail || 'Failed to parse certificate';
+                    showParserError(typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg);
+                    return;
+                }
+                
+                // Store data
+                parsedCertificateData = JSON.parse(JSON.stringify(data));
+                originalCertificateData = JSON.parse(JSON.stringify(data));
+                
+                // Display results
+                displayParsedCertificate(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showParserError('Error connecting to server: ' + error.message);
+            } finally {
+                hideElement('parserLoading');
+                document.getElementById('parseBtn').disabled = false;
+            }
+        }
+        
+        // Date format conversion utilities
+        function isoToDisplay(isoDate) {
+            // Convert YYYY-MM-DD to DD/MM/YYYY
+            if (!isoDate || isoDate === '-') return '-';
+            const parts = isoDate.split('-');
+            if (parts.length !== 3) return isoDate;
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        
+        function displayToIso(displayDate) {
+            // Convert DD/MM/YYYY to YYYY-MM-DD
+            if (!displayDate || displayDate === '-') return null;
+            const parts = displayDate.split('/');
+            if (parts.length !== 3) return displayDate;
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        
+        function isoToInputValue(isoDate) {
+            // Convert YYYY-MM-DD to input date value (YYYY-MM-DD for HTML date input)
+            if (!isoDate || isoDate === '-') return '';
+            return isoDate;
+        }
+        
+        // Display parsed certificate data
+        function displayParsedCertificate(data) {
+            showElement('parserResults');
+            
+            // Populate header fields (note: backend uses mida_no, exemption_start, exemption_end)
+            document.getElementById('certNumber').textContent = data.mida_no || '-';
+            document.getElementById('certCompany').textContent = data.company_name || '-';
+            
+            // Store ISO dates as data attributes and display in DD/MM/YYYY format
+            const startDateEl = document.getElementById('certStartDate');
+            const endDateEl = document.getElementById('certEndDate');
+            
+            startDateEl.dataset.isoDate = data.exemption_start || '';
+            startDateEl.textContent = isoToDisplay(data.exemption_start) || '-';
+            
+            endDateEl.dataset.isoDate = data.exemption_end || '';
+            endDateEl.textContent = isoToDisplay(data.exemption_end) || '-';
+            
+            // Populate items table
+            const tbody = document.getElementById('certItemsBody');
+            tbody.innerHTML = '';
+            
+            if (data.items && data.items.length > 0) {
+                data.items.forEach((item, index) => {
+                    const row = document.createElement('tr');
+                    row.dataset.index = index;
+                    row.innerHTML = `
+                        <td class="editable-cell" data-field="line_no">${item.line_no || ''}</td>
+                        <td class="editable-cell" data-field="hs_code">${escapeHtml(item.hs_code || '')}</td>
+                        <td class="editable-cell" data-field="item_name">${escapeHtml(item.item_name || '')}</td>
+                        <td class="editable-cell" data-field="approved_quantity">${item.approved_quantity ?? ''}</td>
+                        <td class="editable-cell" data-field="uom">${escapeHtml(item.uom || '')}</td>
+                        <td class="editable-cell" data-field="port_klang_qty">${item.port_klang_qty ?? ''}</td>
+                        <td class="editable-cell" data-field="klia_qty">${item.klia_qty ?? ''}</td>
+                        <td class="editable-cell" data-field="bukit_kayu_hitam_qty">${item.bukit_kayu_hitam_qty ?? ''}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #7f8c8d;">No items found in certificate</td></tr>';
+            }
+            
+            // Show warnings if any
+            if (data.warnings && data.warnings.length > 0) {
+                document.getElementById('warningsBadge').textContent = `${data.warnings.length} warning(s)`;
+                showElement('warningsBadge');
+                displayParserWarnings(data.warnings);
+            } else {
+                hideElement('warningsBadge');
+            }
+            
+            // Show raw JSON
+            document.getElementById('parserRawResult').textContent = JSON.stringify(data, null, 2);
+            
+            // Reset edit mode
+            isEditMode = false;
+            updateEditButtons();
+        }
+        
+        // Display parser warnings
+        function displayParserWarnings(warnings) {
+            showElement('parserWarnings');
+            const container = document.getElementById('parserWarningsList');
+            container.innerHTML = '';
+            
+            warnings.forEach(warning => {
+                const div = document.createElement('div');
+                div.className = 'warning-item warning';
+                div.innerHTML = `<span class="reason">${escapeHtml(warning)}</span>`;
+                container.appendChild(div);
+            });
+        }
+        
+        // Toggle edit mode
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            
+            // Store current data before editing
+            if (isEditMode) {
+                originalCertificateData = JSON.parse(JSON.stringify(parsedCertificateData));
+            }
+            
+            // Handle non-date header fields (certificate number, company name)
+            const certNumberEl = document.getElementById('certNumber');
+            const certCompanyEl = document.getElementById('certCompany');
+            
+            if (isEditMode) {
+                certNumberEl.contentEditable = 'true';
+                certNumberEl.classList.add('editable');
+                certCompanyEl.contentEditable = 'true';
+                certCompanyEl.classList.add('editable');
+            } else {
+                certNumberEl.contentEditable = 'false';
+                certNumberEl.classList.remove('editable');
+                certCompanyEl.contentEditable = 'false';
+                certCompanyEl.classList.remove('editable');
+            }
+            
+            // Handle date fields with date input
+            const startDateEl = document.getElementById('certStartDate');
+            const endDateEl = document.getElementById('certEndDate');
+            
+            if (isEditMode) {
+                // Replace text with date input for start date
+                const startIso = startDateEl.dataset.isoDate || '';
+                startDateEl.innerHTML = `<input type="date" id="startDateInput" value="${startIso}" style="width: 100%; padding: 0.4rem; border: 1px solid #3498db; border-radius: 4px;">`;
+                startDateEl.classList.add('editable');
+                
+                // Replace text with date input for end date
+                const endIso = endDateEl.dataset.isoDate || '';
+                endDateEl.innerHTML = `<input type="date" id="endDateInput" value="${endIso}" style="width: 100%; padding: 0.4rem; border: 1px solid #3498db; border-radius: 4px;">`;
+                endDateEl.classList.add('editable');
+            } else {
+                // Restore text display
+                startDateEl.textContent = isoToDisplay(startDateEl.dataset.isoDate) || '-';
+                startDateEl.classList.remove('editable');
+                
+                endDateEl.textContent = isoToDisplay(endDateEl.dataset.isoDate) || '-';
+                endDateEl.classList.remove('editable');
+            }
+            
+            // Make table cells editable
+            const cells = document.querySelectorAll('#certItemsBody .editable-cell');
+            cells.forEach(cell => {
+                if (isEditMode) {
+                    cell.contentEditable = 'true';
+                    cell.classList.add('editing');
+                } else {
+                    cell.contentEditable = 'false';
+                    cell.classList.remove('editing');
+                }
+            });
+            
+            updateEditButtons();
+            hideElement('saveSuccess');
+        }
+        
+        // Update edit button visibility
+        function updateEditButtons() {
+            if (isEditMode) {
+                hideElement('editBtn');
+                hideElement('saveDatabaseBtn');
+                showElement('saveBtn');
+                showElement('cancelBtn');
+            } else {
+                showElement('editBtn');
+                showElement('saveDatabaseBtn');
+                hideElement('saveBtn');
+                hideElement('cancelBtn');
+            }
+        }
+        
+        // Save changes
+        function saveChanges() {
+            // Collect data from header fields (use backend field names: mida_no, exemption_start, exemption_end)
+            parsedCertificateData.mida_no = document.getElementById('certNumber').textContent.trim();
+            parsedCertificateData.company_name = document.getElementById('certCompany').textContent.trim();
+            
+            // Get dates from date inputs (they return ISO format YYYY-MM-DD)
+            const startDateInput = document.getElementById('startDateInput');
+            const endDateInput = document.getElementById('endDateInput');
+            
+            const startDateValue = startDateInput ? startDateInput.value : '';
+            const endDateValue = endDateInput ? endDateInput.value : '';
+            
+            // Update data attributes for display later
+            document.getElementById('certStartDate').dataset.isoDate = startDateValue;
+            document.getElementById('certEndDate').dataset.isoDate = endDateValue;
+            
+            parsedCertificateData.exemption_start = startDateValue || null;
+            parsedCertificateData.exemption_end = endDateValue || null;
+            
+            // Collect data from items table
+            const rows = document.querySelectorAll('#certItemsBody tr');
+            parsedCertificateData.items = [];
+            
+            rows.forEach((row, index) => {
+                if (row.dataset.index !== undefined) {
+                    const item = {
+                        line_no: parseInt(row.querySelector('[data-field="line_no"]').textContent.trim()) || index + 1,
+                        hs_code: row.querySelector('[data-field="hs_code"]').textContent.trim(),
+                        item_name: row.querySelector('[data-field="item_name"]').textContent.trim(),
+                        approved_quantity: parseFloat(row.querySelector('[data-field="approved_quantity"]').textContent.trim()) || null,
+                        uom: row.querySelector('[data-field="uom"]').textContent.trim(),
+                        port_klang_qty: parseFloat(row.querySelector('[data-field="port_klang_qty"]').textContent.trim()) || null,
+                        klia_qty: parseFloat(row.querySelector('[data-field="klia_qty"]').textContent.trim()) || null,
+                        bukit_kayu_hitam_qty: parseFloat(row.querySelector('[data-field="bukit_kayu_hitam_qty"]').textContent.trim()) || null
+                    };
+                    parsedCertificateData.items.push(item);
+                }
+            });
+            
+            // Exit edit mode
+            isEditMode = false;
+            toggleEditMode();
+            
+            // Update raw JSON display
+            document.getElementById('parserRawResult').textContent = JSON.stringify(parsedCertificateData, null, 2);
+            
+            // Show success message
+            showElement('saveSuccess');
+            
+            // Hide success after 3 seconds
+            setTimeout(() => {
+                hideElement('saveSuccess');
+            }, 3000);
+        }
+        
+        // Cancel edit - restore original data and exit edit mode
+        function cancelEdit() {
+            // Restore original data from the snapshot taken when edit mode started
+            parsedCertificateData = JSON.parse(JSON.stringify(originalCertificateData));
+            
+            // Exit edit mode
+            isEditMode = false;
+            
+            // Re-render the display with the original data
+            displayParsedCertificate(parsedCertificateData);
+        }
+        
+        // Show save to database confirmation modal
+        function showSaveConfirmation() {
+            document.getElementById('confirmModal').classList.add('active');
+        }
+        
+        // Hide confirmation modal
+        function hideConfirmModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+        }
+        
+        // Save to database after confirmation
+        function saveToDatabaseConfirmed() {
+            hideConfirmModal();
+            
+            // TODO: Implement actual database save API call
+            // For now, just show a success message
+            console.log('Saving to database:', parsedCertificateData);
+            
+            // Show success message (placeholder until API is implemented)
+            alert('Certificate data will be saved to database.\n\nNote: Database save functionality will be implemented later.');
+        }
+        
+        // Show parser error
+        function showParserError(message) {
+            document.getElementById('parserErrorText').textContent = message;
+            showElement('parserError');
+        }
     </script>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>💾 Save to Database</h3>
+            <p>Are you sure you want to save this certificate data to the database?</p>
+            <p>Please confirm that all the information is correct before proceeding.</p>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideConfirmModal()">Cancel</button>
+                <button class="btn-database" onclick="saveToDatabaseConfirmed()">Yes, Save to Database</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
