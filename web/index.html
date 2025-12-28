@@ -492,6 +492,106 @@
             font-size: 0.85rem;
             margin-left: 0.5rem;
         }
+        
+        /* Discrepancy highlighting */
+        tr.discrepancy-row {
+            background: #fdecea !important;
+        }
+        tr.discrepancy-row:hover {
+            background: #f5c6cb !important;
+        }
+        tr.discrepancy-row td {
+            border-color: #e74c3c;
+        }
+        /* Ensure discrepancy rows can still be edited */
+        tr.discrepancy-row td[contenteditable="true"] {
+            background: #fff3cd !important;
+            border: 2px solid #3498db !important;
+        }
+        tr.discrepancy-row td.editing {
+            background: #fff3cd !important;
+            border: 2px solid #3498db !important;
+        }
+        
+        /* Missing data highlighting (more severe - blocks save) */
+        tr.missing-data-row {
+            background: #f8d7da !important;
+        }
+        tr.missing-data-row:hover {
+            background: #f1b0b7 !important;
+        }
+        tr.missing-data-row td.missing-field {
+            background: #e74c3c !important;
+            color: white;
+            border-color: #c0392b;
+        }
+        tr.missing-data-row td[contenteditable="true"].missing-field {
+            background: #fff3cd !important;
+            color: #333;
+            border: 2px solid #e74c3c !important;
+        }
+        
+        /* Missing header field highlighting */
+        .cert-header-field .value.missing-field {
+            background: #f8d7da !important;
+            border: 2px solid #e74c3c !important;
+            color: #721c24;
+        }
+        .cert-header-field .value.missing-field.editable {
+            background: #fff3cd !important;
+            border: 2px solid #e74c3c !important;
+            color: #333;
+        }
+        
+        /* Missing data warning banner (error level) */
+        .missing-data-warning {
+            background: #f8d7da;
+            border: 1px solid #c0392b;
+            border-left: 4px solid #c0392b;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        .missing-data-warning h4 {
+            margin: 0 0 0.5rem 0;
+            color: #721c24;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .missing-data-warning ul {
+            margin: 0.5rem 0 0 1.5rem;
+            padding: 0;
+        }
+        .missing-data-warning li {
+            margin-bottom: 0.25rem;
+        }
+        
+        /* Discrepancy warning banner */
+        .discrepancy-warning {
+            background: #fdecea;
+            border: 1px solid #e74c3c;
+            border-left: 4px solid #e74c3c;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        .discrepancy-warning h4 {
+            margin: 0 0 0.5rem 0;
+            color: #721c24;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .discrepancy-warning ul {
+            margin: 0.5rem 0 0 1.5rem;
+            padding: 0;
+        }
+        .discrepancy-warning li {
+            margin-bottom: 0.25rem;
+        }
     </style>
 </head>
 <body>
@@ -648,6 +748,21 @@
             
             <!-- Parser Results -->
             <div id="parserResults" class="parser-results hidden">
+                <!-- Discrepancy Warning Banner -->
+                <div id="discrepancyWarning" class="discrepancy-warning hidden">
+                    <h4>⚠️ Quantity Discrepancies Detected</h4>
+                    <p>The following rows have a mismatch between Approved Quantity and the sum of station quantities (Port Klang + KLIA + Bukit Kayu Hitam):</p>
+                    <ul id="discrepancyList"></ul>
+                    <p style="margin-top: 0.5rem; font-size: 0.9rem;">Please review and correct these values before saving to database.</p>
+                </div>
+                
+                <!-- Missing Data Warning Banner (Blocks Save) -->
+                <div id="missingDataWarning" class="missing-data-warning hidden">
+                    <h4>❌ Required Data Missing</h4>
+                    <p>The following required fields are missing. You must fill in all required data before saving to database:</p>
+                    <ul id="missingDataList"></ul>
+                </div>
+                
                 <h3>📋 Certificate Data 
                     <span id="warningsBadge" class="warnings-badge hidden"></span>
                 </h3>
@@ -1198,15 +1313,22 @@
                 data.items.forEach((item, index) => {
                     const row = document.createElement('tr');
                     row.dataset.index = index;
+                    
+                    // Extract station quantities from nested station_split object
+                    const stationSplit = item.station_split || {};
+                    const portKlangQty = stationSplit.PORT_KLANG ?? '';
+                    const kliaQty = stationSplit.KLIA ?? '';
+                    const bukitKayuHitamQty = stationSplit.BUKIT_KAYU_HITAM ?? '';
+                    
                     row.innerHTML = `
                         <td class="editable-cell" data-field="line_no">${item.line_no || ''}</td>
                         <td class="editable-cell" data-field="hs_code">${escapeHtml(item.hs_code || '')}</td>
                         <td class="editable-cell" data-field="item_name">${escapeHtml(item.item_name || '')}</td>
                         <td class="editable-cell" data-field="approved_quantity">${item.approved_quantity ?? ''}</td>
                         <td class="editable-cell" data-field="uom">${escapeHtml(item.uom || '')}</td>
-                        <td class="editable-cell" data-field="port_klang_qty">${item.port_klang_qty ?? ''}</td>
-                        <td class="editable-cell" data-field="klia_qty">${item.klia_qty ?? ''}</td>
-                        <td class="editable-cell" data-field="bukit_kayu_hitam_qty">${item.bukit_kayu_hitam_qty ?? ''}</td>
+                        <td class="editable-cell" data-field="port_klang_qty">${portKlangQty}</td>
+                        <td class="editable-cell" data-field="klia_qty">${kliaQty}</td>
+                        <td class="editable-cell" data-field="bukit_kayu_hitam_qty">${bukitKayuHitamQty}</td>
                     `;
                     tbody.appendChild(row);
                 });
@@ -1229,6 +1351,174 @@
             // Reset edit mode
             isEditMode = false;
             updateEditButtons();
+            
+            // Validate missing required fields after parse
+            validateMissingRequiredFields();
+            
+            // Validate quantity discrepancies after parse
+            validateQuantityDiscrepancies();
+        }
+        
+        // Validate missing required fields (blocks save to database)
+        function validateMissingRequiredFields() {
+            const missingItems = [];
+            
+            // Check header fields
+            const certNumber = document.getElementById('certNumber').textContent.trim();
+            const company = document.getElementById('certCompany').textContent.trim();
+            const startDateEl = document.getElementById('certStartDate');
+            const endDateEl = document.getElementById('certEndDate');
+            
+            // Get date values (check both text content and data attribute)
+            let startDate = startDateEl.dataset.isoDate || '';
+            let endDate = endDateEl.dataset.isoDate || '';
+            
+            // If in view mode, also check text content
+            if (!startDate && startDateEl.textContent.trim() !== '-') {
+                startDate = startDateEl.textContent.trim();
+            }
+            if (!endDate && endDateEl.textContent.trim() !== '-') {
+                endDate = endDateEl.textContent.trim();
+            }
+            
+            // Clear previous header highlighting
+            document.getElementById('certNumber').classList.remove('missing-field');
+            document.getElementById('certCompany').classList.remove('missing-field');
+            startDateEl.classList.remove('missing-field');
+            endDateEl.classList.remove('missing-field');
+            
+            // Check each required header field
+            if (!certNumber || certNumber === '-') {
+                missingItems.push('Certificate Number is missing');
+                document.getElementById('certNumber').classList.add('missing-field');
+            }
+            if (!company || company === '-') {
+                missingItems.push('Company Name is missing');
+                document.getElementById('certCompany').classList.add('missing-field');
+            }
+            if (!startDate) {
+                missingItems.push('Exemption Start Date is missing');
+                startDateEl.classList.add('missing-field');
+            }
+            if (!endDate) {
+                missingItems.push('Exemption End Date is missing');
+                endDateEl.classList.add('missing-field');
+            }
+            
+            // Check table rows for required fields
+            const rows = document.querySelectorAll('#certItemsBody tr[data-index]');
+            
+            rows.forEach((row) => {
+                const lineNo = row.querySelector('[data-field="line_no"]')?.textContent.trim() || '';
+                const hsCode = row.querySelector('[data-field="hs_code"]')?.textContent.trim() || '';
+                const itemName = row.querySelector('[data-field="item_name"]')?.textContent.trim() || '';
+                const approvedQty = row.querySelector('[data-field="approved_quantity"]')?.textContent.trim() || '';
+                const uom = row.querySelector('[data-field="uom"]')?.textContent.trim() || '';
+                
+                // Clear previous cell highlighting
+                row.classList.remove('missing-data-row');
+                row.querySelectorAll('.missing-field').forEach(cell => cell.classList.remove('missing-field'));
+                
+                const rowMissing = [];
+                
+                if (!hsCode) {
+                    rowMissing.push('HS Code');
+                    row.querySelector('[data-field="hs_code"]')?.classList.add('missing-field');
+                }
+                if (!itemName) {
+                    rowMissing.push('Item Name');
+                    row.querySelector('[data-field="item_name"]')?.classList.add('missing-field');
+                }
+                if (!approvedQty) {
+                    rowMissing.push('Approved Quantity');
+                    row.querySelector('[data-field="approved_quantity"]')?.classList.add('missing-field');
+                }
+                if (!uom) {
+                    rowMissing.push('UOM');
+                    row.querySelector('[data-field="uom"]')?.classList.add('missing-field');
+                }
+                
+                if (rowMissing.length > 0) {
+                    row.classList.add('missing-data-row');
+                    missingItems.push(`Line ${lineNo || '?'}: Missing ${rowMissing.join(', ')}`);
+                }
+            });
+            
+            // Update missing data warning banner
+            const warningBanner = document.getElementById('missingDataWarning');
+            const missingList = document.getElementById('missingDataList');
+            
+            if (missingItems.length > 0) {
+                missingList.innerHTML = '';
+                missingItems.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    missingList.appendChild(li);
+                });
+                showElement('missingDataWarning');
+            } else {
+                hideElement('missingDataWarning');
+            }
+            
+            return missingItems.length;
+        }
+        
+        // Validate quantity discrepancies (Approved Qty vs sum of station quantities)
+        function validateQuantityDiscrepancies() {
+            const rows = document.querySelectorAll('#certItemsBody tr[data-index]');
+            const discrepancies = [];
+            
+            rows.forEach((row) => {
+                const lineNo = row.querySelector('[data-field="line_no"]')?.textContent.trim() || '';
+                const approvedQtyText = row.querySelector('[data-field="approved_quantity"]')?.textContent.trim() || '';
+                const portKlangText = row.querySelector('[data-field="port_klang_qty"]')?.textContent.trim() || '';
+                const kliaText = row.querySelector('[data-field="klia_qty"]')?.textContent.trim() || '';
+                const bukitKayuHitamText = row.querySelector('[data-field="bukit_kayu_hitam_qty"]')?.textContent.trim() || '';
+                
+                const approvedQty = parseFloat(approvedQtyText) || 0;
+                const portKlang = parseFloat(portKlangText) || 0;
+                const klia = parseFloat(kliaText) || 0;
+                const bukitKayuHitam = parseFloat(bukitKayuHitamText) || 0;
+                
+                const stationSum = portKlang + klia + bukitKayuHitam;
+                
+                // Check if there's a discrepancy (allow small floating point tolerance)
+                const tolerance = 0.001;
+                const hasDiscrepancy = Math.abs(approvedQty - stationSum) > tolerance;
+                
+                // Also check if all station values are empty/zero but approved qty is not
+                const allStationsEmpty = portKlangText === '' && kliaText === '' && bukitKayuHitamText === '';
+                
+                if (hasDiscrepancy && !allStationsEmpty) {
+                    row.classList.add('discrepancy-row');
+                    discrepancies.push({
+                        lineNo: lineNo,
+                        approvedQty: approvedQty,
+                        stationSum: stationSum,
+                        difference: approvedQty - stationSum
+                    });
+                } else {
+                    row.classList.remove('discrepancy-row');
+                }
+            });
+            
+            // Update discrepancy warning banner
+            const warningBanner = document.getElementById('discrepancyWarning');
+            const discrepancyList = document.getElementById('discrepancyList');
+            
+            if (discrepancies.length > 0) {
+                discrepancyList.innerHTML = '';
+                discrepancies.forEach(d => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>Line ${d.lineNo}:</strong> Approved Qty (${d.approvedQty}) ≠ Station Sum (${d.stationSum.toFixed(2)}) — Difference: ${d.difference.toFixed(2)}`;
+                    discrepancyList.appendChild(li);
+                });
+                showElement('discrepancyWarning');
+            } else {
+                hideElement('discrepancyWarning');
+            }
+            
+            return discrepancies.length;
         }
         
         // Display parser warnings
@@ -1350,26 +1640,37 @@
             
             rows.forEach((row, index) => {
                 if (row.dataset.index !== undefined) {
+                    const portKlangVal = row.querySelector('[data-field="port_klang_qty"]').textContent.trim();
+                    const kliaVal = row.querySelector('[data-field="klia_qty"]').textContent.trim();
+                    const bukitKayuHitamVal = row.querySelector('[data-field="bukit_kayu_hitam_qty"]').textContent.trim();
+                    
                     const item = {
                         line_no: parseInt(row.querySelector('[data-field="line_no"]').textContent.trim()) || index + 1,
                         hs_code: row.querySelector('[data-field="hs_code"]').textContent.trim(),
                         item_name: row.querySelector('[data-field="item_name"]').textContent.trim(),
                         approved_quantity: parseFloat(row.querySelector('[data-field="approved_quantity"]').textContent.trim()) || null,
                         uom: row.querySelector('[data-field="uom"]').textContent.trim(),
-                        port_klang_qty: parseFloat(row.querySelector('[data-field="port_klang_qty"]').textContent.trim()) || null,
-                        klia_qty: parseFloat(row.querySelector('[data-field="klia_qty"]').textContent.trim()) || null,
-                        bukit_kayu_hitam_qty: parseFloat(row.querySelector('[data-field="bukit_kayu_hitam_qty"]').textContent.trim()) || null
+                        station_split: {
+                            PORT_KLANG: portKlangVal ? parseFloat(portKlangVal) : null,
+                            KLIA: kliaVal ? parseFloat(kliaVal) : null,
+                            BUKIT_KAYU_HITAM: bukitKayuHitamVal ? parseFloat(bukitKayuHitamVal) : null
+                        }
                     };
                     parsedCertificateData.items.push(item);
                 }
             });
             
-            // Exit edit mode
-            isEditMode = false;
+            // Exit edit mode (toggle will flip isEditMode from true to false)
             toggleEditMode();
             
             // Update raw JSON display
             document.getElementById('parserRawResult').textContent = JSON.stringify(parsedCertificateData, null, 2);
+            
+            // Validate missing required fields after save
+            validateMissingRequiredFields();
+            
+            // Validate quantity discrepancies after save
+            validateQuantityDiscrepancies();
             
             // Show success message
             showElement('saveSuccess');
@@ -1394,6 +1695,16 @@
         
         // Show save to database confirmation modal
         function showSaveConfirmation() {
+            // First check for missing required fields - this blocks save completely
+            const missingCount = validateMissingRequiredFields();
+            
+            if (missingCount > 0) {
+                // Show error modal instead of confirmation
+                document.getElementById('missingDataErrorModal').classList.add('active');
+                return;
+            }
+            
+            // No missing data, show normal confirmation
             document.getElementById('confirmModal').classList.add('active');
         }
         
@@ -1402,16 +1713,43 @@
             document.getElementById('confirmModal').classList.remove('active');
         }
         
+        // Hide missing data error modal
+        function hideMissingDataModal() {
+            document.getElementById('missingDataErrorModal').classList.remove('active');
+        }
+        
+        // Hide discrepancy confirmation modal
+        function hideDiscrepancyModal() {
+            document.getElementById('discrepancyConfirmModal').classList.remove('active');
+        }
+        
         // Save to database after confirmation
         function saveToDatabaseConfirmed() {
             hideConfirmModal();
+            
+            // Check if there are discrepancies
+            const discrepancyCount = validateQuantityDiscrepancies();
+            
+            if (discrepancyCount > 0) {
+                // Show additional warning modal for discrepancies
+                document.getElementById('discrepancyConfirmModal').classList.add('active');
+                return;
+            }
+            
+            // Proceed with database save
+            proceedWithDatabaseSave();
+        }
+        
+        // Final save after discrepancy warning acknowledged
+        function proceedWithDatabaseSave() {
+            hideDiscrepancyModal();
             
             // TODO: Implement actual database save API call
             // For now, just show a success message
             console.log('Saving to database:', parsedCertificateData);
             
             // Show success message (placeholder until API is implemented)
-            alert('Certificate data will be saved to database.\n\nNote: Database save functionality will be implemented later.');
+            alert('Certificate data will be saved to database.\\n\\nNote: Database save functionality will be implemented later.');
         }
         
         // Show parser error
@@ -1430,6 +1768,43 @@
             <div class="modal-buttons">
                 <button class="btn-secondary" onclick="hideConfirmModal()">Cancel</button>
                 <button class="btn-database" onclick="saveToDatabaseConfirmed()">Yes, Save to Database</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Missing Data Error Modal (Blocks Save) -->
+    <div id="missingDataErrorModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>❌ Cannot Save - Required Data Missing</h3>
+            <p style="color: #c0392b; font-weight: 600;">There are required fields that are missing.</p>
+            <p>You cannot save to the database until all required fields are filled in:</p>
+            <ul style="color: #721c24; margin: 0.5rem 0 1rem 1.5rem;">
+                <li>Certificate Number</li>
+                <li>Company Name</li>
+                <li>Exemption Start Date</li>
+                <li>Exemption End Date</li>
+                <li>HS Code (for each item)</li>
+                <li>Item Name (for each item)</li>
+                <li>Approved Quantity (for each item)</li>
+                <li>UOM (for each item)</li>
+            </ul>
+            <p>Please review and complete the missing fields (highlighted in red) before trying again.</p>
+            <div class="modal-buttons">
+                <button class="btn-edit" onclick="hideMissingDataModal()">OK, I'll Fix It</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Discrepancy Confirmation Modal -->
+    <div id="discrepancyConfirmModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>⚠️ Quantity Discrepancies Detected</h3>
+            <p style="color: #e74c3c; font-weight: 600;">There are unchecked quantity discrepancies in the certificate data.</p>
+            <p>The Approved Quantity does not match the sum of station quantities (Port Klang + KLIA + Bukit Kayu Hitam) for one or more rows.</p>
+            <p>Are you sure you want to proceed with saving to the database anyway?</p>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideDiscrepancyModal()">Cancel</button>
+                <button class="btn-cancel" onclick="proceedWithDatabaseSave()">Yes, Save Anyway</button>
             </div>
         </div>
     </div>
