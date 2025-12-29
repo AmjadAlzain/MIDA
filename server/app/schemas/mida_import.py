@@ -44,6 +44,9 @@ class ImportRecordCreate(BaseModel):
     import_date: date = Field(
         ..., description="Date of the import"
     )
+    declaration_form_reg_no: Optional[str] = Field(
+        default=None, max_length=100, description="Declaration Form Registration Number"
+    )
     invoice_number: str = Field(
         ..., min_length=1, max_length=100, description="Invoice number"
     )
@@ -77,6 +80,7 @@ class ImportRecordRead(BaseModel):
     id: UUID
     certificate_item_id: UUID
     import_date: date
+    declaration_form_reg_no: Optional[str] = None
     invoice_number: str
     invoice_line: Optional[int] = None
     quantity_imported: Decimal

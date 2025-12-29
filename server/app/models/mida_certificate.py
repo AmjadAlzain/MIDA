@@ -201,6 +201,10 @@ class MidaImportRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # Import details
     import_date: Mapped[date] = mapped_column(Date, nullable=False)
+    declaration_form_reg_no: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True,
+        comment="Declaration Form Registration Number"
+    )
     invoice_number: Mapped[str] = mapped_column(String(100), nullable=False)
     invoice_line: Mapped[Optional[int]] = mapped_column(nullable=True)
     quantity_imported: Mapped[Decimal] = mapped_column(Numeric(18, 3), nullable=False)

@@ -36,6 +36,7 @@ def create_import_record(
     port: str,
     balance_before: Decimal,
     balance_after: Decimal,
+    declaration_form_reg_no: Optional[str] = None,
     invoice_line: Optional[int] = None,
     remarks: Optional[str] = None,
 ) -> MidaImportRecord:
@@ -48,6 +49,7 @@ def create_import_record(
     record = MidaImportRecord(
         certificate_item_id=certificate_item_id,
         import_date=import_date,
+        declaration_form_reg_no=declaration_form_reg_no,
         invoice_number=invoice_number,
         invoice_line=invoice_line,
         quantity_imported=quantity_imported,
