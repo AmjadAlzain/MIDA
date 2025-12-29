@@ -20,6 +20,30 @@ from app.schemas.convert import (
     WarningSeverity,
 )
 
+from app.schemas.mida_import import (
+    ImportPort,
+    QuantityStatus,
+    ImportRecordCreate,
+    ImportRecordBulkCreate,
+    ImportRecordRead,
+    ImportRecordWithContext,
+    ImportRecordListResponse,
+    ItemBalanceRead,
+    ItemBalanceUpdate,
+    ItemBalanceListResponse,
+    ItemWarning,
+    WarningStatusResponse,
+    ImportHistoryQuery,
+    ImportHistoryResponse,
+    PortSummary,
+    PortSummaryResponse,
+    SettingRead,
+    SettingUpdate,
+    DefaultThresholdUpdate,
+    ImportPreview,
+    ImportPreviewResponse,
+)
+
 __all__ = [
     # MIDA Certificate schemas
     "CertificateItemIn",
@@ -37,4 +61,26 @@ __all__ = [
     "MatchMode",
     "MidaMatchedItem",
     "WarningSeverity",
+    # Import tracking schemas
+    "ImportPort",
+    "QuantityStatus",
+    "ImportRecordCreate",
+    "ImportRecordBulkCreate",
+    "ImportRecordRead",
+    "ImportRecordWithContext",
+    "ImportRecordListResponse",
+    "ItemBalanceRead",
+    "ItemBalanceUpdate",
+    "ItemBalanceListResponse",
+    "ItemWarning",
+    "WarningStatusResponse",
+    "ImportHistoryQuery",
+    "ImportHistoryResponse",
+    "PortSummary",
+    "PortSummaryResponse",
+    "SettingRead",
+    "SettingUpdate",
+    "DefaultThresholdUpdate",
+    "ImportPreview",
+    "ImportPreviewResponse",
 ]

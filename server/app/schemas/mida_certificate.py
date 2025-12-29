@@ -177,6 +177,17 @@ class CertificateItemRead(BaseModel):
     port_klang_qty: Optional[Decimal] = None
     klia_qty: Optional[Decimal] = None
     bukit_kayu_hitam_qty: Optional[Decimal] = None
+    
+    # Remaining quantities
+    remaining_quantity: Optional[Decimal] = None
+    remaining_port_klang: Optional[Decimal] = None
+    remaining_klia: Optional[Decimal] = None
+    remaining_bukit_kayu_hitam: Optional[Decimal] = None
+    
+    # Warning/status tracking
+    warning_threshold: Optional[Decimal] = None
+    quantity_status: str = "normal"
+    
     created_at: datetime
     updated_at: datetime
 
