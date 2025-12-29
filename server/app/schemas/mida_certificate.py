@@ -101,13 +101,14 @@ class CertificateHeaderIn(BaseModel):
 
 class CertificateDraftCreateRequest(BaseModel):
     """
-    Request schema for creating or replacing a draft certificate.
+    Request schema for creating a new certificate.
 
-    If a certificate with the same certificate_number exists:
-    - If status is 'confirmed': returns 409 Conflict
-    - If status is 'draft': updates header and replaces all items
+    If a certificate with the same certificate_number already exists,
+    returns 409 Conflict - duplicates are not allowed.
 
-    If no certificate exists: creates new draft with items.
+    New certificates are created with:
+    - 'active' status if exemption_end_date is None or >= today
+    - 'expired' status if exemption_end_date < today
     """
 
     header: CertificateHeaderIn
@@ -189,7 +190,7 @@ class CertificateItemRead(BaseModel):
     quantity_status: str = "normal"
     
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -205,7 +206,7 @@ class CertificateRead(BaseModel):
     status: str
     source_filename: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     items: list[CertificateItemRead] = Field(default_factory=list)
 
     # Note: raw_ocr_json is intentionally excluded from read response

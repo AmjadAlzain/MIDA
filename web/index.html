@@ -592,6 +592,307 @@
         .discrepancy-warning li {
             margin-bottom: 0.25rem;
         }
+        
+        /* ==========================================
+           Database View Tab Styles
+           ========================================== */
+        
+        /* Breadcrumb navigation */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .breadcrumb-item {
+            color: #3498db;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .breadcrumb-item:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb-item.active {
+            color: #2c3e50;
+            cursor: default;
+            font-weight: 600;
+        }
+        .breadcrumb-separator {
+            color: #7f8c8d;
+        }
+        
+        /* Clickable table rows */
+        .clickable-row {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .clickable-row:hover {
+            background: #e8f4fc !important;
+        }
+        .clickable-row.selected {
+            background: #d4edfc !important;
+            border-left: 3px solid #3498db;
+        }
+        
+        /* Quantity status colors */
+        .qty-status-normal {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        .qty-status-warning {
+            color: #f39c12;
+            font-weight: 600;
+        }
+        .qty-status-depleted {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        .qty-status-overdrawn {
+            color: #c0392b;
+            font-weight: bold;
+            background: #fdecea;
+        }
+        
+        /* Status badge */
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+        .status-badge.active {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        .status-badge.expired {
+            background: #fdecea;
+            color: #e74c3c;
+        }
+        /* Legacy support for any remaining draft/confirmed badges */
+        .status-badge.draft {
+            background: #fef3cd;
+            color: #856404;
+        }
+        .status-badge.confirmed {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        /* Quantity toggle */
+        .qty-toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            background: #ecf0f1;
+            border-radius: 4px;
+        }
+        .qty-toggle-label {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .qty-toggle-switch {
+            display: flex;
+            background: white;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #bdc3c7;
+        }
+        .qty-toggle-btn {
+            padding: 0.5rem 1rem;
+            background: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            color: #7f8c8d;
+        }
+        .qty-toggle-btn:hover {
+            background: #f8f9fa;
+        }
+        .qty-toggle-btn.active {
+            background: #3498db;
+            color: white;
+        }
+        .qty-toggle-btn:first-child {
+            border-right: 1px solid #bdc3c7;
+        }
+        
+        /* Port filter buttons */
+        .port-filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .port-filter-btn {
+            padding: 0.5rem 1rem;
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .port-filter-btn:hover {
+            background: #d5dbdb;
+        }
+        .port-filter-btn.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #7f8c8d;
+        }
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .empty-state-text {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+        .empty-state-subtext {
+            font-size: 0.9rem;
+            color: #95a5a6;
+        }
+        
+        /* Pagination */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding: 0.75rem 0;
+            border-top: 1px solid #e9ecef;
+        }
+        .pagination-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .pagination-info {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        .rows-per-page {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+        .rows-per-page select {
+            padding: 0.3rem 0.5rem;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .pagination-btn {
+            padding: 0.4rem 0.75rem;
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .pagination-btn:hover:not(:disabled) {
+            background: #d5dbdb;
+        }
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pagination-page {
+            padding: 0.4rem 0.6rem;
+            min-width: 35px;
+            text-align: center;
+            background: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        .pagination-page.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        
+        /* Back button */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 0.5rem 1rem;
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.15s;
+        }
+        .back-btn:hover {
+            background: #d5dbdb;
+        }
+        
+        /* Info card */
+        .info-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .info-card-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+        .info-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+        .info-card-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .info-card-label {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+        }
+        .info-card-value {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        /* Table number formatting */
+        .number-cell {
+            font-family: 'Consolas', 'Monaco', monospace;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -601,6 +902,7 @@
     <div class="tabs">
         <div class="tab active" onclick="switchTab('converter')">Invoice Converter</div>
         <div class="tab" onclick="switchTab('parser')">Certificate Parser</div>
+        <div class="tab" onclick="switchTab('database')">Database View</div>
     </div>
     
     <!-- Converter Tab -->
@@ -833,6 +1135,216 @@
                     <summary style="cursor: pointer; color: #7f8c8d;">Show Raw JSON Response</summary>
                     <pre id="parserRawResult"></pre>
                 </details>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Database View Tab -->
+    <div id="database-tab" class="tab-content">
+        <div class="container">
+            <h2>🗄️ Database View</h2>
+            <p>Browse MIDA certificates, items, and import records stored in the database.</p>
+            
+            <!-- Breadcrumb Navigation -->
+            <div class="breadcrumb" id="dbBreadcrumb">
+                <span class="breadcrumb-item active" onclick="dbNavigateToCertificates()">📋 Certificates</span>
+            </div>
+            
+            <!-- Loading -->
+            <div id="dbLoading" class="loading hidden">Loading data...</div>
+            
+            <!-- Error Display -->
+            <div id="dbError" class="error-message hidden">
+                <h4>❌ Error</h4>
+                <p id="dbErrorText"></p>
+            </div>
+            
+            <!-- Certificates View (Level 1) -->
+            <div id="certificatesView">
+                <h3>📋 MIDA Certificates</h3>
+                <div style="overflow-x: auto;">
+                    <table id="certificatesTable">
+                        <thead>
+                            <tr>
+                                <th>Certificate Number</th>
+                                <th>Company Name</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Status</th>
+                                <th>Items</th>
+                            </tr>
+                        </thead>
+                        <tbody id="certificatesTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="certificatesPagination" class="pagination-container hidden">
+                    <div class="pagination-left">
+                        <div class="pagination-info" id="certificatesPaginationInfo"></div>
+                        <div class="rows-per-page">
+                            <label>Rows per page:</label>
+                            <select id="certificatesPerPageSelect" onchange="changeCertificatesPerPage(this.value)">
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100" selected>100</option>
+                                <option value="200">200</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pagination-controls" id="certificatesPaginationControls"></div>
+                </div>
+            </div>
+            
+            <!-- Certificate Items View (Level 2) -->
+            <div id="itemsView" class="hidden">
+                <button class="back-btn" onclick="dbNavigateToCertificates()">← Back to Certificates</button>
+                
+                <!-- Selected Certificate Info Card -->
+                <div class="info-card" id="selectedCertificateInfo">
+                    <div class="info-card-title">Selected Certificate</div>
+                    <div class="info-card-grid">
+                        <div class="info-card-item">
+                            <span class="info-card-label">Certificate Number</span>
+                            <span class="info-card-value" id="infoCertNumber">-</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Company Name</span>
+                            <span class="info-card-value" id="infoCertCompany">-</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Valid Period</span>
+                            <span class="info-card-value" id="infoCertPeriod">-</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Status</span>
+                            <span class="info-card-value" id="infoCertStatus">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>📦 Certificate Items</h3>
+                
+                <!-- Quantity Toggle -->
+                <div class="qty-toggle-container">
+                    <span class="qty-toggle-label">Display Quantities:</span>
+                    <div class="qty-toggle-switch">
+                        <button class="qty-toggle-btn active" id="toggleApproved" onclick="toggleQuantityView('approved')">Approved (Total)</button>
+                        <button class="qty-toggle-btn" id="toggleRemaining" onclick="toggleQuantityView('remaining')">Remaining</button>
+                    </div>
+                    <span style="font-size: 0.85rem; color: #7f8c8d;">
+                        <span class="qty-status-normal">●</span> Normal &nbsp;
+                        <span class="qty-status-warning">●</span> Depleting &nbsp;
+                        <span class="qty-status-depleted">●</span> Depleted &nbsp;
+                        <span class="qty-status-overdrawn">●</span> Overdrawn
+                    </span>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table id="itemsTable">
+                        <thead>
+                            <tr>
+                                <th>Line</th>
+                                <th>HS Code</th>
+                                <th>Item Name</th>
+                                <th>UOM</th>
+                                <th class="number-cell">Total Qty</th>
+                                <th class="number-cell">Port Klang</th>
+                                <th class="number-cell">KLIA</th>
+                                <th class="number-cell">Bukit Kayu Hitam</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="itemsPagination" class="pagination-container hidden">
+                    <div class="pagination-left">
+                        <div class="pagination-info" id="itemsPaginationInfo"></div>
+                        <div class="rows-per-page">
+                            <label>Rows per page:</label>
+                            <select id="itemsPerPageSelect" onchange="changeItemsPerPage(this.value)">
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100" selected>100</option>
+                                <option value="200">200</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pagination-controls" id="itemsPaginationControls"></div>
+                </div>
+            </div>
+            
+            <!-- Import Records View (Level 3) -->
+            <div id="importsView" class="hidden">
+                <button class="back-btn" onclick="dbNavigateToItems()">← Back to Items</button>
+                
+                <!-- Selected Item Info Card -->
+                <div class="info-card" id="selectedItemInfo">
+                    <div class="info-card-title">Selected Item</div>
+                    <div class="info-card-grid">
+                        <div class="info-card-item">
+                            <span class="info-card-label">Certificate</span>
+                            <span class="info-card-value" id="infoItemCert">-</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">HS Code</span>
+                            <span class="info-card-value" id="infoItemHsCode">-</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Item Name</span>
+                            <span class="info-card-value" id="infoItemName">-</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">UOM</span>
+                            <span class="info-card-value" id="infoItemUom">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>📥 Import Records</h3>
+                
+                <!-- Port Filter -->
+                <div class="port-filter-container">
+                    <button class="port-filter-btn active" data-port="all" onclick="filterByPort('all')">🌐 All Ports</button>
+                    <button class="port-filter-btn" data-port="port_klang" onclick="filterByPort('port_klang')">🚢 Port Klang</button>
+                    <button class="port-filter-btn" data-port="klia" onclick="filterByPort('klia')">✈️ KLIA</button>
+                    <button class="port-filter-btn" data-port="bukit_kayu_hitam" onclick="filterByPort('bukit_kayu_hitam')">🚛 Bukit Kayu Hitam</button>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table id="importsTable">
+                        <thead>
+                            <tr>
+                                <th>Import Date</th>
+                                <th>Invoice Number</th>
+                                <th>Invoice Line</th>
+                                <th>Port</th>
+                                <th class="number-cell">Qty Imported</th>
+                                <th class="number-cell">Before Balance</th>
+                                <th class="number-cell">After Balance</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="importsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="importsPagination" class="pagination-container hidden">
+                    <div class="pagination-left">
+                        <div class="pagination-info" id="importsPaginationInfo"></div>
+                        <div class="rows-per-page">
+                            <label>Rows per page:</label>
+                            <select id="importsPerPageSelect" onchange="changeImportsPerPage(this.value)">
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100" selected>100</option>
+                                <option value="200">200</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pagination-controls" id="importsPaginationControls"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -1694,7 +2206,7 @@
         }
         
         // Show save to database confirmation modal
-        function showSaveConfirmation() {
+        async function showSaveConfirmation() {
             // First check for missing required fields - this blocks save completely
             const missingCount = validateMissingRequiredFields();
             
@@ -1704,7 +2216,32 @@
                 return;
             }
             
-            // No missing data, show normal confirmation
+            // Check if certificate number already exists in database
+            const certNumber = document.getElementById('certNumber').textContent.trim();
+            if (certNumber && certNumber !== '-') {
+                showElement('parserLoading');
+                try {
+                    const response = await fetch(`${API_BASE}/api/mida/certificates/check/${encodeURIComponent(certNumber)}`);
+                    const data = await response.json();
+                    
+                    if (data.exists) {
+                        hideElement('parserLoading');
+                        // Show duplicate certificate warning modal
+                        document.getElementById('duplicateCertNumber').textContent = certNumber;
+                        document.getElementById('duplicateCertStatus').textContent = data.status;
+                        document.getElementById('duplicateCertCompany').textContent = data.company_name || 'N/A';
+                        document.getElementById('duplicateCertModal').classList.add('active');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking certificate:', error);
+                    // Continue with save if check fails
+                } finally {
+                    hideElement('parserLoading');
+                }
+            }
+            
+            // No missing data and no duplicate, show normal confirmation
             document.getElementById('confirmModal').classList.add('active');
         }
         
@@ -1716,6 +2253,11 @@
         // Hide missing data error modal
         function hideMissingDataModal() {
             document.getElementById('missingDataErrorModal').classList.remove('active');
+        }
+        
+        // Hide duplicate certificate modal
+        function hideDuplicateCertModal() {
+            document.getElementById('duplicateCertModal').classList.remove('active');
         }
         
         // Hide discrepancy confirmation modal
@@ -1741,15 +2283,178 @@
         }
         
         // Final save after discrepancy warning acknowledged
-        function proceedWithDatabaseSave() {
+        async function proceedWithDatabaseSave() {
             hideDiscrepancyModal();
             
-            // TODO: Implement actual database save API call
-            // For now, just show a success message
-            console.log('Saving to database:', parsedCertificateData);
+            // Show loading state
+            showElement('parserLoading');
+            document.getElementById('saveDatabaseBtn').disabled = true;
             
-            // Show success message (placeholder until API is implemented)
-            alert('Certificate data will be saved to database.\\n\\nNote: Database save functionality will be implemented later.');
+            try {
+                // Build the request payload in the format expected by the API
+                const payload = buildDatabaseSavePayload();
+                
+                console.log('Saving to database:', payload);
+                
+                const response = await fetch(`${API_BASE}/api/mida/certificates/draft`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    // Handle specific error cases
+                    if (response.status === 409) {
+                        // Certificate already exists - duplicates not allowed
+                        showDatabaseSaveError(
+                            'Certificate Already Exists',
+                            `Certificate "${payload.header.certificate_number}" already exists in the database. Duplicate certificates are not allowed. Please use a different certificate number or view the existing certificate in the Database View tab.`
+                        );
+                    } else if (response.status === 422) {
+                        // Validation error
+                        const errorMsg = data.detail?.[0]?.msg || data.detail || 'Validation error';
+                        showDatabaseSaveError('Validation Error', errorMsg);
+                    } else {
+                        showDatabaseSaveError('Save Failed', data.detail || 'An error occurred while saving to the database.');
+                    }
+                    return;
+                }
+                
+                // Success! Show success modal
+                showDatabaseSaveSuccess(data, false);  // Always a new certificate now
+                
+            } catch (error) {
+                console.error('Error saving to database:', error);
+                showDatabaseSaveError('Connection Error', 'Error connecting to server: ' + error.message);
+            } finally {
+                hideElement('parserLoading');
+                document.getElementById('saveDatabaseBtn').disabled = false;
+            }
+        }
+        
+        // Build the payload for database save API
+        function buildDatabaseSavePayload() {
+            // Get header values
+            const certNumber = document.getElementById('certNumber').textContent.trim();
+            const company = document.getElementById('certCompany').textContent.trim();
+            const startDateEl = document.getElementById('certStartDate');
+            const endDateEl = document.getElementById('certEndDate');
+            
+            // Get dates from data attributes (ISO format)
+            let startDate = startDateEl.dataset.isoDate || null;
+            let endDate = endDateEl.dataset.isoDate || null;
+            
+            // If empty string, convert to null
+            if (startDate === '') startDate = null;
+            if (endDate === '') endDate = null;
+            
+            // Get source filename from the file input
+            const fileInput = document.getElementById('pdfInput');
+            const sourceFilename = fileInput.files[0]?.name || null;
+            
+            // Build items array from the table
+            const items = [];
+            const rows = document.querySelectorAll('#certItemsBody tr[data-index]');
+            
+            rows.forEach((row) => {
+                const lineNoText = row.querySelector('[data-field="line_no"]')?.textContent.trim() || '';
+                const hsCode = row.querySelector('[data-field="hs_code"]')?.textContent.trim() || '';
+                const itemName = row.querySelector('[data-field="item_name"]')?.textContent.trim() || '';
+                const approvedQtyText = row.querySelector('[data-field="approved_quantity"]')?.textContent.trim() || '';
+                const uom = row.querySelector('[data-field="uom"]')?.textContent.trim() || '';
+                const portKlangText = row.querySelector('[data-field="port_klang_qty"]')?.textContent.trim() || '';
+                const kliaText = row.querySelector('[data-field="klia_qty"]')?.textContent.trim() || '';
+                const bukitKayuHitamText = row.querySelector('[data-field="bukit_kayu_hitam_qty"]')?.textContent.trim() || '';
+                
+                const item = {
+                    line_no: parseInt(lineNoText) || (items.length + 1),
+                    hs_code: hsCode,
+                    item_name: itemName,
+                    approved_quantity: approvedQtyText ? parseFloat(approvedQtyText) : null,
+                    uom: uom,
+                    port_klang_qty: portKlangText ? parseFloat(portKlangText) : null,
+                    klia_qty: kliaText ? parseFloat(kliaText) : null,
+                    bukit_kayu_hitam_qty: bukitKayuHitamText ? parseFloat(bukitKayuHitamText) : null,
+                };
+                
+                items.push(item);
+            });
+            
+            // Build the full payload
+            return {
+                header: {
+                    certificate_number: certNumber,
+                    company_name: company,
+                    exemption_start_date: startDate,
+                    exemption_end_date: endDate,
+                    source_filename: sourceFilename,
+                },
+                items: items,
+                raw_ocr_json: parsedCertificateData, // Store the original OCR data for reference
+            };
+        }
+        
+        // Show database save success modal
+        function showDatabaseSaveSuccess(savedCertificate, isUpdate) {
+            const modal = document.getElementById('saveSuccessModal');
+            const titleEl = document.getElementById('saveSuccessTitle');
+            const messageEl = document.getElementById('saveSuccessMessage');
+            const detailsEl = document.getElementById('saveSuccessDetails');
+            
+            titleEl.textContent = isUpdate ? '✅ Certificate Updated' : '✅ Certificate Saved';
+            messageEl.textContent = isUpdate 
+                ? 'The certificate has been updated in the database.'
+                : 'The certificate has been saved to the database.';
+            
+            detailsEl.innerHTML = `
+                <div class="info-card" style="margin-top: 1rem;">
+                    <div class="info-card-grid">
+                        <div class="info-card-item">
+                            <span class="info-card-label">Certificate Number</span>
+                            <span class="info-card-value">${escapeHtml(savedCertificate.certificate_number)}</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Company Name</span>
+                            <span class="info-card-value">${escapeHtml(savedCertificate.company_name)}</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Status</span>
+                            <span class="info-card-value"><span class="status-badge ${savedCertificate.status}">${savedCertificate.status}</span></span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Items Saved</span>
+                            <span class="info-card-value">${savedCertificate.items?.length || 0}</span>
+                        </div>
+                    </div>
+                </div>
+                <p style="margin-top: 1rem; font-size: 0.9rem; color: #7f8c8d;">
+                    You can view this certificate in the <strong>Database View</strong> tab.
+                </p>
+            `;
+            
+            modal.classList.add('active');
+        }
+        
+        // Hide database save success modal
+        function hideSaveSuccessModal() {
+            document.getElementById('saveSuccessModal').classList.remove('active');
+        }
+        
+        // Show database save error modal
+        function showDatabaseSaveError(title, message) {
+            const modal = document.getElementById('saveErrorModal');
+            document.getElementById('saveErrorTitle').textContent = '❌ ' + title;
+            document.getElementById('saveErrorMessage').textContent = message;
+            modal.classList.add('active');
+        }
+        
+        // Hide database save error modal
+        function hideSaveErrorModal() {
+            document.getElementById('saveErrorModal').classList.remove('active');
         }
         
         // Show parser error
@@ -1757,6 +2462,634 @@
             document.getElementById('parserErrorText').textContent = message;
             showElement('parserError');
         }
+        
+        // ==========================================
+        // Database View - Hierarchical Data Browser
+        // ==========================================
+        
+        // State management for database view
+        const dbState = {
+            certificates: [],
+            certificatesTotal: 0,
+            certificatesPage: 1,
+            certificatesPerPage: 100,
+            
+            selectedCertificate: null,
+            items: [],
+            itemsTotal: 0,
+            itemsPage: 1,
+            itemsPerPage: 100,
+            quantityView: 'approved', // 'approved' or 'remaining'
+            
+            selectedItem: null,
+            imports: [],
+            importsTotal: 0,
+            importsPage: 1,
+            importsPerPage: 100,
+            currentPort: 'all'
+        };
+        
+        // Initialize database view when tab is switched
+        function initDatabaseView() {
+            loadCertificates();
+        }
+        
+        // Format number with thousands separator and decimal places
+        function formatNumber(value, decimals = 3) {
+            if (value === null || value === undefined || value === '') return '-';
+            const num = parseFloat(value);
+            if (isNaN(num)) return '-';
+            return num.toLocaleString('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: decimals
+            });
+        }
+        
+        // Format date from ISO to display format
+        function formatDate(isoDate) {
+            if (!isoDate) return '-';
+            const date = new Date(isoDate);
+            if (isNaN(date.getTime())) return isoDate;
+            return date.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+        
+        // Get CSS class for quantity status
+        function getStatusClass(status) {
+            switch (status) {
+                case 'normal': return 'qty-status-normal';
+                case 'warning': return 'qty-status-warning';
+                case 'depleted': return 'qty-status-depleted';
+                case 'overdrawn': return 'qty-status-overdrawn';
+                default: return '';
+            }
+        }
+        
+        // Get display name for port
+        function getPortDisplayName(port) {
+            switch (port) {
+                case 'port_klang': return 'Port Klang';
+                case 'klia': return 'KLIA';
+                case 'bukit_kayu_hitam': return 'Bukit Kayu Hitam';
+                default: return port;
+            }
+        }
+        
+        // Show database error
+        function showDbError(message) {
+            document.getElementById('dbErrorText').textContent = message;
+            showElement('dbError');
+        }
+        
+        // Hide database error
+        function hideDbError() {
+            hideElement('dbError');
+        }
+        
+        // Update breadcrumb navigation
+        function updateBreadcrumb(level, data = {}) {
+            const breadcrumb = document.getElementById('dbBreadcrumb');
+            let html = '';
+            
+            if (level === 'certificates') {
+                html = '<span class="breadcrumb-item active">📋 Certificates</span>';
+            } else if (level === 'items') {
+                html = `
+                    <span class="breadcrumb-item" onclick="dbNavigateToCertificates()">📋 Certificates</span>
+                    <span class="breadcrumb-separator">›</span>
+                    <span class="breadcrumb-item active">📦 ${escapeHtml(data.certificateNumber || 'Items')}</span>
+                `;
+            } else if (level === 'imports') {
+                html = `
+                    <span class="breadcrumb-item" onclick="dbNavigateToCertificates()">📋 Certificates</span>
+                    <span class="breadcrumb-separator">›</span>
+                    <span class="breadcrumb-item" onclick="dbNavigateToItems()">📦 ${escapeHtml(data.certificateNumber || 'Items')}</span>
+                    <span class="breadcrumb-separator">›</span>
+                    <span class="breadcrumb-item active">📥 ${escapeHtml(data.itemName || 'Imports')}</span>
+                `;
+            }
+            
+            breadcrumb.innerHTML = html;
+        }
+        
+        // Render pagination controls
+        function renderPagination(containerId, infoId, currentPage, totalItems, perPage, onPageChange) {
+            const container = document.getElementById(containerId);
+            const info = document.getElementById(infoId);
+            const totalPages = Math.ceil(totalItems / perPage);
+            
+            // Always show pagination bar if there are items (for rows-per-page dropdown)
+            if (totalItems === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            
+            container.classList.remove('hidden');
+            
+            const startItem = (currentPage - 1) * perPage + 1;
+            const endItem = Math.min(currentPage * perPage, totalItems);
+            info.textContent = `Showing ${startItem}-${endItem} of ${totalItems}`;
+            
+            const controls = container.querySelector('.pagination-controls');
+            let html = '';
+            
+            // Hide page controls if only one page
+            if (totalPages <= 1) {
+                controls.innerHTML = '';
+                return;
+            }
+            
+            // Previous button
+            html += `<button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="${onPageChange}(${currentPage - 1})">← Prev</button>`;
+            
+            // Page numbers
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            if (startPage > 1) {
+                html += `<button class="pagination-page" onclick="${onPageChange}(1)">1</button>`;
+                if (startPage > 2) html += '<span style="color: #7f8c8d;">...</span>';
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="pagination-page ${i === currentPage ? 'active' : ''}" onclick="${onPageChange}(${i})">${i}</button>`;
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += '<span style="color: #7f8c8d;">...</span>';
+                html += `<button class="pagination-page" onclick="${onPageChange}(${totalPages})">${totalPages}</button>`;
+            }
+            
+            // Next button
+            html += `<button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="${onPageChange}(${currentPage + 1})">Next →</button>`;
+            
+            controls.innerHTML = html;
+        }
+        
+        // Render empty state
+        function renderEmptyState(tbodyId, colspan, icon, text, subtext) {
+            const tbody = document.getElementById(tbodyId);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="${colspan}">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">${icon}</div>
+                            <div class="empty-state-text">${text}</div>
+                            <div class="empty-state-subtext">${subtext}</div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        // ==========================================
+        // Level 1: Certificates
+        // ==========================================
+        
+        async function loadCertificates(page = 1) {
+            dbState.certificatesPage = page;
+            hideDbError();
+            showElement('dbLoading');
+            
+            try {
+                const offset = (page - 1) * dbState.certificatesPerPage;
+                const response = await fetch(`${API_BASE}/api/mida/certificates?limit=${dbState.certificatesPerPage}&offset=${offset}`);
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.detail || 'Failed to load certificates');
+                }
+                
+                const data = await response.json();
+                dbState.certificates = data.items || [];
+                dbState.certificatesTotal = data.total || 0;
+                
+                // Update the rows-per-page dropdown to reflect current setting
+                const perPageSelect = document.getElementById('certificatesPerPageSelect');
+                if (perPageSelect) perPageSelect.value = dbState.certificatesPerPage;
+                
+                renderCertificatesTable();
+                renderPagination(
+                    'certificatesPagination',
+                    'certificatesPaginationInfo',
+                    dbState.certificatesPage,
+                    dbState.certificatesTotal,
+                    dbState.certificatesPerPage,
+                    'goToCertificatesPage'
+                );
+                
+            } catch (error) {
+                console.error('Error loading certificates:', error);
+                showDbError('Error loading certificates: ' + error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        function goToCertificatesPage(page) {
+            loadCertificates(page);
+        }
+        
+        function changeCertificatesPerPage(value) {
+            const newValue = parseInt(value);
+            if (newValue === dbState.certificatesPerPage) return; // Prevent infinite loop
+            dbState.certificatesPerPage = newValue;
+            dbState.certificatesPage = 1; // Reset to first page
+            loadCertificates(1);
+        }
+        
+        function renderCertificatesTable() {
+            const tbody = document.getElementById('certificatesTableBody');
+            
+            if (dbState.certificates.length === 0) {
+                renderEmptyState(
+                    'certificatesTableBody',
+                    6,
+                    '📋',
+                    'No certificates found',
+                    'Upload and parse a MIDA certificate to get started.'
+                );
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            
+            dbState.certificates.forEach(cert => {
+                const row = document.createElement('tr');
+                row.className = 'clickable-row';
+                row.dataset.id = cert.id;
+                row.onclick = () => selectCertificate(cert);
+                
+                const statusBadge = `<span class="status-badge ${cert.status}">${cert.status}</span>`;
+                
+                row.innerHTML = `
+                    <td>${escapeHtml(cert.certificate_number || '-')}</td>
+                    <td>${escapeHtml(cert.company_name || '-')}</td>
+                    <td>${formatDate(cert.exemption_start_date)}</td>
+                    <td>${formatDate(cert.exemption_end_date)}</td>
+                    <td>${statusBadge}</td>
+                    <td>${cert.items?.length || '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function selectCertificate(cert) {
+            dbState.selectedCertificate = cert;
+            dbState.itemsPage = 1;
+            
+            // Update info card
+            document.getElementById('infoCertNumber').textContent = cert.certificate_number || '-';
+            document.getElementById('infoCertCompany').textContent = cert.company_name || '-';
+            document.getElementById('infoCertPeriod').textContent = 
+                `${formatDate(cert.exemption_start_date)} - ${formatDate(cert.exemption_end_date)}`;
+            document.getElementById('infoCertStatus').innerHTML = 
+                `<span class="status-badge ${cert.status}">${cert.status}</span>`;
+            
+            // Update breadcrumb
+            updateBreadcrumb('items', { certificateNumber: cert.certificate_number });
+            
+            // Show items view
+            hideElement('certificatesView');
+            showElement('itemsView');
+            
+            // Load items for this certificate
+            loadCertificateItems(cert.id);
+        }
+        
+        // ==========================================
+        // Level 2: Certificate Items
+        // ==========================================
+        
+        async function loadCertificateItems(certificateId, page = 1) {
+            dbState.itemsPage = page;
+            hideDbError();
+            showElement('dbLoading');
+            
+            try {
+                // Use the balances endpoint with server-side pagination
+                const offset = (page - 1) * dbState.itemsPerPage;
+                const response = await fetch(`${API_BASE}/api/mida/imports/balances?certificate_id=${certificateId}&limit=${dbState.itemsPerPage}&offset=${offset}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Server error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                dbState.items = data.items || data || [];
+                dbState.itemsTotal = data.total || dbState.items.length;
+                
+                // Update the rows-per-page dropdown to reflect current setting (without triggering onchange)
+                const perPageSelect = document.getElementById('itemsPerPageSelect');
+                if (perPageSelect && perPageSelect.value !== String(dbState.itemsPerPage)) {
+                    perPageSelect.value = dbState.itemsPerPage;
+                }
+                
+                renderItemsTable();
+                
+                // Render pagination using server-side total
+                renderPagination(
+                    'itemsPagination',
+                    'itemsPaginationInfo',
+                    dbState.itemsPage,
+                    dbState.itemsTotal,
+                    dbState.itemsPerPage,
+                    'goToItemsPage'
+                );
+                
+            } catch (error) {
+                console.error('Error loading items:', error);
+                const errorMsg = error.message || (typeof error === 'string' ? error : 'Unknown error');
+                showDbError('Error loading items: ' + errorMsg);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        function goToItemsPage(page) {
+            // Server-side pagination - re-fetch data from server
+            loadCertificateItems(dbState.selectedCertificate.id, page);
+        }
+        
+        function changeItemsPerPage(value) {
+            const newValue = parseInt(value);
+            if (newValue === dbState.itemsPerPage) return; // Prevent infinite loop
+            dbState.itemsPerPage = newValue;
+            dbState.itemsPage = 1; // Reset to first page
+            loadCertificateItems(dbState.selectedCertificate.id, 1);
+        }
+        
+        function paginateArray(array, page, perPage) {
+            const start = (page - 1) * perPage;
+            return array.slice(start, start + perPage);
+        }
+        
+        function toggleQuantityView(view) {
+            dbState.quantityView = view;
+            
+            // Update toggle buttons
+            document.getElementById('toggleApproved').classList.toggle('active', view === 'approved');
+            document.getElementById('toggleRemaining').classList.toggle('active', view === 'remaining');
+            
+            // Update table header
+            const headerCell = document.querySelector('#itemsTable thead th:nth-child(5)');
+            headerCell.textContent = view === 'approved' ? 'Total Qty' : 'Remaining Qty';
+            
+            // Re-render table
+            renderItemsTable();
+        }
+        
+        function renderItemsTable() {
+            const tbody = document.getElementById('itemsTableBody');
+            
+            if (dbState.items.length === 0) {
+                renderEmptyState(
+                    'itemsTableBody',
+                    9,
+                    '📦',
+                    'No items found for this certificate',
+                    'This certificate has no associated items.'
+                );
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            // Server-side pagination: items are already paginated by the API
+            
+            dbState.items.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = 'clickable-row';
+                row.dataset.id = item.item_id;
+                row.onclick = () => selectItem(item);
+                
+                const statusClass = getStatusClass(item.quantity_status);
+                const statusBadge = `<span class="status-badge ${item.quantity_status || 'normal'}">${item.quantity_status || 'normal'}</span>`;
+                
+                // Determine which quantities to show based on toggle
+                const isApproved = dbState.quantityView === 'approved';
+                const totalQty = isApproved ? item.approved_quantity : item.remaining_quantity;
+                const portKlangQty = isApproved ? item.port_klang_qty : item.remaining_port_klang;
+                const kliaQty = isApproved ? item.klia_qty : item.remaining_klia;
+                const bukitQty = isApproved ? item.bukit_kayu_hitam_qty : item.remaining_bukit_kayu_hitam;
+                
+                // Apply status coloring to remaining values regardless of toggle view
+                const applyStatusColor = (value, status) => {
+                    const statusCls = getStatusClass(status);
+                    return statusCls ? `<span class="${statusCls}">${formatNumber(value)}</span>` : formatNumber(value);
+                };
+                
+                row.innerHTML = `
+                    <td>${item.line_no || '-'}</td>
+                    <td>${escapeHtml(item.hs_code || item.item_hs_code || '-')}</td>
+                    <td>${escapeHtml(item.item_name || '-')}</td>
+                    <td>${escapeHtml(item.uom || item.item_uom || '-')}</td>
+                    <td class="number-cell ${statusClass}">${formatNumber(totalQty)}</td>
+                    <td class="number-cell ${statusClass}">${formatNumber(portKlangQty)}</td>
+                    <td class="number-cell ${statusClass}">${formatNumber(kliaQty)}</td>
+                    <td class="number-cell ${statusClass}">${formatNumber(bukitQty)}</td>
+                    <td>${statusBadge}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function selectItem(item) {
+            dbState.selectedItem = item;
+            dbState.importsPage = 1;
+            dbState.currentPort = 'all';
+            
+            // Update info card
+            document.getElementById('infoItemCert').textContent = 
+                dbState.selectedCertificate?.certificate_number || item.certificate_number || '-';
+            document.getElementById('infoItemHsCode').textContent = item.hs_code || item.item_hs_code || '-';
+            document.getElementById('infoItemName').textContent = item.item_name || '-';
+            document.getElementById('infoItemUom').textContent = item.uom || item.item_uom || '-';
+            
+            // Update breadcrumb
+            updateBreadcrumb('imports', {
+                certificateNumber: dbState.selectedCertificate?.certificate_number || item.certificate_number,
+                itemName: item.item_name || `Line ${item.line_no}`
+            });
+            
+            // Reset port filter buttons
+            document.querySelectorAll('.port-filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.port === 'all');
+            });
+            
+            // Show imports view
+            hideElement('itemsView');
+            showElement('importsView');
+            
+            // Load imports for this item
+            loadImportRecords(item.item_id);
+        }
+        
+        // ==========================================
+        // Level 3: Import Records
+        // ==========================================
+        
+        async function loadImportRecords(itemId, port = 'all', page = 1) {
+            dbState.importsPage = page;
+            dbState.currentPort = port;
+            hideDbError();
+            showElement('dbLoading');
+            
+            try {
+                const offset = (page - 1) * dbState.importsPerPage;
+                let url = `${API_BASE}/api/mida/imports/history/item/${itemId}`;
+                const params = [`limit=${dbState.importsPerPage}`, `offset=${offset}`];
+                
+                if (port !== 'all') {
+                    params.push(`port=${port}`);
+                }
+                
+                url += '?' + params.join('&');
+                
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.detail || 'Failed to load import records');
+                }
+                
+                const data = await response.json();
+                dbState.imports = data.imports || [];
+                dbState.importsTotal = data.total || dbState.imports.length;
+                
+                // Update the rows-per-page dropdown to reflect current setting
+                const perPageSelect = document.getElementById('importsPerPageSelect');
+                if (perPageSelect) perPageSelect.value = dbState.importsPerPage;
+                
+                renderImportsTable();
+                
+                // Handle pagination
+                renderPagination(
+                    'importsPagination',
+                    'importsPaginationInfo',
+                    dbState.importsPage,
+                    dbState.importsTotal,
+                    dbState.importsPerPage,
+                    'goToImportsPage'
+                );
+                
+            } catch (error) {
+                console.error('Error loading imports:', error);
+                showDbError('Error loading import records: ' + error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        function goToImportsPage(page) {
+            // Server-side pagination - re-fetch data from server
+            loadImportRecords(dbState.selectedItem.item_id, dbState.currentPort, page);
+        }
+        
+        function changeImportsPerPage(value) {
+            const newValue = parseInt(value);
+            if (newValue === dbState.importsPerPage) return; // Prevent infinite loop
+            dbState.importsPerPage = newValue;
+            dbState.importsPage = 1; // Reset to first page
+            loadImportRecords(dbState.selectedItem.item_id, dbState.currentPort, 1);
+        }
+        
+        function filterByPort(port) {
+            // Update button states
+            document.querySelectorAll('.port-filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.port === port);
+            });
+            
+            // Reload with filter
+            loadImportRecords(dbState.selectedItem.item_id, port, 1);
+        }
+        
+        function renderImportsTable() {
+            const tbody = document.getElementById('importsTableBody');
+            
+            if (dbState.imports.length === 0) {
+                const portName = dbState.currentPort === 'all' ? 'any port' : getPortDisplayName(dbState.currentPort);
+                renderEmptyState(
+                    'importsTableBody',
+                    8,
+                    '📥',
+                    'No import records found',
+                    `There are no import records for this item from ${portName}.`
+                );
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            // Server-side pagination: imports are already paginated by the API
+            
+            dbState.imports.forEach(record => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${formatDate(record.import_date)}</td>
+                    <td>${escapeHtml(record.invoice_number || '-')}</td>
+                    <td>${record.invoice_line || '-'}</td>
+                    <td>${getPortDisplayName(record.port)}</td>
+                    <td class="number-cell">${formatNumber(record.quantity_imported)}</td>
+                    <td class="number-cell">${formatNumber(record.balance_before)}</td>
+                    <td class="number-cell">${formatNumber(record.balance_after)}</td>
+                    <td>${escapeHtml(record.remarks || '-')}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // ==========================================
+        // Navigation
+        // ==========================================
+        
+        function dbNavigateToCertificates() {
+            dbState.selectedCertificate = null;
+            dbState.selectedItem = null;
+            
+            updateBreadcrumb('certificates');
+            
+            hideElement('itemsView');
+            hideElement('importsView');
+            showElement('certificatesView');
+            
+            // Reload certificates to ensure fresh data
+            loadCertificates(dbState.certificatesPage);
+        }
+        
+        function dbNavigateToItems() {
+            dbState.selectedItem = null;
+            
+            updateBreadcrumb('items', {
+                certificateNumber: dbState.selectedCertificate?.certificate_number
+            });
+            
+            hideElement('importsView');
+            showElement('itemsView');
+        }
+        
+        // Override switchTab to initialize database view
+        const originalSwitchTab = switchTab;
+        switchTab = function(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            document.querySelector(`.tab-content#${tabName}-tab`).classList.add('active');
+            document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            
+            // Initialize database view when switching to it
+            if (tabName === 'database') {
+                initDatabaseView();
+            }
+        };
     </script>
     
     <!-- Confirmation Modal -->
@@ -1805,6 +3138,46 @@
             <div class="modal-buttons">
                 <button class="btn-secondary" onclick="hideDiscrepancyModal()">Cancel</button>
                 <button class="btn-cancel" onclick="proceedWithDatabaseSave()">Yes, Save Anyway</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Database Save Success Modal -->
+    <div id="saveSuccessModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="saveSuccessTitle">✅ Certificate Saved</h3>
+            <p id="saveSuccessMessage">The certificate has been saved to the database.</p>
+            <div id="saveSuccessDetails"></div>
+            <div class="modal-buttons">
+                <button class="btn-database" onclick="hideSaveSuccessModal()">OK</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Database Save Error Modal -->
+    <div id="saveErrorModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="saveErrorTitle">❌ Save Failed</h3>
+            <p id="saveErrorMessage">An error occurred while saving to the database.</p>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideSaveErrorModal()">OK</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Duplicate Certificate Warning Modal -->
+    <div id="duplicateCertModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>⚠️ Certificate Already Exists</h3>
+            <p style="color: #e74c3c; font-weight: 600;">A certificate with this number already exists in the database.</p>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <p style="margin: 0.25rem 0;"><strong>Certificate Number:</strong> <span id="duplicateCertNumber"></span></p>
+                <p style="margin: 0.25rem 0;"><strong>Status:</strong> <span id="duplicateCertStatus"></span></p>
+                <p style="margin: 0.25rem 0;"><strong>Company:</strong> <span id="duplicateCertCompany"></span></p>
+            </div>
+            <p>Please change the certificate number before saving, or view the existing certificate in the Database View tab.</p>
+            <div class="modal-buttons">
+                <button class="btn-edit" onclick="hideDuplicateCertModal()">OK, I'll Change It</button>
             </div>
         </div>
     </div>

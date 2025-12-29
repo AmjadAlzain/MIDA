@@ -208,7 +208,7 @@ async def get_history(
     invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
     start_date: Optional[date] = Query(None, description="Filter from this date"),
     end_date: Optional[date] = Query(None, description="Filter until this date"),
-    limit: int = Query(50, ge=1, le=100, description="Maximum results"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Results to skip"),
     db: Session = Depends(get_db),
 ):
@@ -243,7 +243,7 @@ async def get_history(
 async def get_item_history(
     item_id: UUID,
     port: Optional[ImportPort] = Query(None, description="Filter by port"),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
@@ -288,7 +288,7 @@ async def list_balances(
         None, description="Filter by status (normal, warning, depleted, overdrawn)"
     ),
     hs_code: Optional[str] = Query(None, description="Filter by HS code"),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
@@ -428,7 +428,7 @@ async def get_ports_summary(
 )
 async def get_port_history(
     port: ImportPort,
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):

@@ -2,12 +2,12 @@
 MIDA Certificate CRUD Router.
 
 Provides REST API endpoints for managing MIDA certificates:
-- Create/update drafts
-- Confirm certificates (make read-only)
+- Create/update certificates
 - Retrieve single or list of certificates
 
 All endpoints use transactional database operations.
-Confirmed certificates cannot be modified (returns 409 Conflict).
+Expired certificates cannot be modified (returns 409 Conflict).
+New certificates are saved with 'active' status.
 """
 
 from typing import Optional
@@ -29,11 +29,34 @@ from app.services.mida_certificate_service import (
     confirm_certificate,
     create_or_replace_draft,
     get_certificate_by_id,
+    get_certificate_by_number,
     list_certificates,
     update_draft_by_id,
 )
 
 router = APIRouter()
+
+
+@router.get(
+    "/check/{certificate_number:path}",
+    status_code=status.HTTP_200_OK,
+    summary="Check if certificate number exists",
+    description="Check if a certificate with the given number already exists in the database.",
+)
+async def check_certificate_exists(
+    certificate_number: str,
+    db: Session = Depends(get_db),
+):
+    """Check if a certificate number already exists."""
+    certificate = get_certificate_by_number(db, certificate_number)
+    if certificate:
+        return {
+            "exists": True,
+            "id": str(certificate.id),
+            "status": certificate.status,
+            "company_name": certificate.company_name,
+        }
+    return {"exists": False}
 
 
 @router.post(
@@ -42,27 +65,25 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     responses={
         201: {"description": "Certificate created"},
-        200: {"description": "Existing draft updated"},
-        409: {"description": "Certificate is confirmed and cannot be modified"},
+        409: {"description": "Certificate with this number already exists"},
     },
-    summary="Create or replace a draft certificate",
+    summary="Create a new certificate",
     description="""
-    Create a new draft certificate or replace an existing draft.
+    Create a new certificate.
 
-    If a certificate with the same certificate_number exists:
-    - If status is 'confirmed': returns 409 Conflict
-    - If status is 'draft': updates header and replaces all items (returns 200)
+    If a certificate with the same certificate_number already exists,
+    returns 409 Conflict - duplicates are not allowed.
 
-    If no certificate exists: creates new draft with items (returns 201).
-
-    All items are replaced atomically - partial updates are not supported.
+    New certificates are created with:
+    - 'active' status if exemption_end_date is None or >= today
+    - 'expired' status if exemption_end_date < today
     """,
 )
 async def create_draft(
     payload: CertificateDraftCreateRequest,
     db: Session = Depends(get_db),
 ):
-    """Create or replace a draft certificate."""
+    """Create or update a certificate."""
     try:
         certificate = create_or_replace_draft(db, payload)
         return certificate
@@ -80,13 +101,13 @@ async def create_draft(
     responses={
         200: {"description": "Certificate updated"},
         404: {"description": "Certificate not found"},
-        409: {"description": "Certificate is confirmed and cannot be modified"},
+        409: {"description": "Certificate is expired and cannot be modified"},
     },
-    summary="Update a draft certificate by ID",
+    summary="Update a certificate by ID",
     description="""
-    Update an existing draft certificate by its UUID.
+    Update an existing certificate by its UUID.
 
-    Only draft certificates can be updated. Confirmed certificates are read-only.
+    Only active certificates can be updated. Expired certificates are read-only.
     All items are replaced (delete existing, insert new) atomically.
     """,
 )
@@ -95,7 +116,7 @@ async def update_draft(
     payload: CertificateDraftUpdateRequest,
     db: Session = Depends(get_db),
 ):
-    """Update an existing draft certificate."""
+    """Update an existing certificate."""
     try:
         certificate = update_draft_by_id(db, certificate_id, payload)
         return certificate
@@ -116,24 +137,24 @@ async def update_draft(
     response_model=CertificateRead,
     status_code=status.HTTP_200_OK,
     responses={
-        200: {"description": "Certificate confirmed (or already confirmed)"},
+        200: {"description": "Certificate marked as expired (or already expired)"},
         404: {"description": "Certificate not found"},
     },
-    summary="Confirm a certificate",
+    summary="Mark a certificate as expired",
     description="""
-    Confirm a certificate, making it read-only.
+    Mark a certificate as expired, making it read-only.
 
-    This operation is idempotent - if the certificate is already confirmed,
+    This operation is idempotent - if the certificate is already expired,
     it returns success without error.
 
-    Once confirmed, a certificate cannot be modified via update endpoints.
+    Once expired, a certificate cannot be modified via update endpoints.
     """,
 )
 async def confirm(
     certificate_id: UUID,
     db: Session = Depends(get_db),
 ):
-    """Confirm a certificate (makes it read-only)."""
+    """Mark a certificate as expired (makes it read-only)."""
     try:
         certificate = confirm_certificate(db, certificate_id)
         return certificate
@@ -193,7 +214,7 @@ async def get_certificates(
     status_filter: Optional[str] = Query(
         None, alias="status", description="Filter by status ('draft' or 'confirmed')"
     ),
-    limit: int = Query(50, ge=1, le=100, description="Maximum results per page"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum results per page"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
     db: Session = Depends(get_db),
 ):

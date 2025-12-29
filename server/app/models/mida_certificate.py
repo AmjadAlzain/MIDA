@@ -33,8 +33,8 @@ if TYPE_CHECKING:
 class CertificateStatus(str, enum.Enum):
     """Status of a MIDA certificate."""
 
-    draft = "draft"
-    confirmed = "confirmed"
+    active = "active"
+    expired = "expired"
 
 
 class QuantityStatus(str, enum.Enum):
@@ -66,7 +66,7 @@ class MidaCertificate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     exemption_start_date: Mapped[Optional[date]] = mapped_column(nullable=True)
     exemption_end_date: Mapped[Optional[date]] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=CertificateStatus.draft.value
+        String(20), nullable=False, default=CertificateStatus.active.value
     )
     source_filename: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     raw_ocr_json: Mapped[Optional[dict[str, Any]]] = mapped_column(

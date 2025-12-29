@@ -7,7 +7,7 @@ All database writes are transactional - either all changes succeed or none do.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -57,51 +57,42 @@ def create_or_replace_draft(
     db: Session, payload: CertificateDraftCreateRequest
 ) -> MidaCertificate:
     """
-    Create a new draft certificate or replace an existing draft.
+    Create a new certificate.
 
-    If certificate exists by certificate_number:
-    - If status is 'confirmed': raises CertificateConflictError (409)
-    - If status is 'draft': updates header fields and replaces items
+    If a certificate with the same certificate_number already exists,
+    raises CertificateConflictError (409) - duplicates are not allowed.
 
-    If certificate does not exist: creates new draft with items.
+    New certificates are created with:
+    - 'active' status if exemption_end_date is None or >= today
+    - 'expired' status if exemption_end_date < today
 
-    All operations are transactional - items are replaced atomically.
+    All operations are transactional - items are created atomically.
 
     Args:
         db: Database session
         payload: Certificate data with header, items, and optional raw_ocr_json
 
     Returns:
-        The created or updated MidaCertificate with items
+        The created MidaCertificate with items
 
     Raises:
-        CertificateConflictError: If trying to update a confirmed certificate
+        CertificateConflictError: If a certificate with the same number already exists
     """
     existing = repo.get_certificate_by_number(db, payload.header.certificate_number)
 
     if existing:
-        # Cannot modify confirmed certificates
-        if existing.status == CertificateStatus.confirmed.value:
-            raise CertificateConflictError(
-                f"Certificate '{payload.header.certificate_number}' is confirmed and cannot be modified"
-            )
+        # Cannot create duplicate certificates - reject with conflict error
+        raise CertificateConflictError(
+            f"Certificate '{payload.header.certificate_number}' already exists in the database. "
+            f"Duplicate certificates are not allowed."
+        )
 
-        # Update header fields
-        existing.company_name = payload.header.company_name
-        existing.exemption_start_date = payload.header.exemption_start_date
-        existing.exemption_end_date = payload.header.exemption_end_date
-        existing.source_filename = payload.header.source_filename
-        if payload.raw_ocr_json is not None:
-            existing.raw_ocr_json = payload.raw_ocr_json
-        existing.updated_at = datetime.now(timezone.utc)
-
-        # Replace items atomically
-        new_items = [_build_item_model(item, existing.id) for item in payload.items]
-        repo.replace_items(db, existing.id, new_items)
-
-        db.commit()
-        db.refresh(existing)
-        return existing
+    # Determine status based on exemption_end_date
+    today = date.today()
+    if payload.header.exemption_end_date and payload.header.exemption_end_date < today:
+        status = CertificateStatus.expired.value
+    else:
+        status = CertificateStatus.active.value
 
     # Create new certificate
     certificate = MidaCertificate(
@@ -109,7 +100,7 @@ def create_or_replace_draft(
         company_name=payload.header.company_name,
         exemption_start_date=payload.header.exemption_start_date,
         exemption_end_date=payload.header.exemption_end_date,
-        status=CertificateStatus.draft.value,
+        status=status,
         source_filename=payload.header.source_filename,
         raw_ocr_json=payload.raw_ocr_json,
     )
@@ -139,9 +130,9 @@ def update_draft_by_id(
     db: Session, certificate_id: UUID, payload: CertificateDraftUpdateRequest
 ) -> MidaCertificate:
     """
-    Update an existing draft certificate by ID.
+    Update an existing certificate by ID.
 
-    Only draft certificates can be updated. Confirmed certificates are read-only.
+    Only active certificates can be updated. Expired certificates are read-only.
     All items are replaced (delete existing, insert new) atomically.
 
     Args:
@@ -154,16 +145,16 @@ def update_draft_by_id(
 
     Raises:
         CertificateNotFoundError: If certificate not found
-        CertificateConflictError: If certificate is confirmed
+        CertificateConflictError: If certificate is expired
     """
     certificate = repo.get_certificate_by_id(db, certificate_id)
 
     if certificate is None:
         raise CertificateNotFoundError(f"Certificate with id '{certificate_id}' not found")
 
-    if certificate.status == CertificateStatus.confirmed.value:
+    if certificate.status == CertificateStatus.expired.value:
         raise CertificateConflictError(
-            f"Certificate '{certificate.certificate_number}' is confirmed and cannot be modified"
+            f"Certificate '{certificate.certificate_number}' is expired and cannot be modified"
         )
 
     # Update header fields
@@ -185,16 +176,16 @@ def update_draft_by_id(
 
 def confirm_certificate(db: Session, certificate_id: UUID) -> MidaCertificate:
     """
-    Confirm a certificate, making it read-only.
+    Mark a certificate as expired, making it read-only.
 
-    Behavior: Idempotent - if already confirmed, returns success without error.
+    Behavior: Idempotent - if already expired, returns success without error.
 
     Args:
         db: Database session
-        certificate_id: UUID of the certificate to confirm
+        certificate_id: UUID of the certificate to expire
 
     Returns:
-        The confirmed MidaCertificate
+        The expired MidaCertificate
 
     Raises:
         CertificateNotFoundError: If certificate not found
@@ -204,12 +195,12 @@ def confirm_certificate(db: Session, certificate_id: UUID) -> MidaCertificate:
     if certificate is None:
         raise CertificateNotFoundError(f"Certificate with id '{certificate_id}' not found")
 
-    # Idempotent: if already confirmed, just return it
-    if certificate.status == CertificateStatus.confirmed.value:
+    # Idempotent: if already expired, just return it
+    if certificate.status == CertificateStatus.expired.value:
         return certificate
 
-    # Update status to confirmed
-    certificate.status = CertificateStatus.confirmed.value
+    # Update status to expired
+    certificate.status = CertificateStatus.expired.value
     certificate.updated_at = datetime.now(timezone.utc)
 
     db.commit()
@@ -231,6 +222,20 @@ def get_certificate_by_id(db: Session, certificate_id: UUID) -> Optional[MidaCer
     return repo.get_certificate_by_id(db, certificate_id)
 
 
+def get_certificate_by_number(db: Session, certificate_number: str) -> Optional[MidaCertificate]:
+    """
+    Get a certificate by its certificate number.
+
+    Args:
+        db: Database session
+        certificate_number: The certificate number to look up
+
+    Returns:
+        MidaCertificate if found, None otherwise
+    """
+    return repo.get_certificate_by_number(db, certificate_number)
+
+
 def list_certificates(
     db: Session,
     certificate_number: Optional[str] = None,
@@ -244,7 +249,7 @@ def list_certificates(
     Args:
         db: Database session
         certificate_number: Filter by certificate number (partial match)
-        status: Filter by status ('draft' or 'confirmed')
+        status: Filter by status ('active' or 'expired')
         limit: Maximum number of results (default 50, max 100)
         offset: Number of results to skip
 
