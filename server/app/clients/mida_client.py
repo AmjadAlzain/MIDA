@@ -308,7 +308,7 @@ class MidaClient:
                 "/api/mida/certificates",
                 params={
                     "certificate_number": cert_num,
-                    "status": "confirmed",
+                    "status": "active",  # Look for active certificates
                     "limit": 1,
                 },
             )

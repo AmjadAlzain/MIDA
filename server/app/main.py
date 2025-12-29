@@ -2,11 +2,12 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+import traceback
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_settings
 from app.logging_config import setup_logging, get_logger
@@ -54,6 +55,28 @@ app.include_router(mida_certificate.router, prefix="/api/mida/certificate", tags
 app.include_router(mida_certificates.router, prefix="/api/mida/certificates", tags=["mida-crud"])
 app.include_router(mida_imports.router, prefix="/api/mida/imports", tags=["mida-imports"])
 app.include_router(convert.router, prefix="/api", tags=["convert"])
+
+
+# Global exception handler to ensure JSON responses for all errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Handle all unhandled exceptions and return JSON error response."""
+    logger.error(
+        f"Unhandled exception: {exc}",
+        extra={
+            "path": request.url.path,
+            "method": request.method,
+            "traceback": traceback.format_exc(),
+        }
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc),
+            "type": type(exc).__name__,
+        }
+    )
+
 
 # Serve static files from web directory (for local development)
 WEB_DIR = Path(__file__).parent.parent.parent / "web"

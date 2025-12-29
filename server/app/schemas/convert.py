@@ -75,6 +75,7 @@ class MidaMatchedItem(InvoiceItemBase):
     Extends InvoiceItemBase with MIDA-specific matching information.
     """
 
+    mida_item_id: Optional[str] = Field(default=None, description="UUID of the matched MIDA certificate item")
     mida_line_no: int = Field(..., description="Matching MIDA certificate line number")
     mida_hs_code: str = Field(..., description="HS code from MIDA certificate")
     mida_item_name: str = Field(..., description="Item name from MIDA certificate")
@@ -187,3 +188,25 @@ class ConvertErrorDetail(BaseModel):
     error: str = Field(..., description="Error type identifier")
     detail: str = Field(..., description="Human-readable error message")
     field: Optional[str] = Field(default=None, description="Field that caused the error")
+
+
+class MidaExportItem(BaseModel):
+    """Item for MIDA K1 export - uses MIDA certificate HS code instead of invoice HS code."""
+
+    hs_code: str = Field(..., description="HS code from MIDA certificate")
+    description: str = Field(..., description="Item description")
+    quantity: Decimal = Field(..., ge=0, description="Invoice quantity")
+    uom: str = Field(default="UNT", description="Unit of measure")
+    amount: Optional[Decimal] = Field(default=None, description="Amount in USD")
+    net_weight_kg: Optional[Decimal] = Field(default=None, description="Net weight in KG")
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class MidaExportRequest(BaseModel):
+    """Request body for MIDA K1 XLS export."""
+
+    items: list[MidaExportItem] = Field(..., min_length=1, description="List of items to export")
+    country: str = Field(default="MY", description="Country of origin code")
+
+    model_config = ConfigDict(str_strip_whitespace=True)

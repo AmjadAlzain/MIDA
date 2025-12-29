@@ -85,7 +85,7 @@ class MidaCertificate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Index("ix_mida_certificates_certificate_number", "certificate_number"),
         Index("ix_mida_certificates_status", "status"),
         CheckConstraint(
-            "status IN ('draft', 'confirmed')",
+            "status IN ('active', 'expired')",
             name="ck_mida_certificates_status",
         ),
     )

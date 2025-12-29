@@ -152,6 +152,7 @@ class MidaItem:
     hs_code: str
     approved_quantity: Decimal
     uom: str
+    item_id: Optional[str] = None  # UUID of the certificate item for database updates
 
     @property
     def remaining_quantity(self) -> Decimal:

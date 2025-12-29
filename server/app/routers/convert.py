@@ -55,21 +55,18 @@ from decimal import Decimal
 from io import BytesIO
 from typing import Any, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
-from app.clients.mida_client import (
-    get_certificate_by_number as fetch_certificate_from_api,
-    MidaCertificateNotFoundError,
-    MidaApiError,
-    MidaClientConfigError,
-    MidaCertificateItem as ApiMidaItem,
-)
+from app.db.session import get_db
+from app.services.mida_certificate_service import get_certificate_by_number as get_cert_from_db
 from app.schemas.convert import (
     ConversionWarning,
     ConvertResponse,
     InvoiceItemBase,
     MatchMode,
+    MidaExportRequest,
     MidaMatchedItem,
     WarningSeverity,
 )
@@ -105,9 +102,9 @@ def _convert_to_matcher_invoice_items(
 
 
 def _convert_to_matcher_mida_items(
-    api_items: list[ApiMidaItem],
+    db_items: list,
 ) -> list[MatcherMidaItem]:
-    """Convert API MidaCertificateItem objects to MatcherMidaItem objects."""
+    """Convert database MidaCertificateItem objects to MatcherMidaItem objects."""
     return [
         MatcherMidaItem(
             line_no=item.line_no,
@@ -115,15 +112,15 @@ def _convert_to_matcher_mida_items(
             hs_code=item.hs_code,
             approved_quantity=item.approved_quantity or Decimal(0),
             uom=item.uom,
+            item_id=str(item.id),  # Pass the certificate item ID as string
         )
-        for item in api_items
+        for item in db_items
     ]
 
 
 def _convert_schema_match_mode(mode: MatchMode) -> MatcherMatchMode:
     """Convert schema MatchMode to matcher MatchMode."""
     return MatcherMatchMode.exact if mode == MatchMode.exact else MatcherMatchMode.fuzzy
-
 
 def _convert_matcher_severity(severity: MatcherWarningSeverity) -> WarningSeverity:
     """Convert matcher WarningSeverity to schema WarningSeverity."""
@@ -181,6 +178,7 @@ async def convert_with_mida(
         le=1.0,
         description="Minimum match score for fuzzy matching (0.0-1.0)",
     ),
+    db: Session = Depends(get_db),
 ) -> ConvertResponse:
     """
     Convert an invoice file with optional MIDA certificate matching.
@@ -358,10 +356,9 @@ async def convert_with_mida(
     # ====================
     certificate_number = mida_certificate_number.strip()
 
-    # Fetch certificate from MIDA API (no direct DB access for portability)
-    try:
-        certificate = fetch_certificate_from_api(certificate_number)
-    except MidaCertificateNotFoundError:
+    # Fetch certificate directly from database (avoids self-calling API timeout)
+    certificate = get_cert_from_db(db, certificate_number)
+    if certificate is None:
         # Return 422 with "Invalid MIDA certificate number" message
         raise HTTPException(
             status_code=422,
@@ -371,18 +368,6 @@ async def convert_with_mida(
                 "field": "mida_certificate_number",
             },
         )
-    except MidaClientConfigError as exc:
-        logger.error("MIDA client not configured: %s", exc)
-        raise HTTPException(
-            status_code=500,
-            detail="MIDA API client not configured. Set MIDA_API_BASE_URL.",
-        ) from exc
-    except MidaApiError as exc:
-        logger.error("MIDA API error: %s (status=%s)", exc.message, exc.status_code)
-        raise HTTPException(
-            status_code=502,
-            detail=f"MIDA API error: {exc.message}",
-        ) from exc
 
     try:
         # Check if certificate has items
@@ -433,6 +418,7 @@ async def convert_with_mida(
                         amount=orig_item.amount,
                         net_weight_kg=orig_item.net_weight_kg,
                         # MIDA matching fields
+                        mida_item_id=match.mida_item.item_id,
                         mida_line_no=match.mida_item.line_no,
                         mida_hs_code=match.mida_item.hs_code,
                         mida_item_name=match.mida_item.item_name,
@@ -597,4 +583,83 @@ async def export_k1_xls(
         raise HTTPException(
             status_code=500,
             detail="K1 export failed due to an unexpected error.",
+        ) from exc
+
+
+@router.post(
+    "/convert/export-mida",
+    summary="Export MIDA matched items to K1 Import XLS",
+    description="""
+Export MIDA matched items to K1 Import XLS format.
+
+**Key Difference from /convert/export:**
+This endpoint uses HS codes from the MIDA certificate, not from the invoice.
+This is required for MIDA exemption declarations where the HS code must
+match the certificate.
+
+The exported XLS file uses the K1 Import Template with:
+- Import Duty Method: Exemption (100%)
+- SST Method: Exemption (100%)
+- Country of Origin: configurable (default: MY)
+- HS Code: From MIDA certificate (not invoice)
+""",
+    responses={
+        200: {"description": "K1 Import XLS file with MIDA HS codes"},
+        422: {"description": "Validation error"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def export_mida_k1_xls(
+    request: MidaExportRequest,
+) -> StreamingResponse:
+    """
+    Export MIDA matched items to K1 Import XLS format.
+
+    This endpoint accepts matched items with MIDA HS codes and generates
+    a K1 Import XLS file for customs declaration.
+
+    Args:
+        request: MidaExportRequest with items and country
+
+    Returns:
+        StreamingResponse with K1 Import XLS file
+
+    Raises:
+        HTTPException 422: If request is invalid
+        HTTPException 500: If unexpected error occurs
+    """
+    # Convert items to dict list for K1 export
+    items_for_export = [
+        {
+            "hs_code": item.hs_code,
+            "description": item.description,
+            "quantity": item.quantity,
+            "uom": item.uom,
+            "amount": item.amount,
+            "net_weight_kg": item.net_weight_kg,
+        }
+        for item in request.items
+    ]
+
+    try:
+        # Generate K1 XLS
+        xls_bytes = generate_k1_xls(items_for_export, country=request.country)
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        filename = f"mida-k1-import-{timestamp}.xls"
+
+        return StreamingResponse(
+            BytesIO(xls_bytes),
+            media_type="application/vnd.ms-excel",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+    except Exception as exc:
+        logger.error("MIDA K1 export failed: %s", exc)
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail="MIDA K1 export failed due to an unexpected error.",
         ) from exc
