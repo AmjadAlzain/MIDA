@@ -15,3 +15,6 @@ node_modules/
 
 # OCR sample templates (do not commit)
 Templates/
+
+# Allow server templates (K1 export template)
+!server/templates/

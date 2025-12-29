@@ -982,6 +982,80 @@
                         <button id="viewFullBtn" class="toggle-btn" onclick="switchToFullView()">
                             📄 All Items (incl. FORM-D & Total)
                         </button>
+                        <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+                            <label for="countrySelect" style="font-weight: 600; color: #555;">Country:</label>
+                            <select id="countrySelect" style="padding: 0.4rem 0.6rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;">
+                                <option value="AF">Afghanistan (AF)</option>
+                                <option value="AL">Albania (AL)</option>
+                                <option value="DZ">Algeria (DZ)</option>
+                                <option value="AR">Argentina (AR)</option>
+                                <option value="AU">Australia (AU)</option>
+                                <option value="AT">Austria (AT)</option>
+                                <option value="BD">Bangladesh (BD)</option>
+                                <option value="BE">Belgium (BE)</option>
+                                <option value="BR">Brazil (BR)</option>
+                                <option value="BN">Brunei Darussalam (BN)</option>
+                                <option value="KH">Cambodia (KH)</option>
+                                <option value="CA">Canada (CA)</option>
+                                <option value="CN">China (CN)</option>
+                                <option value="CO">Colombia (CO)</option>
+                                <option value="CZ">Czechia (CZ)</option>
+                                <option value="DK">Denmark (DK)</option>
+                                <option value="EG">Egypt (EG)</option>
+                                <option value="FI">Finland (FI)</option>
+                                <option value="FR">France (FR)</option>
+                                <option value="DE">Germany (DE)</option>
+                                <option value="GR">Greece (GR)</option>
+                                <option value="HK">Hong Kong (HK)</option>
+                                <option value="HU">Hungary (HU)</option>
+                                <option value="IN">India (IN)</option>
+                                <option value="ID">Indonesia (ID)</option>
+                                <option value="IR">Iran (IR)</option>
+                                <option value="IQ">Iraq (IQ)</option>
+                                <option value="IE">Ireland (IE)</option>
+                                <option value="IL">Israel (IL)</option>
+                                <option value="IT">Italy (IT)</option>
+                                <option value="JP" selected>Japan (JP)</option>
+                                <option value="JO">Jordan (JO)</option>
+                                <option value="KZ">Kazakhstan (KZ)</option>
+                                <option value="KE">Kenya (KE)</option>
+                                <option value="KR">Korea, Republic of (KR)</option>
+                                <option value="KW">Kuwait (KW)</option>
+                                <option value="LA">Lao PDR (LA)</option>
+                                <option value="LB">Lebanon (LB)</option>
+                                <option value="MY">Malaysia (MY)</option>
+                                <option value="MX">Mexico (MX)</option>
+                                <option value="MM">Myanmar (MM)</option>
+                                <option value="NL">Netherlands (NL)</option>
+                                <option value="NZ">New Zealand (NZ)</option>
+                                <option value="NG">Nigeria (NG)</option>
+                                <option value="NO">Norway (NO)</option>
+                                <option value="PK">Pakistan (PK)</option>
+                                <option value="PH">Philippines (PH)</option>
+                                <option value="PL">Poland (PL)</option>
+                                <option value="PT">Portugal (PT)</option>
+                                <option value="QA">Qatar (QA)</option>
+                                <option value="RO">Romania (RO)</option>
+                                <option value="RU">Russia (RU)</option>
+                                <option value="SA">Saudi Arabia (SA)</option>
+                                <option value="SG">Singapore (SG)</option>
+                                <option value="ZA">South Africa (ZA)</option>
+                                <option value="ES">Spain (ES)</option>
+                                <option value="LK">Sri Lanka (LK)</option>
+                                <option value="SE">Sweden (SE)</option>
+                                <option value="CH">Switzerland (CH)</option>
+                                <option value="TW">Taiwan (TW)</option>
+                                <option value="TH">Thailand (TH)</option>
+                                <option value="TR">Turkey (TR)</option>
+                                <option value="AE">United Arab Emirates (AE)</option>
+                                <option value="GB">United Kingdom (GB)</option>
+                                <option value="US">United States (US)</option>
+                                <option value="VN">Vietnam (VN)</option>
+                            </select>
+                            <button id="exportK1Btn" class="toggle-btn" style="background: #27ae60; color: white; border-color: #27ae60;" onclick="exportK1Xls()">
+                                📥 Export K1 XLS
+                            </button>
+                        </div>
                     </div>
                     <h3 id="itemsTableTitle">📋 Invoice Items with Empty Form Flag (Non-FORM-D)</h3>
                     <div style="overflow-x: auto;">
@@ -1445,6 +1519,70 @@
             } finally {
                 hideElement('converterLoading');
                 document.getElementById('convertBtn').disabled = false;
+            }
+        }
+        
+        // Export K1 XLS
+        async function exportK1Xls() {
+            const fileInput = document.getElementById('invoiceFile');
+            
+            if (!fileInput.files[0]) {
+                showError('Please select an invoice file first.');
+                return;
+            }
+            
+            const exportBtn = document.getElementById('exportK1Btn');
+            const originalText = exportBtn.textContent;
+            exportBtn.disabled = true;
+            exportBtn.textContent = '⏳ Exporting...';
+            
+            const country = document.getElementById('countrySelect').value;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('country', country);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/convert/export`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    const errorDetail = data.detail;
+                    if (typeof errorDetail === 'object') {
+                        showError(errorDetail.detail || 'Export failed');
+                    } else {
+                        showError(errorDetail || 'Export failed');
+                    }
+                    return;
+                }
+                
+                // Download the file
+                const blob = await response.blob();
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'mida-k1-import.xls';
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="(.+)"/);
+                    if (match) filename = match[1];
+                }
+                
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                console.error('Export error:', error);
+                showError('Error exporting K1 XLS: ' + error.message);
+            } finally {
+                exportBtn.disabled = false;
+                exportBtn.textContent = originalText;
             }
         }
         

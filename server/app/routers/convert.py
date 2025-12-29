@@ -50,10 +50,13 @@ from __future__ import annotations
 
 import logging
 import traceback
+from datetime import datetime
 from decimal import Decimal
+from io import BytesIO
 from typing import Any, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.clients.mida_client import (
     get_certificate_by_number as fetch_certificate_from_api,
@@ -78,6 +81,7 @@ from app.services.mida_matcher import (
     WarningSeverity as MatcherWarningSeverity,
     match_items,
 )
+from app.services.k1_export_service import generate_k1_xls
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -479,4 +483,118 @@ async def convert_with_mida(
         raise HTTPException(
             status_code=500,
             detail="Conversion failed due to an unexpected error.",
+        ) from exc
+
+
+@router.post(
+    "/convert/export",
+    summary="Export invoice items to K1 Import XLS",
+    description="""
+Upload an invoice file and export non-FORM-D items to K1 Import XLS format.
+
+The exported XLS file uses the K1 Import Template with:
+- Import Duty Method: Exemption (100%)
+- SST Method: Exemption (100%)
+- Country of Origin: configurable (default: MY)
+
+Only items WITHOUT FORM-D flag are included in the export.
+""",
+    responses={
+        200: {"description": "K1 Import XLS file"},
+        422: {"description": "Validation error (invalid file, etc.)"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def export_k1_xls(
+    file: UploadFile = File(..., description="Invoice file (Excel or CSV)"),
+    country: str = Form(default="MY", description="Country of origin code"),
+) -> StreamingResponse:
+    """
+    Export invoice items to K1 Import XLS format.
+
+    This endpoint processes an uploaded invoice (Excel/CSV), extracts non-FORM-D items,
+    and generates a K1 Import XLS file for customs declaration.
+
+    Args:
+        file: The uploaded invoice file (Excel or CSV format)
+        country: Country of origin code (default: MY)
+
+    Returns:
+        StreamingResponse with K1 Import XLS file
+
+    Raises:
+        HTTPException 422: If file is invalid
+        HTTPException 500: If unexpected error occurs
+    """
+    # Read and validate file
+    data = await file.read()
+    if not data:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": "Uploaded file is empty",
+                "field": "file",
+            },
+        )
+
+    # Parse invoice file (exclude FORM-D items)
+    try:
+        parsed_invoice = parse_invoice_file(data, exclude_form_d_items=True)
+        invoice_items = parsed_invoice.items
+        logger.info(f"Parsed {len(invoice_items)} non-FORM-D items for K1 export")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": str(exc),
+                "field": "file",
+            },
+        ) from exc
+
+    if not invoice_items:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": "No non-FORM-D items found in invoice",
+                "field": "file",
+            },
+        )
+
+    # Convert items to dict list for K1 export
+    items_for_export = [
+        {
+            "hs_code": item.hs_code,
+            "description": item.description,
+            "quantity": item.quantity,
+            "uom": item.uom,
+            "amount": item.amount,
+            "net_weight_kg": item.net_weight_kg,
+        }
+        for item in invoice_items
+    ]
+
+    try:
+        # Generate K1 XLS
+        xls_bytes = generate_k1_xls(items_for_export, country=country)
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        filename = f"mida-k1-import-{timestamp}.xls"
+
+        return StreamingResponse(
+            BytesIO(xls_bytes),
+            media_type="application/vnd.ms-excel",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+    except Exception as exc:
+        logger.error("K1 export failed: %s", exc)
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail="K1 export failed due to an unexpected error.",
         ) from exc
