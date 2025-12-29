@@ -400,12 +400,18 @@ async def convert_with_mida(
             threshold=match_threshold,
         )
 
+        # Build a lookup dict for invoice items by line_no (since line_no may not be sequential)
+        invoice_items_by_line = {item.line_no: item for item in invoice_items}
+
         # Build mida_matched_items output
         mida_matched_items: list[MidaMatchedItem] = []
         for match in matching_result.matches:
             if match.matched and match.mida_item is not None:
-                # Find original invoice item for full details
-                orig_item = invoice_items[match.invoice_item.line_no - 1]  # 0-based index
+                # Find original invoice item by line_no
+                orig_item = invoice_items_by_line.get(match.invoice_item.line_no)
+                if orig_item is None:
+                    logger.warning(f"Invoice item with line_no {match.invoice_item.line_no} not found")
+                    continue
 
                 mida_matched_items.append(
                     MidaMatchedItem(
@@ -443,14 +449,15 @@ async def convert_with_mida(
         # Add warnings for unmatched items
         for match in matching_result.matches:
             if not match.matched:
-                orig_item = invoice_items[match.invoice_item.line_no - 1]
-                warnings.append(
-                    ConversionWarning(
-                        invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
-                        reason="No matching MIDA certificate item found",
-                        severity=WarningSeverity.warning,
+                orig_item = invoice_items_by_line.get(match.invoice_item.line_no)
+                if orig_item:
+                    warnings.append(
+                        ConversionWarning(
+                            invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
+                            reason="No matching MIDA certificate item found",
+                            severity=WarningSeverity.warning,
+                        )
                     )
-                )
 
         return ConvertResponse(
             mida_certificate_number=certificate_number,
