@@ -103,6 +103,7 @@ def make_draft_payload(cert_num: str = None, num_items: int = 2):
         "header": {
             "certificate_number": cert_num,
             "company_name": "Test Company Sdn Bhd",
+            "model_number": "MODEL-001",
             "exemption_start_date": "2024-01-01",
             "exemption_end_date": "2024-12-31",
             "source_filename": "test.pdf"

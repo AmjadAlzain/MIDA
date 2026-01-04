@@ -38,6 +38,12 @@ class CertificateNotFoundError(Exception):
     pass
 
 
+class CertificateRestoreConflictError(Exception):
+    """Raised when attempting to restore a certificate with a conflicting certificate number."""
+
+    pass
+
+
 def _build_item_model(item_in: CertificateItemIn, certificate_id: UUID) -> MidaCertificateItem:
     """Convert a CertificateItemIn schema to a MidaCertificateItem model."""
     return MidaCertificateItem(
@@ -98,6 +104,7 @@ def create_or_replace_draft(
     certificate = MidaCertificate(
         certificate_number=payload.header.certificate_number,
         company_name=payload.header.company_name,
+        model_number=payload.header.model_number,
         exemption_start_date=payload.header.exemption_start_date,
         exemption_end_date=payload.header.exemption_end_date,
         status=status,
@@ -160,6 +167,7 @@ def update_draft_by_id(
     # Update header fields
     certificate.certificate_number = payload.header.certificate_number
     certificate.company_name = payload.header.company_name
+    certificate.model_number = payload.header.model_number
     certificate.exemption_start_date = payload.header.exemption_start_date
     certificate.exemption_end_date = payload.header.exemption_end_date
     certificate.source_filename = payload.header.source_filename
@@ -266,3 +274,143 @@ def list_certificates(
         limit=limit,
         offset=offset,
     )
+
+
+def list_deleted_certificates(
+    db: Session,
+    certificate_number: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[MidaCertificate], int]:
+    """
+    List soft-deleted certificates with optional filters and pagination.
+
+    Args:
+        db: Database session
+        certificate_number: Filter by certificate number (partial match)
+        limit: Maximum number of results (default 50, max 100)
+        offset: Number of results to skip
+
+    Returns:
+        Tuple of (list of deleted certificates, total count)
+    """
+    # Cap limit at 100 for safety
+    limit = min(limit, 100)
+
+    return repo.list_deleted_certificates(
+        db,
+        certificate_number=certificate_number,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def soft_delete_certificate(db: Session, certificate_id: UUID) -> MidaCertificate:
+    """
+    Soft delete a certificate by setting deleted_at timestamp.
+
+    The certificate can be restored later or permanently deleted.
+    Soft-deleted certificates are excluded from MIDA matching.
+
+    Args:
+        db: Database session
+        certificate_id: UUID of the certificate to delete
+
+    Returns:
+        The soft-deleted MidaCertificate
+
+    Raises:
+        CertificateNotFoundError: If certificate not found or already deleted
+    """
+    certificate = repo.soft_delete_certificate(db, certificate_id)
+    
+    if certificate is None:
+        raise CertificateNotFoundError(
+            f"Certificate with id '{certificate_id}' not found or already deleted"
+        )
+    
+    db.commit()
+    db.refresh(certificate)
+    return certificate
+
+
+def restore_certificate(db: Session, certificate_id: UUID) -> MidaCertificate:
+    """
+    Restore a soft-deleted certificate.
+
+    Checks if the certificate number is already in use by an active certificate.
+    If so, raises CertificateRestoreConflictError.
+
+    Args:
+        db: Database session
+        certificate_id: UUID of the certificate to restore
+
+    Returns:
+        The restored MidaCertificate
+
+    Raises:
+        CertificateNotFoundError: If certificate not found or not deleted
+        CertificateRestoreConflictError: If certificate number is already in use
+    """
+    # First get the deleted certificate to check its number
+    deleted_cert = repo.get_certificate_by_id(db, certificate_id, include_deleted=True)
+    
+    if deleted_cert is None:
+        raise CertificateNotFoundError(
+            f"Certificate with id '{certificate_id}' not found"
+        )
+    
+    if deleted_cert.deleted_at is None:
+        raise CertificateNotFoundError(
+            f"Certificate with id '{certificate_id}' is not deleted"
+        )
+    
+    # Check if certificate number is already in use by an active certificate
+    existing = repo.get_certificate_by_number(
+        db, deleted_cert.certificate_number, include_deleted=False
+    )
+    
+    if existing:
+        raise CertificateRestoreConflictError(
+            f"Cannot restore certificate: Certificate number '{deleted_cert.certificate_number}' "
+            f"is already in use by another active certificate"
+        )
+    
+    # Restore the certificate
+    certificate = repo.restore_certificate(db, certificate_id)
+    
+    if certificate is None:
+        raise CertificateNotFoundError(
+            f"Failed to restore certificate with id '{certificate_id}'"
+        )
+    
+    db.commit()
+    db.refresh(certificate)
+    return certificate
+
+
+def permanent_delete_certificate(db: Session, certificate_id: UUID) -> bool:
+    """
+    Permanently delete a certificate from the database.
+
+    This operation cannot be undone. All related items will also be deleted.
+
+    Args:
+        db: Database session
+        certificate_id: UUID of the certificate to delete
+
+    Returns:
+        True if deleted successfully
+
+    Raises:
+        CertificateNotFoundError: If certificate not found
+    """
+    deleted = repo.permanent_delete_certificate(db, certificate_id)
+    
+    if not deleted:
+        raise CertificateNotFoundError(
+            f"Certificate with id '{certificate_id}' not found"
+        )
+    
+    db.commit()
+    return True

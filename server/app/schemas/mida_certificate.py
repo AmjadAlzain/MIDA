@@ -86,6 +86,9 @@ class CertificateHeaderIn(BaseModel):
     company_name: str = Field(
         ..., min_length=1, description="Company name (required, non-empty)"
     )
+    model_number: str = Field(
+        ..., min_length=1, description="Model number (required, non-empty)"
+    )
     exemption_start_date: Optional[date] = Field(
         default=None, description="Exemption period start date"
     )
@@ -201,10 +204,12 @@ class CertificateRead(BaseModel):
     id: UUID
     certificate_number: str
     company_name: str
+    model_number: str
     exemption_start_date: Optional[date] = None
     exemption_end_date: Optional[date] = None
     status: str
     source_filename: Optional[str] = None
+    deleted_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     items: list[CertificateItemRead] = Field(default_factory=list)

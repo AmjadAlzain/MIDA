@@ -684,6 +684,68 @@
             color: #27ae60;
         }
         
+        /* Database Sub-tabs */
+        .db-sub-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 0.5rem;
+        }
+        .db-sub-tab {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            background: #ecf0f1;
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #7f8c8d;
+            transition: all 0.2s ease;
+        }
+        .db-sub-tab:hover {
+            background: #dfe6e9;
+            color: #2c3e50;
+        }
+        .db-sub-tab.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        /* Action Buttons in Tables */
+        .btn-action {
+            padding: 0.3rem 0.6rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin: 0 0.2rem;
+            transition: all 0.2s ease;
+        }
+        .btn-action-delete {
+            background: #fdecea;
+            color: #e74c3c;
+        }
+        .btn-action-delete:hover {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-action-restore {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        .btn-action-restore:hover {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-action-permanent {
+            background: #2c3e50;
+            color: white;
+        }
+        .btn-action-permanent:hover {
+            background: #1a252f;
+        }
+        
         /* Quantity toggle */
         .qty-toggle-container {
             display: flex;
@@ -1175,6 +1237,10 @@
                         <div class="value" id="certCompany" data-field="company_name">-</div>
                     </div>
                     <div class="cert-header-field">
+                        <label>Model Number</label>
+                        <div class="value" id="certModelNumber" data-field="model_number">-</div>
+                    </div>
+                    <div class="cert-header-field">
                         <label>Exemption Start Date</label>
                         <div class="value" id="certStartDate" data-field="exemption_start_date">-</div>
                     </div>
@@ -1256,37 +1322,85 @@
             
             <!-- Certificates View (Level 1) -->
             <div id="certificatesView">
-                <h3>📋 MIDA Certificates</h3>
-                <div style="overflow-x: auto;">
-                    <table id="certificatesTable">
-                        <thead>
-                            <tr>
-                                <th>Certificate Number</th>
-                                <th>Company Name</th>
-                                <th>Start Date</th>
-                                <th>End Date</th>
-                                <th>Status</th>
-                                <th>Items</th>
-                            </tr>
-                        </thead>
-                        <tbody id="certificatesTableBody">
-                        </tbody>
-                    </table>
+                <!-- Sub-tabs for Active/Deleted Certificates -->
+                <div class="db-sub-tabs">
+                    <button class="db-sub-tab active" id="activeCertsTab" onclick="switchDbSubTab('active')">
+                        📋 Active Certificates
+                    </button>
+                    <button class="db-sub-tab" id="deletedCertsTab" onclick="switchDbSubTab('deleted')">
+                        🗑️ Deleted Certificates
+                    </button>
                 </div>
-                <div id="certificatesPagination" class="pagination-container hidden">
-                    <div class="pagination-left">
-                        <div class="pagination-info" id="certificatesPaginationInfo"></div>
-                        <div class="rows-per-page">
-                            <label>Rows per page:</label>
-                            <select id="certificatesPerPageSelect" onchange="changeCertificatesPerPage(this.value)">
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                                <option value="100" selected>100</option>
-                                <option value="200">200</option>
-                            </select>
-                        </div>
+                
+                <!-- Active Certificates Table -->
+                <div id="activeCertificatesSection">
+                    <div style="overflow-x: auto;">
+                        <table id="certificatesTable">
+                            <thead>
+                                <tr>
+                                    <th>Certificate Number</th>
+                                    <th>Company Name</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Status</th>
+                                    <th>Items</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="certificatesTableBody">
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="pagination-controls" id="certificatesPaginationControls"></div>
+                    <div id="certificatesPagination" class="pagination-container hidden">
+                        <div class="pagination-left">
+                            <div class="pagination-info" id="certificatesPaginationInfo"></div>
+                            <div class="rows-per-page">
+                                <label>Rows per page:</label>
+                                <select id="certificatesPerPageSelect" onchange="changeCertificatesPerPage(this.value)">
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100" selected>100</option>
+                                    <option value="200">200</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="pagination-controls" id="certificatesPaginationControls"></div>
+                    </div>
+                </div>
+                
+                <!-- Deleted Certificates Table -->
+                <div id="deletedCertificatesSection" class="hidden">
+                    <div style="overflow-x: auto;">
+                        <table id="deletedCertificatesTable">
+                            <thead>
+                                <tr>
+                                    <th>Certificate Number</th>
+                                    <th>Company Name</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Deleted At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deletedCertificatesTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="deletedCertificatesPagination" class="pagination-container hidden">
+                        <div class="pagination-left">
+                            <div class="pagination-info" id="deletedCertificatesPaginationInfo"></div>
+                            <div class="rows-per-page">
+                                <label>Rows per page:</label>
+                                <select id="deletedCertificatesPerPageSelect" onchange="changeDeletedCertificatesPerPage(this.value)">
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100" selected>100</option>
+                                    <option value="200">200</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="pagination-controls" id="deletedCertificatesPaginationControls"></div>
+                    </div>
                 </div>
             </div>
             
@@ -1305,6 +1419,10 @@
                         <div class="info-card-item">
                             <span class="info-card-label">Company Name</span>
                             <span class="info-card-value" id="infoCertCompany">-</span>
+                        </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Model Number</span>
+                            <span class="info-card-value" id="infoCertModelNumber">-</span>
                         </div>
                         <div class="info-card-item">
                             <span class="info-card-label">Valid Period</span>
@@ -2171,6 +2289,7 @@
             // Populate header fields (note: backend uses mida_no, exemption_start, exemption_end)
             document.getElementById('certNumber').textContent = data.mida_no || '-';
             document.getElementById('certCompany').textContent = data.company_name || '-';
+            document.getElementById('certModelNumber').textContent = '-'; // Model number is user-entered, not from OCR
             
             // Store ISO dates as data attributes and display in DD/MM/YYYY format
             const startDateEl = document.getElementById('certStartDate');
@@ -2243,6 +2362,7 @@
             // Check header fields
             const certNumber = document.getElementById('certNumber').textContent.trim();
             const company = document.getElementById('certCompany').textContent.trim();
+            const modelNumber = document.getElementById('certModelNumber').textContent.trim();
             const startDateEl = document.getElementById('certStartDate');
             const endDateEl = document.getElementById('certEndDate');
             
@@ -2261,6 +2381,7 @@
             // Clear previous header highlighting
             document.getElementById('certNumber').classList.remove('missing-field');
             document.getElementById('certCompany').classList.remove('missing-field');
+            document.getElementById('certModelNumber').classList.remove('missing-field');
             startDateEl.classList.remove('missing-field');
             endDateEl.classList.remove('missing-field');
             
@@ -2272,6 +2393,10 @@
             if (!company || company === '-') {
                 missingItems.push('Company Name is missing');
                 document.getElementById('certCompany').classList.add('missing-field');
+            }
+            if (!modelNumber || modelNumber === '-') {
+                missingItems.push('Model Number is missing');
+                document.getElementById('certModelNumber').classList.add('missing-field');
             }
             if (!startDate) {
                 missingItems.push('Exemption Start Date is missing');
@@ -2421,20 +2546,25 @@
                 originalCertificateData = JSON.parse(JSON.stringify(parsedCertificateData));
             }
             
-            // Handle non-date header fields (certificate number, company name)
+            // Handle non-date header fields (certificate number, company name, model number)
             const certNumberEl = document.getElementById('certNumber');
             const certCompanyEl = document.getElementById('certCompany');
+            const certModelNumberEl = document.getElementById('certModelNumber');
             
             if (isEditMode) {
                 certNumberEl.contentEditable = 'true';
                 certNumberEl.classList.add('editable');
                 certCompanyEl.contentEditable = 'true';
                 certCompanyEl.classList.add('editable');
+                certModelNumberEl.contentEditable = 'true';
+                certModelNumberEl.classList.add('editable');
             } else {
                 certNumberEl.contentEditable = 'false';
                 certNumberEl.classList.remove('editable');
                 certCompanyEl.contentEditable = 'false';
                 certCompanyEl.classList.remove('editable');
+                certModelNumberEl.contentEditable = 'false';
+                certModelNumberEl.classList.remove('editable');
             }
             
             // Handle date fields with date input
@@ -2496,6 +2626,7 @@
             // Collect data from header fields (use backend field names: mida_no, exemption_start, exemption_end)
             parsedCertificateData.mida_no = document.getElementById('certNumber').textContent.trim();
             parsedCertificateData.company_name = document.getElementById('certCompany').textContent.trim();
+            parsedCertificateData.model_number = document.getElementById('certModelNumber').textContent.trim();
             
             // Get dates from date inputs (they return ISO format YYYY-MM-DD)
             const startDateInput = document.getElementById('startDateInput');
@@ -2718,6 +2849,8 @@
             // Get header values
             const certNumber = document.getElementById('certNumber').textContent.trim();
             const company = document.getElementById('certCompany').textContent.trim();
+            let modelNumber = document.getElementById('certModelNumber').textContent.trim();
+            if (modelNumber === '-') modelNumber = '';  // Convert placeholder to empty for validation
             const startDateEl = document.getElementById('certStartDate');
             const endDateEl = document.getElementById('certEndDate');
             
@@ -2766,6 +2899,7 @@
                 header: {
                     certificate_number: certNumber,
                     company_name: company,
+                    model_number: modelNumber,
                     exemption_start_date: startDate,
                     exemption_end_date: endDate,
                     source_filename: sourceFilename,
@@ -3089,7 +3223,7 @@
             if (dbState.certificates.length === 0) {
                 renderEmptyState(
                     'certificatesTableBody',
-                    6,
+                    7,
                     '📋',
                     'No certificates found',
                     'Upload and parse a MIDA certificate to get started.'
@@ -3103,17 +3237,19 @@
                 const row = document.createElement('tr');
                 row.className = 'clickable-row';
                 row.dataset.id = cert.id;
-                row.onclick = () => selectCertificate(cert);
                 
                 const statusBadge = `<span class="status-badge ${cert.status}">${cert.status}</span>`;
                 
                 row.innerHTML = `
-                    <td>${escapeHtml(cert.certificate_number || '-')}</td>
-                    <td>${escapeHtml(cert.company_name || '-')}</td>
-                    <td>${formatDate(cert.exemption_start_date)}</td>
-                    <td>${formatDate(cert.exemption_end_date)}</td>
-                    <td>${statusBadge}</td>
-                    <td>${cert.items?.length || '-'}</td>
+                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${escapeHtml(cert.certificate_number || '-')}</td>
+                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${escapeHtml(cert.company_name || '-')}</td>
+                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${formatDate(cert.exemption_start_date)}</td>
+                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${formatDate(cert.exemption_end_date)}</td>
+                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${statusBadge}</td>
+                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${cert.items?.length || '-'}</td>
+                    <td>
+                        <button class="btn-action btn-action-delete" onclick="event.stopPropagation(); showDeleteCertModal('${cert.id}', '${escapeHtml(cert.certificate_number)}', '${escapeHtml(cert.company_name)}')" title="Delete Certificate">🗑️</button>
+                    </td>
                 `;
                 tbody.appendChild(row);
             });
@@ -3126,6 +3262,7 @@
             // Update info card
             document.getElementById('infoCertNumber').textContent = cert.certificate_number || '-';
             document.getElementById('infoCertCompany').textContent = cert.company_name || '-';
+            document.getElementById('infoCertModelNumber').textContent = cert.model_number || '-';
             document.getElementById('infoCertPeriod').textContent = 
                 `${formatDate(cert.exemption_start_date)} - ${formatDate(cert.exemption_end_date)}`;
             document.getElementById('infoCertStatus').innerHTML = 
@@ -3467,6 +3604,291 @@
                 initDatabaseView();
             }
         };
+        
+        // ==========================================
+        // Deleted Certificates Management
+        // ==========================================
+        
+        // State for deleted certificates
+        let deletedCertificatesState = {
+            certificates: [],
+            page: 1,
+            perPage: 100,
+            total: 0,
+            pendingAction: null,  // { type: 'delete'|'restore'|'permanent', id, certNumber, company }
+        };
+        
+        // Switch between Active and Deleted sub-tabs
+        function switchDbSubTab(tab) {
+            const activeTab = document.getElementById('activeCertsTab');
+            const deletedTab = document.getElementById('deletedCertsTab');
+            const activeSection = document.getElementById('activeCertificatesSection');
+            const deletedSection = document.getElementById('deletedCertificatesSection');
+            
+            if (tab === 'active') {
+                activeTab.classList.add('active');
+                deletedTab.classList.remove('active');
+                showElement('activeCertificatesSection');
+                hideElement('deletedCertificatesSection');
+                loadCertificates(dbState.certificatesPage);
+            } else {
+                activeTab.classList.remove('active');
+                deletedTab.classList.add('active');
+                hideElement('activeCertificatesSection');
+                showElement('deletedCertificatesSection');
+                loadDeletedCertificates(1);
+            }
+        }
+        
+        // Load deleted certificates
+        async function loadDeletedCertificates(page = 1) {
+            deletedCertificatesState.page = page;
+            hideDbError();
+            showElement('dbLoading');
+            
+            try {
+                const offset = (page - 1) * deletedCertificatesState.perPage;
+                const response = await fetch(`${API_BASE}/api/mida/certificates/deleted?limit=${deletedCertificatesState.perPage}&offset=${offset}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                const data = await response.json();
+                deletedCertificatesState.certificates = data.items;
+                deletedCertificatesState.total = data.total;
+                
+                renderDeletedCertificatesTable();
+                renderDeletedCertificatesPagination();
+                
+            } catch (error) {
+                console.error('Error loading deleted certificates:', error);
+                showDbError(error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        function renderDeletedCertificatesTable() {
+            const tbody = document.getElementById('deletedCertificatesTableBody');
+            
+            if (deletedCertificatesState.certificates.length === 0) {
+                renderEmptyState(
+                    'deletedCertificatesTableBody',
+                    6,
+                    '🗑️',
+                    'No deleted certificates',
+                    'Deleted certificates will appear here.'
+                );
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            
+            deletedCertificatesState.certificates.forEach(cert => {
+                const row = document.createElement('tr');
+                row.dataset.id = cert.id;
+                
+                const deletedAt = cert.deleted_at ? new Date(cert.deleted_at).toLocaleString() : '-';
+                
+                row.innerHTML = `
+                    <td>${escapeHtml(cert.certificate_number || '-')}</td>
+                    <td>${escapeHtml(cert.company_name || '-')}</td>
+                    <td>${formatDate(cert.exemption_start_date)}</td>
+                    <td>${formatDate(cert.exemption_end_date)}</td>
+                    <td>${deletedAt}</td>
+                    <td>
+                        <button class="btn-action btn-action-restore" onclick="showRestoreCertModal('${cert.id}', '${escapeHtml(cert.certificate_number)}', '${escapeHtml(cert.company_name)}')" title="Restore Certificate">♻️</button>
+                        <button class="btn-action btn-action-permanent" onclick="showPermanentDeleteCertModal('${cert.id}', '${escapeHtml(cert.certificate_number)}', '${escapeHtml(cert.company_name)}')" title="Permanently Delete">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function renderDeletedCertificatesPagination() {
+            const container = document.getElementById('deletedCertificatesPaginationControls');
+            const info = document.getElementById('deletedCertificatesPaginationInfo');
+            const total = deletedCertificatesState.total;
+            const perPage = deletedCertificatesState.perPage;
+            const page = deletedCertificatesState.page;
+            
+            if (total === 0) {
+                hideElement('deletedCertificatesPagination');
+                return;
+            }
+            
+            showElement('deletedCertificatesPagination');
+            
+            const totalPages = Math.ceil(total / perPage);
+            const start = (page - 1) * perPage + 1;
+            const end = Math.min(page * perPage, total);
+            
+            info.textContent = `Showing ${start}-${end} of ${total} deleted certificates`;
+            
+            let paginationHtml = '';
+            
+            paginationHtml += `<button class="pagination-btn" onclick="loadDeletedCertificates(1)" ${page === 1 ? 'disabled' : ''}>«</button>`;
+            paginationHtml += `<button class="pagination-btn" onclick="loadDeletedCertificates(${page - 1})" ${page === 1 ? 'disabled' : ''}>‹</button>`;
+            
+            const startPage = Math.max(1, page - 2);
+            const endPage = Math.min(totalPages, page + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                paginationHtml += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="loadDeletedCertificates(${i})">${i}</button>`;
+            }
+            
+            paginationHtml += `<button class="pagination-btn" onclick="loadDeletedCertificates(${page + 1})" ${page === totalPages ? 'disabled' : ''}>›</button>`;
+            paginationHtml += `<button class="pagination-btn" onclick="loadDeletedCertificates(${totalPages})" ${page === totalPages ? 'disabled' : ''}>»</button>`;
+            
+            container.innerHTML = paginationHtml;
+        }
+        
+        function changeDeletedCertificatesPerPage(value) {
+            const newValue = parseInt(value);
+            if (newValue === deletedCertificatesState.perPage) return;
+            deletedCertificatesState.perPage = newValue;
+            deletedCertificatesState.page = 1;
+            loadDeletedCertificates(1);
+        }
+        
+        // ==========================================
+        // Delete/Restore/Permanent Delete Modals
+        // ==========================================
+        
+        function showDeleteCertModal(id, certNumber, company) {
+            deletedCertificatesState.pendingAction = { type: 'delete', id, certNumber, company };
+            document.getElementById('deleteCertNumber').textContent = certNumber;
+            document.getElementById('deleteCertCompany').textContent = company;
+            document.getElementById('deleteCertModal').classList.add('active');
+        }
+        
+        function hideDeleteCertModal() {
+            document.getElementById('deleteCertModal').classList.remove('active');
+            deletedCertificatesState.pendingAction = null;
+        }
+        
+        async function confirmDeleteCertificate() {
+            const action = deletedCertificatesState.pendingAction;
+            if (!action || action.type !== 'delete') return;
+            
+            hideDeleteCertModal();
+            showElement('dbLoading');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/mida/certificates/${action.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                // Reload active certificates
+                loadCertificates(dbState.certificatesPage);
+                
+            } catch (error) {
+                console.error('Error deleting certificate:', error);
+                showDbError(error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        function showRestoreCertModal(id, certNumber, company) {
+            deletedCertificatesState.pendingAction = { type: 'restore', id, certNumber, company };
+            document.getElementById('restoreCertNumber').textContent = certNumber;
+            document.getElementById('restoreCertCompany').textContent = company;
+            document.getElementById('restoreCertModal').classList.add('active');
+        }
+        
+        function hideRestoreCertModal() {
+            document.getElementById('restoreCertModal').classList.remove('active');
+            deletedCertificatesState.pendingAction = null;
+        }
+        
+        async function confirmRestoreCertificate() {
+            const action = deletedCertificatesState.pendingAction;
+            if (!action || action.type !== 'restore') return;
+            
+            hideRestoreCertModal();
+            showElement('dbLoading');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/mida/certificates/${action.id}/restore`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    
+                    // Check for conflict (certificate number already in use)
+                    if (response.status === 409) {
+                        hideElement('dbLoading');
+                        document.getElementById('conflictCertNumber').textContent = action.certNumber;
+                        document.getElementById('restoreConflictModal').classList.add('active');
+                        return;
+                    }
+                    
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                // Reload deleted certificates
+                loadDeletedCertificates(deletedCertificatesState.page);
+                
+            } catch (error) {
+                console.error('Error restoring certificate:', error);
+                showDbError(error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        function hideRestoreConflictModal() {
+            document.getElementById('restoreConflictModal').classList.remove('active');
+        }
+        
+        function showPermanentDeleteCertModal(id, certNumber, company) {
+            deletedCertificatesState.pendingAction = { type: 'permanent', id, certNumber, company };
+            document.getElementById('permanentDeleteCertNumber').textContent = certNumber;
+            document.getElementById('permanentDeleteCertCompany').textContent = company;
+            document.getElementById('permanentDeleteCertModal').classList.add('active');
+        }
+        
+        function hidePermanentDeleteCertModal() {
+            document.getElementById('permanentDeleteCertModal').classList.remove('active');
+            deletedCertificatesState.pendingAction = null;
+        }
+        
+        async function confirmPermanentDeleteCertificate() {
+            const action = deletedCertificatesState.pendingAction;
+            if (!action || action.type !== 'permanent') return;
+            
+            hidePermanentDeleteCertModal();
+            showElement('dbLoading');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/mida/certificates/${action.id}/permanent`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                // Reload deleted certificates
+                loadDeletedCertificates(deletedCertificatesState.page);
+                
+            } catch (error) {
+                console.error('Error permanently deleting certificate:', error);
+                showDbError(error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
     </script>
     
     <!-- Confirmation Modal -->
@@ -3555,6 +3977,72 @@
             <p>Please change the certificate number before saving, or view the existing certificate in the Database View tab.</p>
             <div class="modal-buttons">
                 <button class="btn-edit" onclick="hideDuplicateCertModal()">OK, I'll Change It</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Delete Certificate Confirmation Modal -->
+    <div id="deleteCertModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>🗑️ Delete Certificate</h3>
+            <p>Are you sure you want to delete this certificate?</p>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <p style="margin: 0.25rem 0;"><strong>Certificate Number:</strong> <span id="deleteCertNumber"></span></p>
+                <p style="margin: 0.25rem 0;"><strong>Company:</strong> <span id="deleteCertCompany"></span></p>
+            </div>
+            <p style="color: #7f8c8d; font-size: 0.9rem;">The certificate will be moved to Deleted Certificates and can be restored later.</p>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideDeleteCertModal()">Cancel</button>
+                <button class="btn-action btn-action-delete" onclick="confirmDeleteCertificate()">🗑️ Delete</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Restore Certificate Confirmation Modal -->
+    <div id="restoreCertModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>♻️ Restore Certificate</h3>
+            <p>Are you sure you want to restore this certificate?</p>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <p style="margin: 0.25rem 0;"><strong>Certificate Number:</strong> <span id="restoreCertNumber"></span></p>
+                <p style="margin: 0.25rem 0;"><strong>Company:</strong> <span id="restoreCertCompany"></span></p>
+            </div>
+            <p style="color: #7f8c8d; font-size: 0.9rem;">The certificate will be restored to Active Certificates.</p>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideRestoreCertModal()">Cancel</button>
+                <button class="btn-action btn-action-restore" onclick="confirmRestoreCertificate()">♻️ Restore</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Permanent Delete Certificate Confirmation Modal -->
+    <div id="permanentDeleteCertModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>⚠️ Permanently Delete Certificate</h3>
+            <p style="color: #e74c3c; font-weight: 600;">This action cannot be undone!</p>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <p style="margin: 0.25rem 0;"><strong>Certificate Number:</strong> <span id="permanentDeleteCertNumber"></span></p>
+                <p style="margin: 0.25rem 0;"><strong>Company:</strong> <span id="permanentDeleteCertCompany"></span></p>
+            </div>
+            <p>All certificate data including items and import records will be permanently deleted.</p>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hidePermanentDeleteCertModal()">Cancel</button>
+                <button class="btn-action btn-action-permanent" onclick="confirmPermanentDeleteCertificate()">🗑️ Permanently Delete</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Restore Conflict Error Modal -->
+    <div id="restoreConflictModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>⚠️ Cannot Restore Certificate</h3>
+            <p style="color: #e74c3c; font-weight: 600;">The certificate number is already in use.</p>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <p style="margin: 0.25rem 0;"><strong>Certificate Number:</strong> <span id="conflictCertNumber"></span></p>
+            </div>
+            <p>Another active certificate already uses this certificate number. You must delete or rename the active certificate before restoring this one.</p>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideRestoreConflictModal()">OK</button>
             </div>
         </div>
     </div>

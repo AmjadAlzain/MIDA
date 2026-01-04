@@ -1,5 +1,6 @@
 """Repository helpers for MIDA certificates."""
 
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -10,17 +11,28 @@ from app.models.mida_certificate import MidaCertificate, MidaCertificateItem
 
 
 def get_certificate_by_number(
-    db: Session, certificate_number: str
+    db: Session, certificate_number: str, include_deleted: bool = False
 ) -> Optional[MidaCertificate]:
-    """Fetch a certificate by its unique certificate number."""
+    """Fetch a certificate by its unique certificate number.
+    
+    Args:
+        db: Database session
+        certificate_number: The certificate number to look up
+        include_deleted: If True, include soft-deleted certificates
+        
+    Returns:
+        MidaCertificate if found, None otherwise
+    """
     stmt = select(MidaCertificate).where(
         MidaCertificate.certificate_number == certificate_number
     )
+    if not include_deleted:
+        stmt = stmt.where(MidaCertificate.deleted_at.is_(None))
     return db.execute(stmt).scalar_one_or_none()
 
 
 def get_certificate_by_id(
-    db: Session, certificate_id: UUID
+    db: Session, certificate_id: UUID, include_deleted: bool = False
 ) -> Optional[MidaCertificate]:
     """
     Fetch a certificate by its UUID, eagerly loading items.
@@ -28,6 +40,7 @@ def get_certificate_by_id(
     Args:
         db: Database session
         certificate_id: UUID of the certificate
+        include_deleted: If True, include soft-deleted certificates
 
     Returns:
         MidaCertificate with items loaded, or None if not found
@@ -37,6 +50,8 @@ def get_certificate_by_id(
         .options(joinedload(MidaCertificate.items))
         .where(MidaCertificate.id == certificate_id)
     )
+    if not include_deleted:
+        stmt = stmt.where(MidaCertificate.deleted_at.is_(None))
     return db.execute(stmt).unique().scalar_one_or_none()
 
 
@@ -96,6 +111,7 @@ def list_certificates(
     status: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    include_deleted: bool = False,
 ) -> tuple[list[MidaCertificate], int]:
     """
     List certificates with optional filters and pagination.
@@ -106,6 +122,7 @@ def list_certificates(
         status: Filter by status ('draft' or 'confirmed')
         limit: Maximum number of results
         offset: Number of results to skip
+        include_deleted: If True, include soft-deleted certificates
 
     Returns:
         Tuple of (list of certificates with items, total count)
@@ -113,6 +130,11 @@ def list_certificates(
     # Base query
     query = select(MidaCertificate).options(joinedload(MidaCertificate.items))
     count_query = select(func.count(MidaCertificate.id))
+
+    # Filter out deleted certificates by default
+    if not include_deleted:
+        query = query.where(MidaCertificate.deleted_at.is_(None))
+        count_query = count_query.where(MidaCertificate.deleted_at.is_(None))
 
     # Apply filters
     if certificate_number:
@@ -141,3 +163,126 @@ def list_certificates(
     certificates = db.execute(query).unique().scalars().all()
 
     return list(certificates), total
+
+
+def list_deleted_certificates(
+    db: Session,
+    certificate_number: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[MidaCertificate], int]:
+    """
+    List soft-deleted certificates with optional filters and pagination.
+
+    Args:
+        db: Database session
+        certificate_number: Filter by certificate number (partial match, case-insensitive)
+        limit: Maximum number of results
+        offset: Number of results to skip
+
+    Returns:
+        Tuple of (list of deleted certificates with items, total count)
+    """
+    # Base query - only deleted certificates
+    query = select(MidaCertificate).options(joinedload(MidaCertificate.items))
+    count_query = select(func.count(MidaCertificate.id))
+
+    # Only include deleted certificates
+    query = query.where(MidaCertificate.deleted_at.is_not(None))
+    count_query = count_query.where(MidaCertificate.deleted_at.is_not(None))
+
+    # Apply filters
+    if certificate_number:
+        query = query.where(
+            MidaCertificate.certificate_number.ilike(f"%{certificate_number}%")
+        )
+        count_query = count_query.where(
+            MidaCertificate.certificate_number.ilike(f"%{certificate_number}%")
+        )
+
+    # Get total count
+    total = db.execute(count_query).scalar() or 0
+
+    # Apply pagination and ordering (most recently deleted first)
+    query = (
+        query.order_by(MidaCertificate.deleted_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+
+    # Execute and return unique results (due to joinedload)
+    certificates = db.execute(query).unique().scalars().all()
+
+    return list(certificates), total
+
+
+def soft_delete_certificate(db: Session, certificate_id: UUID) -> Optional[MidaCertificate]:
+    """
+    Soft delete a certificate by setting deleted_at timestamp.
+
+    Args:
+        db: Database session
+        certificate_id: UUID of the certificate to delete
+
+    Returns:
+        The soft-deleted MidaCertificate, or None if not found
+    """
+    certificate = get_certificate_by_id(db, certificate_id, include_deleted=False)
+    if certificate is None:
+        return None
+    
+    certificate.deleted_at = datetime.now(timezone.utc)
+    db.flush()
+    return certificate
+
+
+def restore_certificate(db: Session, certificate_id: UUID) -> Optional[MidaCertificate]:
+    """
+    Restore a soft-deleted certificate by clearing deleted_at.
+
+    Args:
+        db: Database session
+        certificate_id: UUID of the certificate to restore
+
+    Returns:
+        The restored MidaCertificate, or None if not found
+    """
+    # Get the deleted certificate
+    stmt = (
+        select(MidaCertificate)
+        .options(joinedload(MidaCertificate.items))
+        .where(
+            MidaCertificate.id == certificate_id,
+            MidaCertificate.deleted_at.is_not(None)
+        )
+    )
+    certificate = db.execute(stmt).unique().scalar_one_or_none()
+    
+    if certificate is None:
+        return None
+    
+    certificate.deleted_at = None
+    db.flush()
+    return certificate
+
+
+def permanent_delete_certificate(db: Session, certificate_id: UUID) -> bool:
+    """
+    Permanently delete a certificate from the database.
+
+    Args:
+        db: Database session
+        certificate_id: UUID of the certificate to delete
+
+    Returns:
+        True if deleted, False if not found
+    """
+    # First check if certificate exists (include deleted)
+    certificate = get_certificate_by_id(db, certificate_id, include_deleted=True)
+    if certificate is None:
+        return False
+    
+    # Delete the certificate (cascade will handle items)
+    db.delete(certificate)
+    db.flush()
+    return True

@@ -60,9 +60,10 @@ class MidaCertificate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "mida_certificates"
 
     certificate_number: Mapped[str] = mapped_column(
-        String(100), unique=True, nullable=False
+        String(100), nullable=False
     )
     company_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    model_number: Mapped[str] = mapped_column(String(100), nullable=False)
     exemption_start_date: Mapped[Optional[date]] = mapped_column(nullable=True)
     exemption_end_date: Mapped[Optional[date]] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(
@@ -71,6 +72,9 @@ class MidaCertificate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     source_filename: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     raw_ocr_json: Mapped[Optional[dict[str, Any]]] = mapped_column(
         JSONB, nullable=True
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     # Relationships

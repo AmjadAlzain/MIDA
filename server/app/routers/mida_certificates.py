@@ -26,11 +26,16 @@ from app.schemas.mida_certificate import (
 from app.services.mida_certificate_service import (
     CertificateConflictError,
     CertificateNotFoundError,
+    CertificateRestoreConflictError,
     confirm_certificate,
     create_or_replace_draft,
     get_certificate_by_id,
     get_certificate_by_number,
     list_certificates,
+    list_deleted_certificates,
+    permanent_delete_certificate,
+    restore_certificate,
+    soft_delete_certificate,
     update_draft_by_id,
 )
 
@@ -166,6 +171,41 @@ async def confirm(
 
 
 @router.get(
+    "/deleted",
+    response_model=CertificateListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List deleted certificates",
+    description="""
+    List soft-deleted certificates with optional filters and pagination.
+
+    These certificates have been deleted but can be restored.
+    Most recently deleted certificates are shown first.
+    """,
+)
+async def get_deleted_certificates(
+    certificate_number: Optional[str] = Query(
+        None, description="Filter by certificate number (partial match)"
+    ),
+    limit: int = Query(50, ge=1, le=200, description="Maximum results per page"),
+    offset: int = Query(0, ge=0, description="Number of results to skip"),
+    db: Session = Depends(get_db),
+):
+    """List soft-deleted certificates."""
+    certificates, total = list_deleted_certificates(
+        db,
+        certificate_number=certificate_number,
+        limit=limit,
+        offset=offset,
+    )
+    return CertificateListResponse(
+        items=certificates,
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get(
     "/{certificate_id}",
     response_model=CertificateRead,
     status_code=status.HTTP_200_OK,
@@ -232,3 +272,112 @@ async def get_certificates(
         limit=limit,
         offset=offset,
     )
+
+
+# ============================================================================
+# Soft Delete / Restore / Permanent Delete Endpoints
+# ============================================================================
+
+@router.delete(
+    "/{certificate_id}",
+    response_model=CertificateRead,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Certificate soft-deleted"},
+        404: {"description": "Certificate not found or already deleted"},
+    },
+    summary="Soft delete a certificate",
+    description="""
+    Soft delete a certificate by setting its deleted_at timestamp.
+
+    The certificate will be excluded from:
+    - Certificate listings (unless viewing deleted certificates)
+    - MIDA invoice matching
+
+    The certificate can be restored later or permanently deleted.
+    """,
+)
+async def delete_certificate(
+    certificate_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Soft delete a certificate."""
+    try:
+        certificate = soft_delete_certificate(db, certificate_id)
+        return certificate
+    except CertificateNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.post(
+    "/{certificate_id}/restore",
+    response_model=CertificateRead,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Certificate restored"},
+        404: {"description": "Certificate not found or not deleted"},
+        409: {"description": "Certificate number already in use by active certificate"},
+    },
+    summary="Restore a soft-deleted certificate",
+    description="""
+    Restore a soft-deleted certificate by clearing its deleted_at timestamp.
+
+    This will fail if:
+    - The certificate is not found
+    - The certificate is not deleted
+    - Another active certificate already uses the same certificate number
+    """,
+)
+async def restore_deleted_certificate(
+    certificate_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Restore a soft-deleted certificate."""
+    try:
+        certificate = restore_certificate(db, certificate_id)
+        return certificate
+    except CertificateNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except CertificateRestoreConflictError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+
+
+@router.delete(
+    "/{certificate_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "Certificate permanently deleted"},
+        404: {"description": "Certificate not found"},
+    },
+    summary="Permanently delete a certificate",
+    description="""
+    Permanently delete a certificate from the database.
+
+    **WARNING**: This action cannot be undone!
+    All related items and import records will also be deleted.
+
+    This can be used for both active and soft-deleted certificates.
+    """,
+)
+async def permanently_delete_certificate(
+    certificate_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Permanently delete a certificate."""
+    try:
+        permanent_delete_certificate(db, certificate_id)
+        return None
+    except CertificateNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
