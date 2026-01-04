@@ -971,27 +971,35 @@
     <div id="converter-tab" class="tab-content active">
         <div class="container">
             <h2>📄 Invoice to MIDA Converter</h2>
-            <p>Upload an invoice file (Excel .xls or .xlsx) and optionally match against a MIDA certificate.</p>
+            <p>Upload an invoice file (Excel .xls or .xlsx) and match against MIDA certificates.</p>
             
             <div class="form-group">
                 <label for="invoiceFile">Invoice File</label>
                 <input type="file" id="invoiceFile" accept=".xls,.xlsx">
             </div>
             
-            <div class="form-group">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="midaMode" onchange="toggleMidaMode()">
-                    <label for="midaMode" style="display: inline; margin-bottom: 0;">Enable MIDA Matching Mode</label>
-                </div>
-            </div>
-            
-            <div id="midaOptions" class="hidden">
+            <!-- MIDA Certificate Selection (always visible) -->
+            <div id="midaOptions">
                 <div class="form-group">
-                    <label for="midaCertNumber">MIDA Certificate Number</label>
-                    <select id="midaCertNumber" style="width: 100%; padding: 0.6rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 1rem;">
-                        <option value="">-- Select Certificate --</option>
+                    <label for="companySelect">Company</label>
+                    <select id="companySelect" style="width: 100%; padding: 0.6rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 1rem;" onchange="loadCertificatesForCompany()">
+                        <option value="">-- Select Company --</option>
                     </select>
+                    <small id="companyLoadingText" class="hidden">⏳ Loading companies...</small>
+                </div>
+                
+                <div class="form-group" id="certificateListSection" class="hidden">
+                    <label>MIDA Certificates (select one or more)</label>
+                    <div id="certificateSearchBox" style="margin-bottom: 0.5rem;">
+                        <input type="text" id="certSearchInput" placeholder="🔍 Search certificates..." 
+                               style="width: 100%; padding: 0.5rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;"
+                               oninput="filterCertificates()">
+                    </div>
+                    <div id="certificateList" style="max-height: 250px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 4px; padding: 0.5rem; background: #fff;">
+                        <p style="color: #7f8c8d; text-align: center; margin: 1rem 0;">Select a company to view certificates</p>
+                    </div>
                     <small id="certLoadingText" class="hidden">⏳ Loading certificates...</small>
+                    <div id="selectedCertsInfo" style="margin-top: 0.5rem; font-size: 0.85rem; color: #2c3e50;"></div>
                 </div>
             </div>
             
@@ -1101,7 +1109,9 @@
                                 <tr>
                                     <th>Line</th>
                                     <th>Invoice Part Name</th>
+                                    <th>Model No</th>
                                     <th>Qty</th>
+                                    <th>Certificate</th>
                                     <th>MIDA Line</th>
                                     <th>MIDA Item</th>
                                     <th>MIDA HS Code</th>
@@ -1567,12 +1577,15 @@
         const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
         
         // Set default import date to today
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             const importDateInput = document.getElementById('importDate');
             if (importDateInput) {
                 const today = new Date().toISOString().split('T')[0];
                 importDateInput.value = today;
             }
+            
+            // Load companies on page load
+            await loadCompanies();
         });
         
         // Tab switching
@@ -1584,83 +1597,175 @@
             document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
         }
         
-        // Toggle MIDA mode options
-        async function toggleMidaMode() {
-            const midaMode = document.getElementById('midaMode').checked;
-            const midaOptions = document.getElementById('midaOptions');
-            const databaseUpdateSection = document.getElementById('databaseUpdateSection');
+        // Store all certificates for the selected company (for filtering)
+        let allCertificatesForCompany = [];
+        
+        // Load companies for the dropdown
+        async function loadCompanies() {
+            const companySelect = document.getElementById('companySelect');
+            const loadingText = document.getElementById('companyLoadingText');
             
-            if (midaMode) {
-                midaOptions.classList.remove('hidden');
-                if (databaseUpdateSection) {
-                    databaseUpdateSection.classList.remove('hidden');
-                    databaseUpdateSection.style.display = 'flex';
+            loadingText.classList.remove('hidden');
+            companySelect.disabled = true;
+            
+            try {
+                const url = `${API_BASE}/api/mida/certificates/companies?status=active`;
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    loadingText.textContent = '❌ Failed to load companies';
+                    return;
                 }
                 
-                // Fetch and populate certificate dropdown
-                await loadMidaCertificates();
-            } else {
-                midaOptions.classList.add('hidden');
-                if (databaseUpdateSection) {
-                    databaseUpdateSection.classList.add('hidden');
-                    databaseUpdateSection.style.display = 'none';
+                const data = await response.json();
+                
+                companySelect.innerHTML = '<option value="">-- Select Company --</option>';
+                
+                if (data.companies && data.companies.length > 0) {
+                    data.companies.forEach(company => {
+                        const option = document.createElement('option');
+                        option.value = company;
+                        option.textContent = company;
+                        companySelect.appendChild(option);
+                    });
+                    loadingText.classList.add('hidden');
+                } else {
+                    loadingText.textContent = '📭 No companies found';
                 }
+                
+            } catch (error) {
+                console.error('Error loading companies:', error);
+                loadingText.textContent = '❌ Error connecting to database';
+            } finally {
+                companySelect.disabled = false;
             }
         }
         
-        // Load certificates from database for MIDA matching dropdown
-        async function loadMidaCertificates() {
-            console.log('loadMidaCertificates called');
-            const certSelect = document.getElementById('midaCertNumber');
+        // Load certificates for the selected company
+        async function loadCertificatesForCompany() {
+            const companySelect = document.getElementById('companySelect');
+            const certificateList = document.getElementById('certificateList');
+            const certificateListSection = document.getElementById('certificateListSection');
             const loadingText = document.getElementById('certLoadingText');
+            const selectedCertsInfo = document.getElementById('selectedCertsInfo');
             
-            console.log('certSelect:', certSelect);
-            console.log('loadingText:', loadingText);
+            const companyName = companySelect.value;
             
-            // Show loading
+            // Clear previous certificates
+            allCertificatesForCompany = [];
+            selectedCertsInfo.innerHTML = '';
+            
+            if (!companyName) {
+                certificateList.innerHTML = '<p style="color: #7f8c8d; text-align: center; margin: 1rem 0;">Select a company to view certificates</p>';
+                certificateListSection.classList.add('hidden');
+                return;
+            }
+            
+            certificateListSection.classList.remove('hidden');
             loadingText.classList.remove('hidden');
-            certSelect.disabled = true;
+            certificateList.innerHTML = '<p style="color: #7f8c8d; text-align: center;">Loading...</p>';
             
             try {
-                const url = `${API_BASE}/api/mida/certificates?limit=100&status=active`;
-                console.log('Fetching certificates from:', url);
+                const url = `${API_BASE}/api/mida/certificates/by-company/${encodeURIComponent(companyName)}?status=active`;
                 const response = await fetch(url);
-                console.log('Response status:', response.status);
                 
                 if (!response.ok) {
-                    console.error('Failed to fetch certificates, status:', response.status);
                     loadingText.textContent = '❌ Failed to load certificates';
                     return;
                 }
                 
                 const data = await response.json();
-                console.log('Certificates data:', data);
                 
-                // Clear existing options (except placeholder)
-                certSelect.innerHTML = '<option value="">-- Select Certificate --</option>';
-                
-                // Add certificate options
-                if (data.items && data.items.length > 0) {
-                    console.log('Found', data.items.length, 'certificates');
-                    data.items.forEach(cert => {
-                        const option = document.createElement('option');
-                        option.value = cert.certificate_number;
-                        option.textContent = `${cert.certificate_number} - ${cert.company_name}`;
-                        option.dataset.certId = cert.id;
-                        certSelect.appendChild(option);
-                    });
+                if (data.certificates && data.certificates.length > 0) {
+                    allCertificatesForCompany = data.certificates;
+                    renderCertificateList(data.certificates);
                     loadingText.classList.add('hidden');
                 } else {
-                    console.log('No certificates found in response');
-                    loadingText.textContent = '📭 No active certificates found';
+                    certificateList.innerHTML = '<p style="color: #7f8c8d; text-align: center; margin: 1rem 0;">No active certificates found for this company</p>';
+                    loadingText.classList.add('hidden');
                 }
                 
             } catch (error) {
                 console.error('Error loading certificates:', error);
                 loadingText.textContent = '❌ Error connecting to database';
-            } finally {
-                certSelect.disabled = false;
+                certificateList.innerHTML = '<p style="color: #e74c3c; text-align: center; margin: 1rem 0;">Error loading certificates</p>';
             }
+        }
+        
+        // Render the certificate checkbox list
+        function renderCertificateList(certificates) {
+            const certificateList = document.getElementById('certificateList');
+            
+            if (!certificates || certificates.length === 0) {
+                certificateList.innerHTML = '<p style="color: #7f8c8d; text-align: center; margin: 1rem 0;">No certificates match your search</p>';
+                return;
+            }
+            
+            let html = '';
+            certificates.forEach(cert => {
+                const expDate = cert.exemption_end_date ? new Date(cert.exemption_end_date).toLocaleDateString() : 'N/A';
+                const isExpiringSoon = cert.exemption_end_date && new Date(cert.exemption_end_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                const expiryClass = isExpiringSoon ? 'color: #e74c3c; font-weight: bold;' : '';
+                
+                html += `
+                    <label style="display: flex; align-items: flex-start; padding: 0.5rem; margin-bottom: 0.25rem; background: #f8f9fa; border-radius: 4px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s;"
+                           onmouseover="this.style.borderColor='#3498db'" onmouseout="this.style.borderColor='transparent'">
+                        <input type="checkbox" class="cert-checkbox" value="${cert.id}" 
+                               data-cert-number="${cert.certificate_number}" 
+                               data-model-number="${cert.model_number || ''}"
+                               data-end-date="${cert.exemption_end_date || ''}"
+                               onchange="updateSelectedCertsInfo()"
+                               style="margin-right: 0.75rem; margin-top: 0.25rem;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #2c3e50;">${escapeHtml(cert.certificate_number)}</div>
+                            <div style="font-size: 0.85rem; color: #666;">
+                                Model: ${escapeHtml(cert.model_number || 'N/A')} | 
+                                Items: ${cert.item_count} | 
+                                <span style="${expiryClass}">Expires: ${expDate}</span>
+                            </div>
+                        </div>
+                    </label>
+                `;
+            });
+            
+            certificateList.innerHTML = html;
+        }
+        
+        // Filter certificates based on search input
+        function filterCertificates() {
+            const searchInput = document.getElementById('certSearchInput').value.toLowerCase();
+            
+            if (!allCertificatesForCompany || allCertificatesForCompany.length === 0) {
+                return;
+            }
+            
+            const filtered = allCertificatesForCompany.filter(cert => {
+                const certNum = (cert.certificate_number || '').toLowerCase();
+                const modelNum = (cert.model_number || '').toLowerCase();
+                return certNum.includes(searchInput) || modelNum.includes(searchInput);
+            });
+            
+            renderCertificateList(filtered);
+        }
+        
+        // Update the selected certificates info display
+        function updateSelectedCertsInfo() {
+            const checkboxes = document.querySelectorAll('.cert-checkbox:checked');
+            const selectedCertsInfo = document.getElementById('selectedCertsInfo');
+            
+            if (checkboxes.length === 0) {
+                selectedCertsInfo.innerHTML = '';
+                return;
+            }
+            
+            const certNumbers = Array.from(checkboxes).map(cb => cb.dataset.certNumber).join(', ');
+            selectedCertsInfo.innerHTML = `<strong>Selected (${checkboxes.length}):</strong> ${certNumbers}`;
+        }
+        
+        // Get selected certificate IDs
+        function getSelectedCertificateIds() {
+            const checkboxes = document.querySelectorAll('.cert-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
         }
         
         // Store matched items data for database update
@@ -1671,14 +1776,14 @@
         
         // Update database with matched import records
         async function updateDatabase() {
-            const certNumber = document.getElementById('midaCertNumber').value.trim();
+            const selectedCertIds = getSelectedCertificateIds();
             const declarationNumber = document.getElementById('declarationNumber').value.trim();
             const importDate = document.getElementById('importDate').value;
             const port = document.getElementById('portSelect').value;
             
             // Validation
-            if (!certNumber) {
-                showError('Please select a MIDA certificate.');
+            if (selectedCertIds.length === 0) {
+                showError('Please select at least one MIDA certificate.');
                 return;
             }
             
@@ -1753,8 +1858,7 @@
         // Convert Invoice
         async function convertInvoice() {
             const fileInput = document.getElementById('invoiceFile');
-            const midaMode = document.getElementById('midaMode').checked;
-            const certNumber = document.getElementById('midaCertNumber').value.trim();
+            const selectedCertIds = getSelectedCertificateIds();
             // Match mode and threshold are developer-controlled defaults
             const matchMode = 'fuzzy';
             const matchThreshold = 0.88;
@@ -1772,8 +1876,11 @@
                 return;
             }
             
-            if (midaMode && !certNumber) {
-                showError('Please select a MIDA certificate from the dropdown.');
+            // Determine if MIDA mode (certificates selected)
+            const midaMode = selectedCertIds.length > 0;
+            
+            if (!midaMode) {
+                showError('Please select at least one MIDA certificate to match against.');
                 return;
             }
             
@@ -1786,12 +1893,11 @@
             formData.append('match_mode', matchMode);
             formData.append('match_threshold', matchThreshold);
             
-            if (midaMode && certNumber) {
-                formData.append('mida_certificate_number', certNumber);
-            }
+            // Use multi-certificate endpoint
+            formData.append('mida_certificate_ids', selectedCertIds.join(','));
             
             try {
-                const response = await fetch(`${API_BASE}/api/convert`, {
+                const response = await fetch(`${API_BASE}/api/convert-multi`, {
                     method: 'POST',
                     body: formData
                 });
@@ -1931,11 +2037,22 @@
             // Raw JSON
             document.getElementById('rawResult').textContent = JSON.stringify(data, null, 2);
             
+            // Show database update section when we have MIDA matched items
+            const databaseUpdateSection = document.getElementById('databaseUpdateSection');
+            
             if (midaMode && data.mida_matched_items && data.mida_matched_items.length > 0) {
-                // Store matched items for database update
+                // Show database update section
+                if (databaseUpdateSection) {
+                    databaseUpdateSection.classList.remove('hidden');
+                    databaseUpdateSection.style.display = 'flex';
+                }
+                
+                // Store matched items for database update (with certificate info for multi-cert)
                 matchedItemsForDatabase = data.mida_matched_items.map(item => ({
                     mida_item_id: item.mida_item_id,
-                    invoice_number: data.mida_certificate_number || 'UNKNOWN',
+                    mida_certificate_id: item.mida_certificate_id,
+                    mida_certificate_number: item.mida_certificate_number,
+                    invoice_number: item.invoice_no || 'UNKNOWN',
                     invoice_line: item.line_no,
                     quantity: parseFloat(item.quantity) || 0,
                     match_score: item.match_score
@@ -1951,9 +2068,15 @@
                     net_weight_kg: item.net_weight_kg ? parseFloat(item.net_weight_kg) : null
                 }));
                 
-                // Display matched items table
+                // Display matched items table (with certificate column for multi-cert)
                 displayMatchedItems(data.mida_matched_items);
             } else if (!midaMode && data.all_invoice_items && data.all_invoice_items.length > 0) {
+                // Hide database update section
+                if (databaseUpdateSection) {
+                    databaseUpdateSection.classList.add('hidden');
+                    databaseUpdateSection.style.display = 'none';
+                }
+                
                 // Clear matched items when not in MIDA mode
                 matchedItemsForDatabase = [];
                 matchedItemsForExport = [];
@@ -1963,14 +2086,19 @@
                 currentViewMode = 'filtered';
                 updateToggleUI();
                 displayAllItems(data.all_invoice_items, false);
+            } else {
+                // No matches - hide database update section
+                if (databaseUpdateSection) {
+                    databaseUpdateSection.classList.add('hidden');
+                    databaseUpdateSection.style.display = 'none';
+                }
+                matchedItemsForDatabase = [];
+                matchedItemsForExport = [];
             }
             
-            // Display warnings (only in full view for normal mode, since filtered view won't match totals)
+            // Display warnings
             if (data.warnings && data.warnings.length > 0) {
-                if (midaMode) {
-                    displayWarnings(data.warnings);
-                }
-                // For normal mode, warnings shown only when switching to full view
+                displayWarnings(data.warnings);
             }
         }
         
@@ -2034,7 +2162,9 @@
                 row.innerHTML = `
                     <td>${item.line_no}</td>
                     <td>${escapeHtml(item.description)}</td>
+                    <td>${escapeHtml(item.model_no || '-')}</td>
                     <td>${item.quantity}</td>
+                    <td><small>${escapeHtml(item.mida_certificate_number || '-')}</small></td>
                     <td>${item.mida_line_no}</td>
                     <td>${escapeHtml(item.mida_item_name)}</td>
                     <td><code>${escapeHtml(item.mida_hs_code)}</code></td>

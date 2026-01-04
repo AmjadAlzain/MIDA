@@ -92,6 +92,7 @@ ITEM_NO_CANDIDATES = ["item", "item no", "itemno", "line", "line no", "lineno", 
 INVOICE_NO_CANDIDATES = ["invoice no", "invoiceno", "invoice", "inv no", "invno"]
 PRODUCT_TITLE_CANDIDATES = ["product title", "producttitle", "product"]
 MODEL_CODE_CANDIDATES = ["model code", "modelcode", "model"]
+MODEL_NO_CANDIDATES = ["model no", "modelno", "model number", "modelnumber", "model code", "modelcode", "model"]
 SPEC_CODE_CANDIDATES = ["spec code", "speccode", "spec"]
 PARTS_NO_CANDIDATES = ["parts no", "partsno", "part no", "partno", "part number", "partnumber"]
 HS_CODE_CANDIDATES = [
@@ -237,6 +238,7 @@ def parse_invoice_file(
     item_no_col = _find_column(columns, ITEM_NO_CANDIDATES)
     invoice_no_col = _find_column(columns, INVOICE_NO_CANDIDATES)
     parts_no_col = _find_column(columns, PARTS_NO_CANDIDATES)
+    model_no_col = _find_column(columns, MODEL_NO_CANDIDATES)
     hs_col = _find_column(columns, HS_CODE_CANDIDATES)
     desc_col = _find_column(columns, DESCRIPTION_CANDIDATES)
     qty_col = _find_column(columns, QUANTITY_CANDIDATES)
@@ -335,6 +337,11 @@ def parse_invoice_file(
         if invoice_no_col:
             invoice_no = str(row.get(invoice_no_col, "") or "").strip()
 
+        # Get model number if available
+        model_no = ""
+        if model_no_col:
+            model_no = str(row.get(model_no_col, "") or "").strip()
+
         items.append(
             InvoiceItemBase(
                 line_no=line_no,
@@ -346,6 +353,7 @@ def parse_invoice_file(
                 net_weight_kg=net_weight,
                 parts_no=parts_no,
                 invoice_no=invoice_no,
+                model_no=model_no,
             )
         )
 

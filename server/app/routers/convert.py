@@ -54,13 +54,17 @@ from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
 from typing import Any, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.services.mida_certificate_service import get_certificate_by_number as get_cert_from_db
+from app.services.mida_certificate_service import (
+    get_certificate_by_number as get_cert_from_db,
+    get_certificates_by_ids,
+)
 from app.schemas.convert import (
     ConversionWarning,
     ConvertResponse,
@@ -77,6 +81,7 @@ from app.services.mida_matcher import (
     MatchMode as MatcherMatchMode,
     WarningSeverity as MatcherWarningSeverity,
     match_items,
+    match_items_multi_certificate,
 )
 from app.services.k1_export_service import generate_k1_xls
 
@@ -96,6 +101,7 @@ def _convert_to_matcher_invoice_items(
             quantity_uom=item.uom,
             net_weight=item.net_weight_kg,
             amount_usd=item.amount,
+            model_no=item.model_no,  # Pass model number for matching
         )
         for item in invoice_items
     ]
@@ -113,6 +119,32 @@ def _convert_to_matcher_mida_items(
             approved_quantity=item.approved_quantity or Decimal(0),
             uom=item.uom,
             item_id=str(item.id),  # Pass the certificate item ID as string
+        )
+        for item in db_items
+    ]
+
+
+def _convert_to_matcher_mida_items_with_cert_info(
+    db_items: list,
+    certificate,
+) -> list[MatcherMidaItem]:
+    """
+    Convert database MidaCertificateItem objects to MatcherMidaItem objects
+    with certificate information for multi-certificate matching.
+    """
+    return [
+        MatcherMidaItem(
+            line_no=item.line_no,
+            item_name=item.item_name,
+            hs_code=item.hs_code,
+            approved_quantity=item.approved_quantity or Decimal(0),
+            uom=item.uom,
+            item_id=str(item.id),
+            certificate_id=str(certificate.id),
+            certificate_number=certificate.certificate_number,
+            certificate_model_number=certificate.model_number,
+            certificate_end_date=certificate.exemption_end_date,
+            remaining_balance=item.remaining_quantity,  # Use actual remaining balance
         )
         for item in db_items
     ]
@@ -472,6 +504,272 @@ async def convert_with_mida(
         raise
     except Exception as exc:
         logger.error("Unexpected error during conversion: %s", exc)
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail="Conversion failed due to an unexpected error.",
+        ) from exc
+
+
+@router.post(
+    "/convert-multi",
+    response_model=ConvertResponse,
+    summary="Convert invoice with multi-certificate MIDA matching",
+    description="""
+Upload an invoice file and match items against MULTIPLE MIDA certificates.
+
+**Matching Rules:**
+1. Items WITHOUT model_no in the invoice CANNOT be matched (user is alerted)
+2. Match by item_name AND certificate's model_number matching invoice's model_no
+3. If same item appears in multiple certificates, pick:
+   a. Certificate with nearest expiration date
+   b. If dates are equal, pick certificate with highest remaining balance
+4. Each MIDA item can only be matched once per certificate
+
+**Returns:**
+- Matched items with certificate info (which certificate each item was matched to)
+- Warnings for items without model numbers
+- Warnings for unmatched items
+- Summary statistics including missing_model_no_count
+
+**Returns 422 if:**
+- No certificate IDs provided
+- No valid certificates found
+- File is not provided or invalid format
+- Required columns are missing from invoice
+""",
+    responses={
+        200: {"description": "Successfully processed invoice with multi-cert matching"},
+        422: {"description": "Validation error"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def convert_with_multi_mida(
+    file: UploadFile = File(..., description="Invoice file (Excel or CSV)"),
+    mida_certificate_ids: str = Form(
+        ...,
+        description="Comma-separated list of MIDA certificate UUIDs to match against",
+    ),
+    match_mode: str = Form(
+        default="fuzzy",
+        description="Matching mode: 'exact' or 'fuzzy'",
+    ),
+    match_threshold: float = Form(
+        default=0.88,
+        ge=0.0,
+        le=1.0,
+        description="Minimum match score for fuzzy matching (0.0-1.0)",
+    ),
+    db: Session = Depends(get_db),
+) -> ConvertResponse:
+    """
+    Convert an invoice file with multi-certificate MIDA matching.
+
+    This endpoint processes an uploaded invoice (Excel/CSV), extracts items,
+    and matches them against multiple selected MIDA certificates using
+    name + model number matching with tie-breaking rules.
+    """
+    # Validate match_mode
+    try:
+        mode = MatchMode(match_mode.lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": f"Invalid match_mode: '{match_mode}'. Must be 'exact' or 'fuzzy'",
+                "field": "match_mode",
+            },
+        )
+
+    # Parse certificate IDs
+    cert_id_strings = [cid.strip() for cid in mida_certificate_ids.split(",") if cid.strip()]
+    if not cert_id_strings:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": "No certificate IDs provided",
+                "field": "mida_certificate_ids",
+            },
+        )
+
+    # Convert to UUIDs
+    try:
+        cert_uuids = [UUID(cid) for cid in cert_id_strings]
+    except ValueError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": f"Invalid certificate ID format: {e}",
+                "field": "mida_certificate_ids",
+            },
+        )
+
+    # Read and validate file
+    data = await file.read()
+    if not data:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": "Uploaded file is empty",
+                "field": "file",
+            },
+        )
+
+    # Parse invoice file
+    try:
+        exclude_form_d_items = True
+        parsed_invoice = parse_invoice_file(data, exclude_form_d_items=exclude_form_d_items)
+        invoice_items = parsed_invoice.items
+        logger.info(f"Parsed {len(invoice_items)} filtered items for multi-cert matching")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": str(exc),
+                "field": "file",
+            },
+        ) from exc
+
+    # Fetch all selected certificates
+    certificates = get_certificates_by_ids(db, cert_uuids)
+    
+    if not certificates:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "VALIDATION",
+                "detail": "No valid certificates found for the provided IDs",
+                "field": "mida_certificate_ids",
+            },
+        )
+
+    try:
+        # Build mida_items_by_cert dict for multi-cert matching
+        mida_items_by_cert: dict[str, list[MatcherMidaItem]] = {}
+        cert_lookup: dict[str, Any] = {}  # For lookup by cert_id
+        
+        for certificate in certificates:
+            cert_id = str(certificate.id)
+            cert_lookup[cert_id] = certificate
+            
+            if certificate.items:
+                mida_items_by_cert[cert_id] = _convert_to_matcher_mida_items_with_cert_info(
+                    certificate.items, certificate
+                )
+            else:
+                mida_items_by_cert[cert_id] = []
+
+        # Convert invoice items
+        matcher_invoice_items = _convert_to_matcher_invoice_items(invoice_items)
+        matcher_mode = _convert_schema_match_mode(mode)
+
+        # Perform multi-certificate matching
+        matching_result = match_items_multi_certificate(
+            invoice_items=matcher_invoice_items,
+            mida_items_by_cert=mida_items_by_cert,
+            mode=matcher_mode,
+            threshold=match_threshold,
+        )
+
+        # Build lookup for invoice items
+        invoice_items_by_line = {item.line_no: item for item in invoice_items}
+
+        # Build mida_matched_items output
+        mida_matched_items: list[MidaMatchedItem] = []
+        for match in matching_result.matches:
+            if match.matched and match.mida_item is not None:
+                orig_item = invoice_items_by_line.get(match.invoice_item.line_no)
+                if orig_item is None:
+                    logger.warning(f"Invoice item with line_no {match.invoice_item.line_no} not found")
+                    continue
+
+                mida_matched_items.append(
+                    MidaMatchedItem(
+                        # Original invoice fields
+                        line_no=orig_item.line_no,
+                        hs_code=orig_item.hs_code,
+                        description=orig_item.description,
+                        quantity=orig_item.quantity,
+                        uom=orig_item.uom,
+                        amount=orig_item.amount,
+                        net_weight_kg=orig_item.net_weight_kg,
+                        model_no=orig_item.model_no,
+                        # MIDA matching fields
+                        mida_item_id=match.mida_item.item_id,
+                        mida_certificate_id=match.certificate_id,
+                        mida_certificate_number=match.certificate_number,
+                        mida_line_no=match.mida_item.line_no,
+                        mida_hs_code=match.mida_item.hs_code,
+                        mida_item_name=match.mida_item.item_name,
+                        remaining_qty=match.remaining_qty,
+                        remaining_uom=match.mida_item.uom,
+                        match_score=round(match.match_score, 4),
+                        approved_qty=match.mida_item.approved_quantity,
+                    )
+                )
+
+        # Convert matcher warnings to schema warnings
+        warnings: list[ConversionWarning] = []
+        
+        # Add warning about missing model numbers if any
+        if matching_result.missing_model_no_count > 0:
+            warnings.append(
+                ConversionWarning(
+                    invoice_item="<summary>",
+                    reason=f"{matching_result.missing_model_no_count} item(s) have no model number and cannot be matched to MIDA certificates",
+                    severity=WarningSeverity.warning,
+                )
+            )
+        
+        # Add individual matcher warnings
+        for warning in matching_result.warnings:
+            warnings.append(
+                ConversionWarning(
+                    invoice_item=warning.invoice_item,
+                    reason=warning.reason,
+                    severity=_convert_matcher_severity(warning.severity),
+                )
+            )
+
+        # Add warnings for unmatched items (excluding those with missing model_no since they're already warned)
+        for match in matching_result.matches:
+            if not match.matched:
+                # Check if this was due to missing model_no
+                has_model_no_warning = any(
+                    w.reason == "Missing model number" for w in match.warnings
+                )
+                if not has_model_no_warning:
+                    orig_item = invoice_items_by_line.get(match.invoice_item.line_no)
+                    if orig_item:
+                        warnings.append(
+                            ConversionWarning(
+                                invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
+                                reason="No matching MIDA certificate item found",
+                                severity=WarningSeverity.warning,
+                            )
+                        )
+
+        # Return certificate numbers as comma-separated for response
+        cert_numbers = ",".join(c.certificate_number for c in certificates)
+        
+        return ConvertResponse(
+            mida_certificate_number=cert_numbers,
+            mida_matched_items=mida_matched_items,
+            warnings=warnings,
+            total_invoice_items=len(invoice_items),
+            matched_item_count=len(mida_matched_items),
+            unmatched_item_count=len(invoice_items) - len(mida_matched_items),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Unexpected error during multi-cert conversion: %s", exc)
         logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,

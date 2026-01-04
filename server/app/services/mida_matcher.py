@@ -43,6 +43,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from difflib import SequenceMatcher
 from enum import Enum
@@ -133,6 +134,7 @@ class InvoiceItem:
     net_weight: Optional[Decimal] = None
     amount_usd: Optional[Decimal] = None
     line_no: Optional[int] = None  # Invoice line number for reference
+    model_no: Optional[str] = None  # Model number for matching
 
     @property
     def effective_quantity(self) -> Decimal:
@@ -153,15 +155,21 @@ class MidaItem:
     approved_quantity: Decimal
     uom: str
     item_id: Optional[str] = None  # UUID of the certificate item for database updates
+    certificate_id: Optional[str] = None  # UUID of the parent certificate
+    certificate_number: Optional[str] = None  # Certificate number for display
+    certificate_model_number: Optional[str] = None  # Model number from the certificate
+    certificate_end_date: Optional[date] = None  # Expiration date for tie-breaking
+    remaining_balance: Optional[Decimal] = None  # Remaining balance for tie-breaking
 
     @property
     def remaining_quantity(self) -> Decimal:
         """
         Get remaining approved quantity.
 
-        TODO: Replace with computed remaining after import deductions.
-        For now, returns approved_quantity as remaining.
+        Uses remaining_balance if set, otherwise approved_quantity.
         """
+        if self.remaining_balance is not None:
+            return self.remaining_balance
         return self.approved_quantity
 
 
@@ -186,6 +194,8 @@ class MatchResult:
     is_exact_match: bool
     remaining_qty: Decimal
     warnings: list[MatchWarning] = field(default_factory=list)
+    certificate_id: Optional[str] = None  # UUID of the matched certificate
+    certificate_number: Optional[str] = None  # Certificate number for display
 
     @property
     def matched(self) -> bool:
@@ -203,6 +213,7 @@ class MatchingResult:
     total_invoice_items: int
     matched_count: int
     unmatched_count: int
+    missing_model_no_count: int = 0  # Items without model number (cannot match)
 
 
 # =============================================================================
@@ -603,4 +614,185 @@ def match_items(
         total_invoice_items=len(invoice_items),
         matched_count=matched_count,
         unmatched_count=len(unmatched),
+    )
+
+
+def match_items_multi_certificate(
+    invoice_items: list[InvoiceItem],
+    mida_items_by_cert: dict[str, list[MidaItem]],
+    mode: MatchMode = MatchMode.fuzzy,
+    threshold: float = 0.75,
+) -> MatchingResult:
+    """
+    Match invoice items against multiple MIDA certificates with name+model matching.
+
+    Matching rules:
+    1. Items WITHOUT model_no in the invoice CANNOT be matched (alert user)
+    2. Match by item_name AND certificate's model_number matching invoice's model_no
+    3. If same item appears in multiple certificates, pick:
+       a. Certificate with nearest expiration date
+       b. If dates are equal, pick certificate with highest remaining balance for that item
+       c. If still tied, pick alphabetically by certificate_number (deterministic)
+    4. Each MIDA item can only be matched once per certificate
+
+    Args:
+        invoice_items: List of invoice items to match
+        mida_items_by_cert: Dict mapping certificate_id to list of MidaItem
+        mode: Matching mode ('exact' or 'fuzzy')
+        threshold: Minimum score for fuzzy matches (0.0-1.0)
+
+    Returns:
+        MatchingResult with matches, unmatched items, and warnings
+    """
+    matches: list[MatchResult] = []
+    unmatched: list[InvoiceItem] = []
+    all_warnings: list[MatchWarning] = []
+    missing_model_no_count = 0
+    
+    # Track used items per certificate to enforce 1-to-1 matching within each cert
+    used_items_by_cert: dict[str, set[int]] = {cert_id: set() for cert_id in mida_items_by_cert}
+    
+    # Track remaining quantities by (cert_id, item_idx) - will be updated as we match
+    remaining_qtys: dict[tuple[str, int], Decimal] = {}
+    for cert_id, mida_items in mida_items_by_cert.items():
+        for idx, item in enumerate(mida_items):
+            remaining_qtys[(cert_id, idx)] = item.remaining_quantity
+
+    for invoice_item in invoice_items:
+        # Rule 1: Items without model_no cannot be matched
+        if not invoice_item.model_no or not invoice_item.model_no.strip():
+            missing_model_no_count += 1
+            unmatched.append(invoice_item)
+            matches.append(
+                MatchResult(
+                    invoice_item=invoice_item,
+                    mida_item=None,
+                    match_score=0.0,
+                    is_exact_match=False,
+                    remaining_qty=Decimal(0),
+                    warnings=[
+                        MatchWarning(
+                            invoice_item=f"Line {invoice_item.line_no}: {invoice_item.item_name[:40]}",
+                            mida_item="",
+                            reason="Missing model number",
+                            severity=WarningSeverity.warning,
+                            details="Invoice item has no model number and cannot be matched to MIDA certificates",
+                        )
+                    ],
+                )
+            )
+            continue
+        
+        norm_invoice_name = normalize(invoice_item.item_name)
+        norm_invoice_model = normalize(invoice_item.model_no)
+        
+        # Find all potential matches across all certificates
+        # Each match is: (cert_id, item_idx, mida_item, score, is_exact)
+        potential_matches: list[tuple[str, int, MidaItem, float, bool]] = []
+        
+        for cert_id, mida_items in mida_items_by_cert.items():
+            for idx, mida_item in enumerate(mida_items):
+                # Skip already-used items in this certificate
+                if idx in used_items_by_cert[cert_id]:
+                    continue
+                
+                # Rule 2: Certificate model_number must match invoice model_no
+                cert_model = mida_item.certificate_model_number or ""
+                norm_cert_model = normalize(cert_model)
+                
+                if not norm_cert_model or norm_invoice_model != norm_cert_model:
+                    continue  # Model number doesn't match
+                
+                norm_mida_name = normalize(mida_item.item_name)
+                
+                if not norm_mida_name:
+                    continue
+                
+                # Check for name match
+                if norm_invoice_name == norm_mida_name:
+                    score = 1.0
+                    is_exact = True
+                elif mode == MatchMode.fuzzy:
+                    score = calculate_similarity(norm_invoice_name, norm_mida_name)
+                    is_exact = False
+                    if score < threshold:
+                        continue  # Below threshold
+                else:
+                    continue  # Exact mode but not an exact match
+                
+                potential_matches.append((cert_id, idx, mida_item, score, is_exact))
+        
+        if not potential_matches:
+            # No match found
+            unmatched.append(invoice_item)
+            matches.append(
+                MatchResult(
+                    invoice_item=invoice_item,
+                    mida_item=None,
+                    match_score=0.0,
+                    is_exact_match=False,
+                    remaining_qty=Decimal(0),
+                    warnings=[],
+                )
+            )
+            continue
+        
+        # Rule 3: Apply tie-breaking for items matching in multiple certificates
+        # Sort by: (score DESC, expiration_date ASC, remaining_balance DESC, cert_number ASC)
+        def sort_key(match_tuple: tuple[str, int, MidaItem, float, bool]):
+            cert_id, item_idx, mida_item, score, is_exact = match_tuple
+            # Get remaining balance for this specific item
+            remaining = remaining_qtys.get((cert_id, item_idx), Decimal(0))
+            # Expiration date: None treated as far future (9999-12-31)
+            exp_date = mida_item.certificate_end_date or date(9999, 12, 31)
+            cert_num = mida_item.certificate_number or ""
+            
+            return (
+                -score,  # Higher score first (negative for ascending sort)
+                exp_date,  # Nearest expiration first
+                -float(remaining),  # Higher remaining balance first
+                cert_num,  # Alphabetical by cert number (deterministic tie-breaker)
+            )
+        
+        potential_matches.sort(key=sort_key)
+        best_cert_id, best_idx, best_mida_item, best_score, best_is_exact = potential_matches[0]
+        
+        # Get remaining quantity for the best match
+        remaining_qty = remaining_qtys[(best_cert_id, best_idx)]
+        
+        # Check for quantity warnings
+        warnings = check_quantity_warnings(invoice_item, best_mida_item, remaining_qty)
+        all_warnings.extend(warnings)
+        
+        # Update remaining quantity
+        if are_uoms_compatible(invoice_item.quantity_uom, best_mida_item.uom):
+            consumed = invoice_item.effective_quantity
+            remaining_qtys[(best_cert_id, best_idx)] = max(Decimal(0), remaining_qty - consumed)
+        
+        # Mark as used in this certificate
+        used_items_by_cert[best_cert_id].add(best_idx)
+        
+        matches.append(
+            MatchResult(
+                invoice_item=invoice_item,
+                mida_item=best_mida_item,
+                match_score=best_score,
+                is_exact_match=best_is_exact,
+                remaining_qty=remaining_qtys[(best_cert_id, best_idx)],
+                warnings=warnings,
+                certificate_id=best_mida_item.certificate_id,
+                certificate_number=best_mida_item.certificate_number,
+            )
+        )
+
+    matched_count = sum(1 for m in matches if m.matched)
+
+    return MatchingResult(
+        matches=matches,
+        unmatched_invoice_items=unmatched,
+        warnings=all_warnings,
+        total_invoice_items=len(invoice_items),
+        matched_count=matched_count,
+        unmatched_count=len(unmatched),
+        missing_model_no_count=missing_model_no_count,
     )

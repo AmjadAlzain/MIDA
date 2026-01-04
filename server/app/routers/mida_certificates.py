@@ -33,6 +33,8 @@ from app.services.mida_certificate_service import (
     get_certificate_by_number,
     list_certificates,
     list_deleted_certificates,
+    list_distinct_companies,
+    list_certificates_by_company,
     permanent_delete_certificate,
     restore_certificate,
     soft_delete_certificate,
@@ -62,6 +64,56 @@ async def check_certificate_exists(
             "company_name": certificate.company_name,
         }
     return {"exists": False}
+
+
+@router.get(
+    "/companies",
+    status_code=status.HTTP_200_OK,
+    summary="List distinct company names",
+    description="Get a list of all distinct company names from active certificates.",
+)
+async def get_companies(
+    status_filter: Optional[str] = Query(
+        None, alias="status", description="Filter by status ('active' or 'expired')"
+    ),
+    db: Session = Depends(get_db),
+):
+    """List distinct company names from certificates."""
+    companies = list_distinct_companies(db, status=status_filter)
+    return {"companies": companies}
+
+
+@router.get(
+    "/by-company/{company_name:path}",
+    status_code=status.HTTP_200_OK,
+    summary="List certificates by company",
+    description="Get all certificates for a specific company.",
+)
+async def get_certificates_by_company(
+    company_name: str,
+    status_filter: Optional[str] = Query(
+        None, alias="status", description="Filter by status ('active' or 'expired')"
+    ),
+    db: Session = Depends(get_db),
+):
+    """List certificates for a specific company."""
+    certificates = list_certificates_by_company(db, company_name, status=status_filter)
+    return {
+        "company_name": company_name,
+        "certificates": [
+            {
+                "id": str(cert.id),
+                "certificate_number": cert.certificate_number,
+                "model_number": cert.model_number,
+                "exemption_start_date": cert.exemption_start_date.isoformat() if cert.exemption_start_date else None,
+                "exemption_end_date": cert.exemption_end_date.isoformat() if cert.exemption_end_date else None,
+                "status": cert.status,
+                "item_count": len(cert.items) if cert.items else 0,
+            }
+            for cert in certificates
+        ],
+        "total": len(certificates),
+    }
 
 
 @router.post(

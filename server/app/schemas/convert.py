@@ -64,6 +64,7 @@ class InvoiceItemBase(BaseModel):
     net_weight_kg: Optional[Decimal] = Field(default=None, description="Net weight in KG")
     parts_no: Optional[str] = Field(default=None, description="Parts number")
     invoice_no: Optional[str] = Field(default=None, description="Invoice number reference")
+    model_no: Optional[str] = Field(default=None, description="Model number (for MIDA matching)")
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -76,6 +77,8 @@ class MidaMatchedItem(InvoiceItemBase):
     """
 
     mida_item_id: Optional[str] = Field(default=None, description="UUID of the matched MIDA certificate item")
+    mida_certificate_id: Optional[str] = Field(default=None, description="UUID of the matched MIDA certificate")
+    mida_certificate_number: Optional[str] = Field(default=None, description="Certificate number of the matched MIDA certificate")
     mida_line_no: int = Field(..., description="Matching MIDA certificate line number")
     mida_hs_code: str = Field(..., description="HS code from MIDA certificate")
     mida_item_name: str = Field(..., description="Item name from MIDA certificate")

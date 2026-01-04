@@ -286,3 +286,98 @@ def permanent_delete_certificate(db: Session, certificate_id: UUID) -> bool:
     db.delete(certificate)
     db.flush()
     return True
+
+
+def list_distinct_companies(
+    db: Session,
+    status: Optional[str] = None,
+) -> list[str]:
+    """
+    List distinct company names from active (non-deleted) certificates.
+
+    Args:
+        db: Database session
+        status: Filter by status ('active' or 'expired')
+
+    Returns:
+        List of distinct company names, sorted alphabetically
+    """
+    query = select(MidaCertificate.company_name).distinct()
+    
+    # Filter out deleted certificates
+    query = query.where(MidaCertificate.deleted_at.is_(None))
+    
+    # Apply status filter if provided
+    if status:
+        query = query.where(MidaCertificate.status == status)
+    
+    # Order alphabetically
+    query = query.order_by(MidaCertificate.company_name)
+    
+    result = db.execute(query).scalars().all()
+    return list(result)
+
+
+def list_certificates_by_company(
+    db: Session,
+    company_name: str,
+    status: Optional[str] = None,
+) -> list[MidaCertificate]:
+    """
+    List certificates for a specific company.
+
+    Args:
+        db: Database session
+        company_name: Company name to filter by
+        status: Filter by status ('active' or 'expired')
+
+    Returns:
+        List of certificates with items for the given company
+    """
+    query = select(MidaCertificate).options(joinedload(MidaCertificate.items))
+    
+    # Filter by company and non-deleted
+    query = query.where(
+        MidaCertificate.company_name == company_name,
+        MidaCertificate.deleted_at.is_(None)
+    )
+    
+    # Apply status filter if provided
+    if status:
+        query = query.where(MidaCertificate.status == status)
+    
+    # Order by certificate number
+    query = query.order_by(MidaCertificate.certificate_number)
+    
+    certificates = db.execute(query).unique().scalars().all()
+    return list(certificates)
+
+
+def get_certificates_by_ids(
+    db: Session,
+    certificate_ids: list[UUID],
+) -> list[MidaCertificate]:
+    """
+    Fetch multiple certificates by their UUIDs, eagerly loading items.
+
+    Args:
+        db: Database session
+        certificate_ids: List of certificate UUIDs
+
+    Returns:
+        List of certificates with items loaded
+    """
+    if not certificate_ids:
+        return []
+    
+    query = (
+        select(MidaCertificate)
+        .options(joinedload(MidaCertificate.items))
+        .where(
+            MidaCertificate.id.in_(certificate_ids),
+            MidaCertificate.deleted_at.is_(None)
+        )
+    )
+    
+    certificates = db.execute(query).unique().scalars().all()
+    return list(certificates)

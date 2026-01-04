@@ -414,3 +414,56 @@ def permanent_delete_certificate(db: Session, certificate_id: UUID) -> bool:
     
     db.commit()
     return True
+
+
+def list_distinct_companies(
+    db: Session,
+    status: Optional[str] = None,
+) -> list[str]:
+    """
+    List distinct company names from active (non-deleted) certificates.
+
+    Args:
+        db: Database session
+        status: Filter by status ('active' or 'expired')
+
+    Returns:
+        List of distinct company names, sorted alphabetically
+    """
+    return repo.list_distinct_companies(db, status=status)
+
+
+def list_certificates_by_company(
+    db: Session,
+    company_name: str,
+    status: Optional[str] = None,
+) -> list[MidaCertificate]:
+    """
+    List certificates for a specific company.
+
+    Args:
+        db: Database session
+        company_name: Company name to filter by
+        status: Filter by status ('active' or 'expired')
+
+    Returns:
+        List of certificates with items for the given company
+    """
+    return repo.list_certificates_by_company(db, company_name, status=status)
+
+
+def get_certificates_by_ids(
+    db: Session,
+    certificate_ids: list[UUID],
+) -> list[MidaCertificate]:
+    """
+    Fetch multiple certificates by their UUIDs, eagerly loading items.
+
+    Args:
+        db: Database session
+        certificate_ids: List of certificate UUIDs
+
+    Returns:
+        List of certificates with items loaded
+    """
+    return repo.get_certificates_by_ids(db, certificate_ids)
