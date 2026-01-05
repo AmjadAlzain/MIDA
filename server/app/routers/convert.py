@@ -31,6 +31,13 @@ MIDA Matching Flow:
    - Items near their MIDA limit (>=90%)
 6. Response includes matched items with MIDA details and all warnings
 
+3-Tab Classification Mode:
+--------------------------
+The /api/convert/classify endpoint provides full classification of invoice items:
+1. Form-D items: Items with Form-D flag (and for HICOM, dual-flagged items)
+2. MIDA items: Items matched to MIDA certificates (and for Hong Leong, dual-flagged items)
+3. Duties Payable items: Items that are neither Form-D nor MIDA matched
+
 Error Handling:
 ---------------
 - 422 Unprocessable Entity if:
@@ -50,7 +57,7 @@ from __future__ import annotations
 
 import logging
 import traceback
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
 from typing import Any, Optional
@@ -66,6 +73,7 @@ from app.services.mida_certificate_service import (
     get_certificates_by_ids,
 )
 from app.repositories.hscode_uom_repo import get_uom_by_hscode, HscodeNotFoundError
+from app.repositories.company_repo import get_all_companies, get_company_by_id
 from app.schemas.convert import (
     ConversionWarning,
     ConvertResponse,
@@ -74,6 +82,14 @@ from app.schemas.convert import (
     MidaExportRequest,
     MidaMatchedItem,
     WarningSeverity,
+)
+from app.schemas.classification import (
+    ClassifiedItem,
+    ClassifyResponse,
+    CompanyOut,
+    ExportType,
+    ItemTable,
+    K1ExportRequest,
 )
 from app.services.mida_matching_service import parse_invoice_file, ParsedInvoice, InvoiceTotals
 from app.services.mida_matcher import (
@@ -84,7 +100,11 @@ from app.services.mida_matcher import (
     match_items,
     match_items_multi_certificate,
 )
-from app.services.k1_export_service import generate_k1_xls
+from app.services.k1_export_service import generate_k1_xls, generate_k1_xls_with_options
+from app.services.invoice_classification_service import (
+    parse_all_invoice_items,
+    classify_items,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1119,4 +1139,340 @@ async def export_mida_k1_xls(
         raise HTTPException(
             status_code=500,
             detail="MIDA K1 export failed due to an unexpected error.",
+        ) from exc
+
+
+# =============================================================================
+# New 3-Tab Classification Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/companies",
+    summary="Get all companies",
+    description="Retrieve list of all companies for the company selection dropdown.",
+    responses={
+        200: {"description": "List of companies"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def list_companies(
+    db: Session = Depends(get_db),
+) -> list[CompanyOut]:
+    """Get all companies from the database."""
+    try:
+        companies = get_all_companies(db)
+        return [CompanyOut.model_validate(c) for c in companies]
+    except Exception as exc:
+        logger.error("Failed to fetch companies: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch companies",
+        ) from exc
+
+
+@router.post(
+    "/convert/classify",
+    response_model=ClassifyResponse,
+    summary="Classify invoice items into Form-D, MIDA, and Duties Payable",
+    description="""
+Upload an invoice file and classify items into 3 categories based on:
+1. Form-D flag in the invoice
+2. MIDA certificate matching (if certificates provided)
+3. Company-specific rules for dual-flagged items
+
+**Classification Rules:**
+- Form-D flag AND NOT MIDA matched → Form-D table
+- NOT Form-D flag AND MIDA matched → MIDA table
+- Form-D flag AND MIDA matched:
+  - HICOM company → Form-D table
+  - Hong Leong company → MIDA table
+- Neither Form-D nor MIDA matched → Duties Payable table
+
+**SST Exemption Defaults:**
+- HICOM: SST ON for all items in all tables
+- Other companies: SST ON only for MIDA items
+
+**Required:** Company must be selected.
+**Optional:** MIDA certificate IDs for matching.
+""",
+    responses={
+        200: {"description": "Successfully classified invoice items"},
+        422: {"description": "Validation error"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def classify_invoice(
+    file: UploadFile = File(..., description="Invoice file (Excel or CSV)"),
+    company_id: str = Form(..., description="Company UUID (mandatory)"),
+    mida_certificate_ids: Optional[str] = Form(
+        default=None,
+        description="Comma-separated list of MIDA certificate UUIDs (optional)",
+    ),
+    country: str = Form(default="JP", description="Country of origin code"),
+    port: str = Form(default="port_klang", description="Import port"),
+    import_date: Optional[str] = Form(default=None, description="Import date (YYYY-MM-DD)"),
+    match_mode: str = Form(default="fuzzy", description="Matching mode: 'exact' or 'fuzzy'"),
+    match_threshold: float = Form(
+        default=0.88, ge=0.0, le=1.0, description="Minimum match score for fuzzy matching"
+    ),
+    db: Session = Depends(get_db),
+) -> ClassifyResponse:
+    """
+    Classify invoice items into Form-D, MIDA, and Duties Payable categories.
+    """
+    # Validate company_id
+    try:
+        company_uuid = UUID(company_id.strip())
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "VALIDATION", "detail": "Invalid company ID format", "field": "company_id"},
+        )
+
+    company = get_company_by_id(db, company_uuid)
+    if not company:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "VALIDATION", "detail": "Company not found", "field": "company_id"},
+        )
+
+    # Validate match_mode
+    try:
+        mode = MatchMode(match_mode.lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "VALIDATION", "detail": f"Invalid match_mode: '{match_mode}'", "field": "match_mode"},
+        )
+
+    # Parse import_date
+    parsed_import_date = None
+    if import_date:
+        try:
+            parsed_import_date = date.fromisoformat(import_date)
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "VALIDATION", "detail": "Invalid import_date format. Use YYYY-MM-DD", "field": "import_date"},
+            )
+
+    # Read and validate file
+    data = await file.read()
+    if not data:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "VALIDATION", "detail": "Uploaded file is empty", "field": "file"},
+        )
+
+    # Parse ALL invoice items (including Form-D flagged)
+    try:
+        invoice_items = parse_all_invoice_items(data)
+        logger.info(f"Parsed {len(invoice_items)} total items for classification")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "VALIDATION", "detail": str(exc), "field": "file"},
+        )
+
+    # Initialize warnings list
+    warnings: list[dict[str, Any]] = []
+
+    # Perform MIDA matching on ALL items if certificate IDs provided
+    mida_matches: dict[int, dict] = {}
+
+    if mida_certificate_ids and mida_certificate_ids.strip():
+        # Parse certificate IDs
+        cert_id_strings = [cid.strip() for cid in mida_certificate_ids.split(",") if cid.strip()]
+        
+        if cert_id_strings:
+            try:
+                cert_uuids = [UUID(cid) for cid in cert_id_strings]
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"error": "VALIDATION", "detail": f"Invalid certificate ID format: {e}", "field": "mida_certificate_ids"},
+                )
+
+            # Fetch certificates
+            certificates = get_certificates_by_ids(db, cert_uuids)
+            
+            if certificates:
+                # Build mida_items_by_cert dict for multi-cert matching
+                mida_items_by_cert: dict[str, list[MatcherMidaItem]] = {}
+                
+                for certificate in certificates:
+                    cert_id = str(certificate.id)
+                    if certificate.items:
+                        mida_items_by_cert[cert_id] = _convert_to_matcher_mida_items_with_cert_info(
+                            certificate.items, certificate
+                        )
+                    else:
+                        mida_items_by_cert[cert_id] = []
+
+                # Convert invoice items to matcher format
+                matcher_invoice_items = [
+                    MatcherInvoiceItem(
+                        line_no=item["line_no"],
+                        item_name=item["description"],
+                        quantity=item["quantity"],
+                        quantity_uom=item["uom"],
+                        net_weight=item.get("net_weight_kg"),
+                        amount_usd=item.get("amount"),
+                        model_no=item.get("model_no"),
+                    )
+                    for item in invoice_items
+                ]
+                
+                matcher_mode = _convert_schema_match_mode(mode)
+
+                # Perform multi-certificate matching
+                matching_result = match_items_multi_certificate(
+                    invoice_items=matcher_invoice_items,
+                    mida_items_by_cert=mida_items_by_cert,
+                    mode=matcher_mode,
+                    threshold=match_threshold,
+                )
+
+                # Build mida_matches dict for classification
+                for match in matching_result.matches:
+                    if match.matched and match.mida_item is not None:
+                        line_no = match.invoice_item.line_no
+                        
+                        # Get invoice item for HSCODE lookup
+                        inv_item = next((i for i in invoice_items if i["line_no"] == line_no), None)
+                        
+                        # Look up HSCODE UOM
+                        hscode_uom = None
+                        deduction_quantity = None
+                        if inv_item:
+                            try:
+                                hscode_uom, deduction_quantity = _get_hscode_uom_and_deduction(
+                                    db,
+                                    match.mida_item.hs_code,
+                                    inv_item["quantity"],
+                                    inv_item.get("net_weight_kg"),
+                                )
+                            except (HscodeNotFoundError, ValueError) as e:
+                                warnings.append({
+                                    "invoice_item": f"Line {line_no}: {inv_item.get('description', '')[:50]}",
+                                    "reason": str(e),
+                                    "severity": "error",
+                                })
+
+                        mida_matches[line_no] = {
+                            "mida_item_id": match.mida_item.item_id,
+                            "mida_certificate_id": match.certificate_id,
+                            "mida_certificate_number": match.certificate_number,
+                            "mida_line_no": match.mida_item.line_no,
+                            "mida_hs_code": match.mida_item.hs_code,
+                            "mida_item_name": match.mida_item.item_name,
+                            "remaining_qty": match.remaining_qty,
+                            "remaining_uom": match.mida_item.uom,
+                            "match_score": round(match.match_score, 4),
+                            "approved_qty": match.mida_item.approved_quantity,
+                            "hscode_uom": hscode_uom,
+                            "deduction_quantity": deduction_quantity,
+                        }
+
+                # Add matcher warnings
+                for warning in matching_result.warnings:
+                    warnings.append({
+                        "invoice_item": warning.invoice_item,
+                        "reason": warning.reason,
+                        "severity": warning.severity.value,
+                    })
+
+    # Classify items into 3 categories
+    form_d_items, mida_items, duties_payable_items = classify_items(
+        invoice_items, company, mida_matches
+    )
+
+    return ClassifyResponse(
+        company=CompanyOut.model_validate(company),
+        country=country,
+        port=port,
+        import_date=parsed_import_date,
+        form_d_items=form_d_items,
+        mida_items=mida_items,
+        duties_payable_items=duties_payable_items,
+        total_items=len(invoice_items),
+        form_d_count=len(form_d_items),
+        mida_count=len(mida_items),
+        duties_payable_count=len(duties_payable_items),
+        warnings=warnings,
+    )
+
+
+@router.post(
+    "/convert/export-classified",
+    summary="Export classified items to K1 Import XLS",
+    description="""
+Export items from any of the 3 classification tables (Form-D, MIDA, Duties Payable) to K1 Import XLS.
+
+**Export Type Settings:**
+- form_d: Import Duty exemption ON (Exemption, E, 100)
+- mida: Import Duty exemption ON (Exemption, E, 100)
+- duties_payable: Import Duty exemption OFF (empty columns)
+
+**SST columns are set per item based on sst_exempted field:**
+- If sst_exempted=True: SSTMethod=Exemption, Method=E, Percentage=100
+- If sst_exempted=False: Empty SST columns
+""",
+    responses={
+        200: {"description": "K1 Import XLS file"},
+        422: {"description": "Validation error"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def export_classified_k1_xls(
+    request: K1ExportRequest,
+) -> StreamingResponse:
+    """
+    Export classified items to K1 Import XLS format.
+
+    This endpoint handles all 3 export types (Form-D, MIDA, Duties Payable)
+    with appropriate duty/SST column settings.
+    """
+    # Convert items to dict list for K1 export
+    items_for_export = [
+        {
+            "hs_code": item.hs_code,
+            "description": item.description,
+            "description2": item.description2,
+            "quantity": item.quantity,
+            "uom": item.uom,
+            "amount": item.amount,
+            "net_weight_kg": item.net_weight_kg,
+            "sst_exempted": item.sst_exempted,
+        }
+        for item in request.items
+    ]
+
+    try:
+        # Generate K1 XLS with options
+        xls_bytes = generate_k1_xls_with_options(
+            items_for_export,
+            export_type=request.export_type.value,
+            country=request.country,
+        )
+
+        # Generate filename with timestamp and export type
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        export_label = request.export_type.value.replace("_", "-")
+        filename = f"k1-{export_label}-{timestamp}.xls"
+
+        return StreamingResponse(
+            BytesIO(xls_bytes),
+            media_type="application/vnd.ms-excel",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+    except Exception as exc:
+        logger.error("K1 export failed: %s", exc)
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail="K1 export failed due to an unexpected error.",
         ) from exc

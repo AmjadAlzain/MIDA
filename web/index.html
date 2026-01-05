@@ -955,6 +955,237 @@
             font-family: 'Consolas', 'Monaco', monospace;
             text-align: right;
         }
+        
+        /* ==========================================
+           3-Tab Classification Styles
+           ========================================== */
+        
+        /* Classification results tabs */
+        .classification-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0;
+            border-bottom: 2px solid #ddd;
+        }
+        .classification-tab {
+            padding: 0.75rem 1.5rem;
+            background: #ecf0f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #7f8c8d;
+            border-radius: 4px 4px 0 0;
+            margin-right: 2px;
+            position: relative;
+        }
+        .classification-tab.active {
+            background: white;
+            color: #3498db;
+            border-bottom: 2px solid white;
+            margin-bottom: -2px;
+        }
+        .classification-tab .tab-count {
+            display: inline-block;
+            background: #7f8c8d;
+            color: white;
+            padding: 0.1rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+        .classification-tab.active .tab-count {
+            background: #3498db;
+        }
+        .classification-tab.form-d.active { color: #9b59b6; }
+        .classification-tab.form-d.active .tab-count { background: #9b59b6; }
+        .classification-tab.mida.active { color: #27ae60; }
+        .classification-tab.mida.active .tab-count { background: #27ae60; }
+        .classification-tab.duties.active { color: #e67e22; }
+        .classification-tab.duties.active .tab-count { background: #e67e22; }
+        
+        .classification-content {
+            display: none;
+            border: 1px solid #ddd;
+            border-top: none;
+            padding: 1rem;
+            background: white;
+        }
+        .classification-content.active {
+            display: block;
+        }
+        
+        /* SST Toggle */
+        .sst-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sst-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .sst-toggle label {
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .sst-toggle.on label {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        .sst-toggle.off label {
+            color: #e74c3c;
+        }
+        
+        /* Modified row highlighting */
+        tr.modified-row {
+            background: #fffacd !important;
+        }
+        tr.modified-row:hover {
+            background: #fff3a0 !important;
+        }
+        
+        /* Move item dropdown */
+        .move-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .move-dropdown-btn {
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0.3rem 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .move-dropdown-btn:hover {
+            background: #f0f0f0;
+        }
+        .move-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            min-width: 180px;
+            z-index: 100;
+        }
+        .move-dropdown-content.show {
+            display: block;
+        }
+        .move-dropdown-item {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .move-dropdown-item:hover {
+            background: #f8f9fa;
+        }
+        .move-dropdown-item.form-d { color: #9b59b6; }
+        .move-dropdown-item.mida { color: #27ae60; }
+        .move-dropdown-item.duties { color: #e67e22; }
+        
+        /* Move dropdown select styling */
+        .move-dropdown select {
+            padding: 0.3rem 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            background: white;
+            min-width: 100px;
+        }
+        .move-dropdown select:hover {
+            border-color: #3498db;
+        }
+        
+        /* Export buttons section */
+        .export-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+        }
+        .export-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .export-btn.form-d {
+            background: #9b59b6;
+            color: white;
+        }
+        .export-btn.form-d:hover { background: #8e44ad; }
+        .export-btn.form-d:disabled { background: #c39bd3; cursor: not-allowed; }
+        .export-btn.mida {
+            background: #27ae60;
+            color: white;
+        }
+        .export-btn.mida:hover { background: #219a52; }
+        .export-btn.mida:disabled { background: #82e0aa; cursor: not-allowed; }
+        .export-btn.duties {
+            background: #e67e22;
+            color: white;
+        }
+        .export-btn.duties:hover { background: #d35400; }
+        .export-btn.duties:disabled { background: #f5b041; cursor: not-allowed; }
+        
+        /* Company mandatory indicator */
+        .required-field::after {
+            content: " *";
+            color: #e74c3c;
+        }
+        
+        /* Stat item styles for classification summary */
+        .stat-item {
+            background: #ecf0f1;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            text-align: center;
+            min-width: 100px;
+        }
+        .stat-item .stat-label {
+            color: #7f8c8d;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .stat-item .stat-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-item.form-d {
+            background: #f5eef8;
+        }
+        .stat-item.form-d .stat-value {
+            color: #9b59b6;
+        }
+        .stat-item.mida {
+            background: #d5f4e6;
+        }
+        .stat-item.mida .stat-value {
+            color: #27ae60;
+        }
+        .stat-item.duties {
+            background: #fef5e7;
+        }
+        .stat-item.duties .stat-value {
+            color: #e67e22;
+        }
     </style>
 </head>
 <body>
@@ -970,8 +1201,8 @@
     <!-- Converter Tab -->
     <div id="converter-tab" class="tab-content active">
         <div class="container">
-            <h2>📄 Invoice to MIDA Converter</h2>
-            <p>Upload an invoice file (Excel .xls or .xlsx) and match against MIDA certificates.</p>
+            <h2>📄 Invoice Converter</h2>
+            <p>Upload an invoice file (Excel .xls or .xlsx), select a company, and classify items into Form-D, MIDA, and Duties Payable categories.</p>
             
             <div class="form-group">
                 <label for="invoiceFile">Invoice File</label>
@@ -981,15 +1212,15 @@
             <!-- MIDA Certificate Selection (always visible) -->
             <div id="midaOptions">
                 <div class="form-group">
-                    <label for="companySelect">Company</label>
-                    <select id="companySelect" style="width: 100%; padding: 0.6rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 1rem;" onchange="loadCertificatesForCompany()">
-                        <option value="">-- Select Company --</option>
+                    <label for="companySelect" class="required-field">Company</label>
+                    <select id="companySelect" style="width: 100%; padding: 0.6rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 1rem;" onchange="onCompanyChange()">
+                        <option value="">-- Select Company (Required) --</option>
                     </select>
                     <small id="companyLoadingText" class="hidden">⏳ Loading companies...</small>
                 </div>
                 
                 <div class="form-group" id="certificateListSection" class="hidden">
-                    <label>MIDA Certificates (select one or more)</label>
+                    <label>MIDA Certificates (optional - select for MIDA matching)</label>
                     <div id="certificateSearchBox" style="margin-bottom: 0.5rem;">
                         <input type="text" id="certSearchInput" placeholder="🔍 Search certificates..." 
                                style="width: 100%; padding: 0.5rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;"
@@ -1003,7 +1234,7 @@
                 </div>
             </div>
             
-            <button onclick="convertInvoice()" id="convertBtn">Convert Invoice</button>
+            <button onclick="classifyInvoice()" id="convertBtn">🔄 Classify Items</button>
             
             <!-- Import Metadata Fields (always visible) -->
             <div id="importMetadataSection" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px;">
@@ -1100,7 +1331,116 @@
                 <!-- Summary Stats -->
                 <div id="summaryStats" class="summary-stats"></div>
                 
-                <!-- Matched Items Table -->
+                <!-- 3-Tab Classification Results -->
+                <div id="classificationSection" class="hidden">
+                    <!-- Classification Tabs -->
+                    <div class="classification-tabs">
+                        <div class="classification-tab form-d active" onclick="switchClassificationTab('form-d')">
+                            🏷️ Form-D <span class="tab-count" id="formDCount">0</span>
+                        </div>
+                        <div class="classification-tab mida" onclick="switchClassificationTab('mida')">
+                            ✅ MIDA <span class="tab-count" id="midaCount">0</span>
+                        </div>
+                        <div class="classification-tab duties" onclick="switchClassificationTab('duties')">
+                            💰 Duties Payable <span class="tab-count" id="dutiesCount">0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Form-D Content -->
+                    <div id="form-d-content" class="classification-content active">
+                        <div style="overflow-x: auto;">
+                            <table id="formDTable">
+                                <thead>
+                                    <tr>
+                                        <th>Line</th>
+                                        <th>Parts Name</th>
+                                        <th>HS Code</th>
+                                        <th>Qty</th>
+                                        <th>Net Wt (Kg)</th>
+                                        <th>Amount (USD)</th>
+                                        <th>SST Exempt</th>
+                                        <th>Move</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="formDTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- MIDA Content -->
+                    <div id="mida-content" class="classification-content">
+                        <div style="overflow-x: auto;">
+                            <table id="midaTable">
+                                <thead>
+                                    <tr>
+                                        <th>Line</th>
+                                        <th>Parts Name</th>
+                                        <th>MIDA HS Code</th>
+                                        <th>Certificate</th>
+                                        <th>Remaining</th>
+                                        <th>Deduction</th>
+                                        <th>Score</th>
+                                        <th>SST Exempt</th>
+                                        <th>Move</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="midaTableBody"></tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Balance Sheet Update Section (MIDA tab only) -->
+                        <div id="databaseUpdateSection" class="hidden" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+                            <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label for="declarationNumber" style="font-weight: 600; color: #555; font-size: 0.85rem;">Declaration Form Reg No</label>
+                                    <input type="text" id="declarationNumber" placeholder="e.g., Bxxxxxx" style="width: 180px; padding: 0.5rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;">
+                                </div>
+                                <button id="updateDatabaseBtn" style="background: #3498db; color: white; border: none; border-radius: 4px; padding: 0.6rem 1.2rem; cursor: pointer; font-weight: 600;" onclick="updateClassifiedDatabase()">
+                                    📊 Update Balance Sheet
+                                </button>
+                            </div>
+                            <p style="font-size: 0.85rem; color: #7f8c8d; margin-top: 0.5rem;">
+                                Note: Only non-manually-moved MIDA items with certificate matches will be updated.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Duties Payable Content -->
+                    <div id="duties-content" class="classification-content">
+                        <div style="overflow-x: auto;">
+                            <table id="dutiesTable">
+                                <thead>
+                                    <tr>
+                                        <th>Line</th>
+                                        <th>Parts Name</th>
+                                        <th>HS Code</th>
+                                        <th>Qty</th>
+                                        <th>Net Wt (Kg)</th>
+                                        <th>Amount (USD)</th>
+                                        <th>SST Exempt</th>
+                                        <th>Move</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dutiesTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Export Buttons -->
+                    <div class="export-buttons">
+                        <button class="export-btn form-d" id="exportFormDBtn" onclick="exportClassifiedK1('form_d')">
+                            📥 Export Form-D
+                        </button>
+                        <button class="export-btn mida" id="exportMidaBtn" onclick="exportClassifiedK1('mida')">
+                            📥 Export MIDA
+                        </button>
+                        <button class="export-btn duties" id="exportDutiesBtn" onclick="exportClassifiedK1('duties_payable')">
+                            📥 Export Duties Payable
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Legacy: Matched Items Table (kept for backward compatibility) -->
                 <div id="matchedItemsSection" class="hidden">
                     <h3>✅ Matched Items (MIDA-Eligible)</h3>
                     <div style="overflow-x: auto;">
@@ -1124,22 +1464,9 @@
                             <tbody></tbody>
                         </table>
                     </div>
-                    
-                    <!-- Balance Sheet Update Section (appears after MIDA matching) -->
-                    <div id="databaseUpdateSection" class="hidden" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
-                        <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-                            <div class="form-group" style="margin: 0;">
-                                <label for="declarationNumber" style="font-weight: 600; color: #555; font-size: 0.85rem;">Declaration Form Reg No</label>
-                                <input type="text" id="declarationNumber" placeholder="e.g., Bxxxxxx" style="width: 180px; padding: 0.5rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;">
-                            </div>
-                            <button id="updateDatabaseBtn" style="background: #3498db; color: white; border: none; border-radius: 4px; padding: 0.6rem 1.2rem; cursor: pointer; font-weight: 600;" onclick="updateDatabase()">
-                                📊 Update Balance Sheet
-                            </button>
-                        </div>
-                    </div>
                 </div>
                 
-                <!-- All Invoice Items (Normal Mode) -->
+                <!-- Legacy: All Invoice Items (Normal Mode) -->
                 <div id="allItemsSection" class="hidden">
                     <div class="view-toggle">
                         <button id="viewFilteredBtn" class="toggle-btn active" onclick="switchToFilteredView()">
@@ -1606,7 +1933,7 @@
         // Store all certificates for the selected company (for filtering)
         let allCertificatesForCompany = [];
         
-        // Load companies for the dropdown
+        // Load companies for the dropdown (from companies table)
         async function loadCompanies() {
             const companySelect = document.getElementById('companySelect');
             const loadingText = document.getElementById('companyLoadingText');
@@ -1615,23 +1942,25 @@
             companySelect.disabled = true;
             
             try {
-                const url = `${API_BASE}/api/mida/certificates/companies?status=active`;
-                const response = await fetch(url);
+                // Fetch companies from the companies API endpoint
+                const response = await fetch(`${API_BASE}/api/companies`);
                 
                 if (!response.ok) {
                     loadingText.textContent = '❌ Failed to load companies';
                     return;
                 }
                 
-                const data = await response.json();
+                const companies = await response.json();
                 
-                companySelect.innerHTML = '<option value="">-- Select Company --</option>';
+                companySelect.innerHTML = '<option value="">-- Select Company (Required) --</option>';
                 
-                if (data.companies && data.companies.length > 0) {
-                    data.companies.forEach(company => {
+                if (companies && companies.length > 0) {
+                    companies.forEach(company => {
                         const option = document.createElement('option');
-                        option.value = company;
-                        option.textContent = company;
+                        option.value = company.id;  // Use company ID as value
+                        option.textContent = company.name;
+                        option.dataset.sstDefault = company.sst_default_behavior;
+                        option.dataset.dualFlagRouting = company.dual_flag_routing;
                         companySelect.appendChild(option);
                     });
                     loadingText.classList.add('hidden');
@@ -1647,6 +1976,12 @@
             }
         }
         
+        // Handle company selection change
+        function onCompanyChange() {
+            // Load certificates for the selected company
+            loadCertificatesForCompany();
+        }
+        
         // Load certificates for the selected company
         async function loadCertificatesForCompany() {
             const companySelect = document.getElementById('companySelect');
@@ -1655,13 +1990,14 @@
             const loadingText = document.getElementById('certLoadingText');
             const selectedCertsInfo = document.getElementById('selectedCertsInfo');
             
-            const companyName = companySelect.value;
+            const companyId = companySelect.value;
+            const companyName = companySelect.options[companySelect.selectedIndex]?.textContent || '';
             
             // Clear previous certificates
             allCertificatesForCompany = [];
             selectedCertsInfo.innerHTML = '';
             
-            if (!companyName) {
+            if (!companyId) {
                 certificateList.innerHTML = '<p style="color: #7f8c8d; text-align: center; margin: 1rem 0;">Select a company to view certificates</p>';
                 certificateListSection.classList.add('hidden');
                 return;
@@ -1672,6 +2008,7 @@
             certificateList.innerHTML = '<p style="color: #7f8c8d; text-align: center;">Loading...</p>';
             
             try {
+                // Use company name for the certificate lookup (existing API)
                 const url = `${API_BASE}/api/mida/certificates/by-company/${encodeURIComponent(companyName)}?status=active`;
                 const response = await fetch(url);
                 
@@ -1874,7 +2211,512 @@
             }
         }
         
-        // Convert Invoice
+        // ==================== CLASSIFICATION TAB FUNCTIONS ====================
+        
+        // Global state for classification
+        let classificationData = {
+            form_d_items: [],
+            mida_items: [],
+            duties_payable_items: [],
+            company: null,
+            country: '',
+            port: '',
+            import_date: ''
+        };
+        
+        // Switch between classification tabs
+        function switchClassificationTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.classification-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`.classification-tab.${tabName === 'duties_payable' ? 'duties' : tabName.replace('-', '-')}`).classList.add('active');
+            
+            // Update content visibility
+            document.querySelectorAll('.classification-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName === 'duties_payable' ? 'duties' : tabName}-content`).classList.add('active');
+        }
+        
+        // Toggle SST exemption for an item
+        function toggleSST(itemId, currentTable) {
+            const tableKey = currentTable + '_items';
+            const items = classificationData[tableKey];
+            const item = items.find(i => i.id === itemId);
+            
+            if (item) {
+                item.sst_exempted = !item.sst_exempted;
+                item.manually_moved = true;  // Mark as modified
+                renderClassificationTable(currentTable);
+            }
+        }
+        
+        // Move item to a different table
+        function moveItemToTable(itemId, sourceTable, targetTable) {
+            if (sourceTable === targetTable) return;
+            
+            const sourceKey = sourceTable + '_items';
+            const targetKey = targetTable + '_items';
+            
+            // Find and remove from source
+            const sourceItems = classificationData[sourceKey];
+            const itemIndex = sourceItems.findIndex(i => i.id === itemId);
+            
+            if (itemIndex === -1) return;
+            
+            const item = sourceItems.splice(itemIndex, 1)[0];
+            
+            // Mark as manually moved and modified
+            item.manually_moved = true;
+            item.original_table = item.original_table || sourceTable;  // Remember original
+            item.current_table = targetTable;
+            
+            // Add to target
+            classificationData[targetKey].push(item);
+            
+            // Re-render both tables and update counts
+            renderClassificationTable(sourceTable);
+            renderClassificationTable(targetTable);
+            updateTabCounts();
+        }
+        
+        // Render a classification table
+        function renderClassificationTable(tableName) {
+            const tableKey = tableName + '_items';
+            const items = classificationData[tableKey];
+            
+            let tbodyId, tableType;
+            if (tableName === 'form_d') {
+                tbodyId = 'formDTableBody';
+                tableType = 'form_d';
+            } else if (tableName === 'mida') {
+                tbodyId = 'midaTableBody';
+                tableType = 'mida';
+            } else {
+                tbodyId = 'dutiesTableBody';
+                tableType = 'duties_payable';
+            }
+            
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            items.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                
+                // Add modified class if manually changed
+                if (item.manually_moved) {
+                    tr.classList.add('modified-row');
+                }
+                
+                if (tableName === 'mida') {
+                    // MIDA table has different columns
+                    tr.innerHTML = `
+                        <td>${item.line_no || index + 1}</td>
+                        <td>${escapeHtml(item.description || item.parts_name || '')}</td>
+                        <td>${escapeHtml(item.mida_hs_code || item.hs_code || '')}</td>
+                        <td>${escapeHtml(item.mida_certificate_number || '-')}</td>
+                        <td>${item.remaining_qty != null ? parseFloat(item.remaining_qty).toLocaleString() : '-'}</td>
+                        <td>${item.deduction_quantity != null ? parseFloat(item.deduction_quantity).toLocaleString() : '-'}</td>
+                        <td>${item.match_score != null ? (item.match_score * 100).toFixed(0) + '%' : '-'}</td>
+                        <td>
+                            <label class="sst-toggle">
+                                <input type="checkbox" ${item.sst_exempted ? 'checked' : ''} 
+                                    onchange="toggleSST('${item.id}', '${tableName}')">
+                                <span class="sst-slider"></span>
+                            </label>
+                        </td>
+                        <td>
+                            <div class="move-dropdown">
+                                <select onchange="moveItemToTable('${item.id}', '${tableName}', this.value); this.value='';">
+                                    <option value="">Move to...</option>
+                                    ${tableName !== 'form_d' ? '<option value="form_d">Form-D</option>' : ''}
+                                    ${tableName !== 'mida' ? '<option value="mida">MIDA</option>' : ''}
+                                    ${tableName !== 'duties_payable' ? '<option value="duties_payable">Duties Payable</option>' : ''}
+                                </select>
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    // Form-D and Duties Payable tables
+                    tr.innerHTML = `
+                        <td>${item.line_no || index + 1}</td>
+                        <td>${escapeHtml(item.description || item.parts_name || '')}</td>
+                        <td>${escapeHtml(item.hs_code || '')}</td>
+                        <td>${item.quantity != null ? parseFloat(item.quantity).toLocaleString() : ''}</td>
+                        <td>${item.net_weight_kg != null ? parseFloat(item.net_weight_kg).toFixed(2) : ''}</td>
+                        <td>${item.amount != null ? parseFloat(item.amount).toFixed(2) : ''}</td>
+                        <td>
+                            <label class="sst-toggle">
+                                <input type="checkbox" ${item.sst_exempted ? 'checked' : ''} 
+                                    onchange="toggleSST('${item.id}', '${tableName}')">
+                                <span class="sst-slider"></span>
+                            </label>
+                        </td>
+                        <td>
+                            <div class="move-dropdown">
+                                <select onchange="moveItemToTable('${item.id}', '${tableName}', this.value); this.value='';">
+                                    <option value="">Move to...</option>
+                                    ${tableName !== 'form_d' ? '<option value="form_d">Form-D</option>' : ''}
+                                    ${tableName !== 'mida' ? '<option value="mida">MIDA</option>' : ''}
+                                    ${tableName !== 'duties_payable' ? '<option value="duties_payable">Duties Payable</option>' : ''}
+                                </select>
+                            </div>
+                        </td>
+                    `;
+                }
+                
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // Update tab counts
+        function updateTabCounts() {
+            document.getElementById('formDCount').textContent = classificationData.form_d_items.length;
+            document.getElementById('midaCount').textContent = classificationData.mida_items.length;
+            document.getElementById('dutiesCount').textContent = classificationData.duties_payable_items.length;
+        }
+        
+        // Display classification results
+        function displayClassificationResults(data) {
+            // Store in global state with unique IDs
+            classificationData = {
+                form_d_items: (data.form_d_items || []).map((item, i) => ({
+                    ...item,
+                    id: `fd_${i}_${Date.now()}`,
+                    original_table: 'form_d',
+                    current_table: 'form_d'
+                })),
+                mida_items: (data.mida_items || []).map((item, i) => ({
+                    ...item,
+                    id: `mida_${i}_${Date.now()}`,
+                    original_table: 'mida',
+                    current_table: 'mida'
+                })),
+                duties_payable_items: (data.duties_payable_items || []).map((item, i) => ({
+                    ...item,
+                    id: `dp_${i}_${Date.now()}`,
+                    original_table: 'duties_payable',
+                    current_table: 'duties_payable'
+                })),
+                company: data.company,
+                country: document.getElementById('countrySelect').value,
+                port: document.getElementById('portSelect')?.value || '',
+                import_date: document.getElementById('importDate')?.value || ''
+            };
+            
+            // Render all tables
+            renderClassificationTable('form_d');
+            renderClassificationTable('mida');
+            renderClassificationTable('duties_payable');
+            
+            // Update counts
+            updateTabCounts();
+            
+            // Show classification section
+            showElement('classificationSection');
+            
+            // Show database update section if there are MIDA items with certificates
+            const midaWithCerts = classificationData.mida_items.filter(i => i.mida_certificate_number && !i.manually_moved);
+            if (midaWithCerts.length > 0) {
+                showElement('databaseUpdateSection');
+            } else {
+                hideElement('databaseUpdateSection');
+            }
+            
+            // Update summary stats
+            const summaryHtml = `
+                <div class="stat-item">
+                    <span class="stat-label">Total Items</span>
+                    <span class="stat-value">${data.total_items || 0}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Company</span>
+                    <span class="stat-value">${escapeHtml(data.company?.name || 'N/A')}</span>
+                </div>
+                <div class="stat-item form-d">
+                    <span class="stat-label">Form-D Items</span>
+                    <span class="stat-value">${classificationData.form_d_items.length}</span>
+                </div>
+                <div class="stat-item mida">
+                    <span class="stat-label">MIDA Items</span>
+                    <span class="stat-value">${classificationData.mida_items.length}</span>
+                </div>
+                <div class="stat-item duties">
+                    <span class="stat-label">Duties Payable</span>
+                    <span class="stat-value">${classificationData.duties_payable_items.length}</span>
+                </div>
+            `;
+            document.getElementById('summaryStats').innerHTML = summaryHtml;
+            
+            // Switch to Form-D tab by default
+            switchClassificationTab('form-d');
+        }
+        
+        // Classify Invoice - Main function for classification
+        async function classifyInvoice() {
+            const fileInput = document.getElementById('invoiceFile');
+            const companySelect = document.getElementById('companySelect');
+            const selectedCertIds = getSelectedCertificateIds();
+            
+            // Reset UI
+            hideElement('converterResults');
+            hideElement('converterError');
+            hideElement('classificationSection');
+            hideElement('matchedItemsSection');
+            hideElement('allItemsSection');
+            hideElement('warningsSection');
+            
+            // Validation
+            if (!fileInput.files[0]) {
+                showError('Please select an invoice file first.');
+                return;
+            }
+            
+            if (!companySelect.value) {
+                showError('Please select a company. This is required for SST exemption rules.');
+                return;
+            }
+            
+            // Show loading
+            showElement('converterLoading');
+            document.getElementById('convertBtn').disabled = true;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('company_id', companySelect.value);
+            formData.append('country', document.getElementById('countrySelect').value);
+            
+            const portSelect = document.getElementById('portSelect');
+            if (portSelect) {
+                formData.append('port', portSelect.value);
+            }
+            
+            const importDate = document.getElementById('importDate');
+            if (importDate && importDate.value) {
+                formData.append('import_date', importDate.value);
+            }
+            
+            // Add certificate IDs if any selected
+            if (selectedCertIds.length > 0) {
+                formData.append('mida_certificate_ids', selectedCertIds.join(','));
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/convert/classify`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    const errorDetail = data.detail;
+                    if (typeof errorDetail === 'object') {
+                        showError(errorDetail.detail || 'Classification failed');
+                    } else {
+                        showError(errorDetail || 'Classification failed');
+                    }
+                    return;
+                }
+                
+                // Show results section
+                showElement('converterResults');
+                
+                // Display classification results
+                displayClassificationResults(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error connecting to server: ' + error.message);
+            } finally {
+                hideElement('converterLoading');
+                document.getElementById('convertBtn').disabled = false;
+            }
+        }
+        
+        // Export classified K1 XLS
+        async function exportClassifiedK1(exportType) {
+            const btnId = exportType === 'form_d' ? 'exportFormDBtn' : 
+                          exportType === 'mida' ? 'exportMidaBtn' : 'exportDutiesBtn';
+            const btn = document.getElementById(btnId);
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Exporting...';
+            
+            try {
+                // Gather items based on export type
+                let items;
+                if (exportType === 'form_d') {
+                    items = classificationData.form_d_items;
+                } else if (exportType === 'mida') {
+                    items = classificationData.mida_items;
+                } else {
+                    items = classificationData.duties_payable_items;
+                }
+                
+                if (items.length === 0) {
+                    showError(`No items to export for ${exportType.replace('_', ' ').replace('-', ' ')}`);
+                    return;
+                }
+                
+                // Transform items to K1ExportItem format
+                const exportItems = items.map(item => ({
+                    hs_code: item.mida_hs_code || item.hs_code || '',
+                    description: item.description || '',
+                    description2: item.quantity ? String(item.quantity) : '',
+                    quantity: parseFloat(item.quantity) || 0,
+                    uom: item.uom || 'UNT',
+                    amount: item.amount ? parseFloat(item.amount) : null,
+                    net_weight_kg: item.net_weight_kg ? parseFloat(item.net_weight_kg) : null,
+                    sst_exempted: item.sst_exempted || false
+                }));
+                
+                const response = await fetch(`${API_BASE}/api/convert/export-classified`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        items: exportItems,
+                        export_type: exportType,
+                        country: classificationData.country || document.getElementById('countrySelect').value
+                    })
+                });
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    const errorDetail = data.detail;
+                    if (typeof errorDetail === 'object') {
+                        showError(errorDetail.detail || 'Export failed');
+                    } else {
+                        showError(errorDetail || 'Export failed');
+                    }
+                    return;
+                }
+                
+                // Download the file
+                const blob = await response.blob();
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `${exportType}-k1-import.xls`;
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="(.+)"/);
+                    if (match) filename = match[1];
+                }
+                
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                console.error('Export error:', error);
+                showError('Error exporting: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+        
+        // Update database with MIDA items (only non-manually-moved with certificates)
+        async function updateClassifiedDatabase() {
+            const declarationNumber = document.getElementById('declarationNumber').value.trim();
+            const importDate = document.getElementById('importDate')?.value || new Date().toISOString().split('T')[0];
+            const port = document.getElementById('portSelect')?.value || 'port_klang';
+            
+            if (!declarationNumber) {
+                showError('Please enter the Declaration Form Reg No.');
+                return;
+            }
+            
+            // Filter MIDA items: only non-manually-moved with certificate matches
+            const eligibleItems = classificationData.mida_items.filter(item => 
+                !item.manually_moved && 
+                item.mida_certificate_number && 
+                item.original_table === 'mida' &&
+                item.deduction_quantity != null
+            );
+            
+            if (eligibleItems.length === 0) {
+                showError('No eligible items to update. Only non-manually-moved MIDA items with certificate matches and valid deduction quantities can update balances.');
+                return;
+            }
+            
+            // Check for items with missing deduction quantity
+            const itemsWithErrors = classificationData.mida_items.filter(item => 
+                !item.manually_moved && 
+                item.mida_certificate_number && 
+                item.original_table === 'mida' &&
+                (item.deduction_quantity === null || item.deduction_quantity === undefined)
+            );
+            if (itemsWithErrors.length > 0) {
+                const errorItems = itemsWithErrors.map(item => `Line ${item.line_no}: ${(item.description || '').substring(0, 30)}`).join('\n');
+                alert(`❌ Some items have HSCODE errors (UOM could not be determined):\n\n${errorItems}\n\nThese items will be skipped.`);
+            }
+            
+            const updateBtn = document.getElementById('updateDatabaseBtn');
+            const originalText = updateBtn.textContent;
+            updateBtn.disabled = true;
+            updateBtn.textContent = '⏳ Saving...';
+            
+            try {
+                // Build import records from eligible items
+                const importRecords = eligibleItems.map(item => ({
+                    certificate_item_id: item.mida_item_id,
+                    import_date: importDate,
+                    declaration_form_reg_no: declarationNumber || null,
+                    invoice_number: item.invoice_no || 'UNKNOWN',
+                    invoice_line: item.line_no,
+                    quantity_imported: parseFloat(item.deduction_quantity),
+                    port: port,
+                    remarks: `Matched score ${(item.match_score * 100).toFixed(0)}%, UOM: ${item.hscode_uom || 'N/A'}`
+                }));
+                
+                const response = await fetch(`${API_BASE}/api/mida/imports/bulk`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ records: importRecords })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    const errorDetail = data.detail;
+                    showError(typeof errorDetail === 'object' ? errorDetail.detail : errorDetail || 'Update failed');
+                    return;
+                }
+                
+                // Success
+                alert(`✅ Successfully saved ${data.length} import records to the database!\n\nRedirecting to Database View to see updated balances...`);
+                updateBtn.textContent = '✅ Updated!';
+                
+                setTimeout(() => {
+                    updateBtn.textContent = originalText;
+                    switchTab('database');
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Database update error:', error);
+                showError('Error updating database: ' + error.message);
+            } finally {
+                updateBtn.disabled = false;
+                if (updateBtn.textContent === '⏳ Saving...') {
+                    updateBtn.textContent = originalText;
+                }
+            }
+        }
+        
+        // ==================== END CLASSIFICATION TAB FUNCTIONS ====================
+        
+        // Convert Invoice (Legacy - kept for backward compatibility)
         async function convertInvoice() {
             const fileInput = document.getElementById('invoiceFile');
             const selectedCertIds = getSelectedCertificateIds();

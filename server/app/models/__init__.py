@@ -8,6 +8,7 @@ from app.models.mida_certificate import (
     QuantityStatus,
     ImportPort,
 )
+from app.models.company import Company
 
 __all__ = [
     "CertificateStatus",
@@ -16,4 +17,5 @@ __all__ = [
     "MidaImportRecord",
     "QuantityStatus",
     "ImportPort",
+    "Company",
 ]

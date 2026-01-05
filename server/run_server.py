@@ -2,6 +2,11 @@
 import os
 import sys
 
+# Change to server directory and load .env file
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+from dotenv import load_dotenv
+load_dotenv()
+
 # Set environment variables
 os.environ["PYTHONPATH"] = os.path.dirname(os.path.abspath(__file__))
 os.environ["MIDA_API_BASE_URL"] = "http://localhost:8000"
