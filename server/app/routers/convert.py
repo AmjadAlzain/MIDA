@@ -65,6 +65,7 @@ from app.services.mida_certificate_service import (
     get_certificate_by_number as get_cert_from_db,
     get_certificates_by_ids,
 )
+from app.repositories.hscode_uom_repo import get_uom_by_hscode, HscodeNotFoundError
 from app.schemas.convert import (
     ConversionWarning,
     ConvertResponse,
@@ -118,7 +119,7 @@ def _convert_to_matcher_mida_items(
             hs_code=item.hs_code,
             approved_quantity=item.approved_quantity or Decimal(0),
             uom=item.uom,
-            item_id=str(item.id),  # Pass the certificate item ID as string
+            item_id=str(item.id),
         )
         for item in db_items
     ]
@@ -144,7 +145,7 @@ def _convert_to_matcher_mida_items_with_cert_info(
             certificate_number=certificate.certificate_number,
             certificate_model_number=certificate.model_number,
             certificate_end_date=certificate.exemption_end_date,
-            remaining_balance=item.remaining_quantity,  # Use actual remaining balance
+            remaining_balance=item.remaining_quantity,
         )
         for item in db_items
     ]
@@ -162,6 +163,42 @@ def _convert_matcher_severity(severity: MatcherWarningSeverity) -> WarningSeveri
         MatcherWarningSeverity.error: WarningSeverity.error,
     }
     return mapping.get(severity, WarningSeverity.warning)
+
+
+def _get_hscode_uom_and_deduction(
+    db: Session,
+    mida_hs_code: str,
+    invoice_quantity: Decimal,
+    net_weight_kg: Optional[Decimal],
+) -> tuple[str, Decimal]:
+    """
+    Get the UOM for an HSCODE and calculate the deduction quantity.
+    
+    Args:
+        db: Database session
+        mida_hs_code: The HSCODE from the MIDA certificate
+        invoice_quantity: The quantity from the invoice
+        net_weight_kg: The net weight from the invoice (optional)
+        
+    Returns:
+        Tuple of (hscode_uom, deduction_quantity)
+        
+    Raises:
+        HscodeNotFoundError: If the HSCODE is not found in the mapping table
+    """
+    hscode_uom = get_uom_by_hscode(db, mida_hs_code)
+    
+    if hscode_uom == "KGM":
+        if net_weight_kg is None:
+            raise ValueError(
+                f"HSCODE {mida_hs_code} requires net weight (KGM) but invoice item has no net_weight_kg"
+            )
+        deduction_quantity = net_weight_kg
+    else:
+        # UNIT - use invoice quantity
+        deduction_quantity = invoice_quantity
+    
+    return hscode_uom, deduction_quantity
 
 
 @router.post(
@@ -435,6 +472,9 @@ async def convert_with_mida(
         # Build a lookup dict for invoice items by line_no (since line_no may not be sequential)
         invoice_items_by_line = {item.line_no: item for item in invoice_items}
 
+        # Initialize warnings list (will be populated with HSCODE lookup errors and matcher warnings)
+        warnings: list[ConversionWarning] = []
+
         # Build mida_matched_items output
         mida_matched_items: list[MidaMatchedItem] = []
         for match in matching_result.matches:
@@ -444,6 +484,55 @@ async def convert_with_mida(
                 if orig_item is None:
                     logger.warning(f"Invoice item with line_no {match.invoice_item.line_no} not found")
                     continue
+
+                # Look up HSCODE UOM and calculate deduction quantity
+                hscode_uom = None
+                deduction_quantity = None
+                try:
+                    hscode_uom, deduction_quantity = _get_hscode_uom_and_deduction(
+                        db,
+                        match.mida_item.hs_code,
+                        orig_item.quantity,
+                        orig_item.net_weight_kg,
+                    )
+                except HscodeNotFoundError as e:
+                    # Add warning but still include the item
+                    warnings.append(
+                        ConversionWarning(
+                            invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
+                            reason=f"HSCODE {match.mida_item.hs_code} not found in UOM mapping table. Cannot determine deduction quantity.",
+                            severity=WarningSeverity.error,
+                        )
+                    )
+                except ValueError as e:
+                    # Missing net weight for KGM item
+                    warnings.append(
+                        ConversionWarning(
+                            invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
+                            reason=str(e),
+                            severity=WarningSeverity.error,
+                        )
+                    )
+
+                # Check for UOM mismatch between HSCODE UOM and MIDA certificate UOM
+                if hscode_uom is not None:
+                    mida_cert_uom = match.mida_item.uom.upper() if match.mida_item.uom else ""
+                    # Normalize MIDA certificate UOM for comparison
+                    if mida_cert_uom in ("UNT", "UNIT", "UNITS", "PCS", "PC", "PIECE", "EA", "EACH", "NOS", "NO"):
+                        mida_cert_uom_normalized = "UNIT"
+                    elif mida_cert_uom in ("KGM", "KG", "KGS", "KILOGRAM", "KILOGRAMS"):
+                        mida_cert_uom_normalized = "KGM"
+                    else:
+                        mida_cert_uom_normalized = mida_cert_uom
+                    
+                    if hscode_uom != mida_cert_uom_normalized:
+                        warnings.append(
+                            ConversionWarning(
+                                invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
+                                reason=f"UOM mismatch: HSCODE {match.mida_item.hs_code} indicates UOM '{hscode_uom}' but MIDA certificate has '{match.mida_item.uom}'",
+                                severity=WarningSeverity.warning,
+                            )
+                        )
 
                 mida_matched_items.append(
                     MidaMatchedItem(
@@ -464,12 +553,17 @@ async def convert_with_mida(
                         remaining_uom=match.mida_item.uom,
                         match_score=round(match.match_score, 4),
                         approved_qty=match.mida_item.approved_quantity,
+                        # HSCODE-based UOM for balance deduction
+                        hscode_uom=hscode_uom,
+                        deduction_quantity=deduction_quantity,
                     )
                 )
 
-        # Convert matcher warnings to schema warnings
-        warnings: list[ConversionWarning] = []
+        # Add matcher warnings to warnings list, but filter out "UOM mismatch" since we handle that ourselves
+        # using HSCODE UOM comparison above
         for warning in matching_result.warnings:
+            if warning.reason == "UOM mismatch":
+                continue  # Skip - we do our own HSCODE-based UOM mismatch check
             warnings.append(
                 ConversionWarning(
                     invoice_item=warning.invoice_item,
@@ -679,6 +773,9 @@ async def convert_with_multi_mida(
         # Build lookup for invoice items
         invoice_items_by_line = {item.line_no: item for item in invoice_items}
 
+        # Initialize warnings list
+        warnings: list[ConversionWarning] = []
+
         # Build mida_matched_items output
         mida_matched_items: list[MidaMatchedItem] = []
         for match in matching_result.matches:
@@ -687,6 +784,53 @@ async def convert_with_multi_mida(
                 if orig_item is None:
                     logger.warning(f"Invoice item with line_no {match.invoice_item.line_no} not found")
                     continue
+
+                # Look up HSCODE UOM and calculate deduction quantity
+                hscode_uom = None
+                deduction_quantity = None
+                try:
+                    hscode_uom, deduction_quantity = _get_hscode_uom_and_deduction(
+                        db,
+                        match.mida_item.hs_code,
+                        orig_item.quantity,
+                        orig_item.net_weight_kg,
+                    )
+                except HscodeNotFoundError as e:
+                    warnings.append(
+                        ConversionWarning(
+                            invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
+                            reason=f"HSCODE {match.mida_item.hs_code} not found in UOM mapping table. Cannot determine deduction quantity.",
+                            severity=WarningSeverity.error,
+                        )
+                    )
+                except ValueError as e:
+                    warnings.append(
+                        ConversionWarning(
+                            invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
+                            reason=str(e),
+                            severity=WarningSeverity.error,
+                        )
+                    )
+
+                # Check for UOM mismatch between HSCODE UOM and MIDA certificate UOM
+                if hscode_uom is not None:
+                    mida_cert_uom = match.mida_item.uom.upper() if match.mida_item.uom else ""
+                    # Normalize MIDA certificate UOM for comparison
+                    if mida_cert_uom in ("UNT", "UNIT", "UNITS", "PCS", "PC", "PIECE", "EA", "EACH", "NOS", "NO"):
+                        mida_cert_uom_normalized = "UNIT"
+                    elif mida_cert_uom in ("KGM", "KG", "KGS", "KILOGRAM", "KILOGRAMS"):
+                        mida_cert_uom_normalized = "KGM"
+                    else:
+                        mida_cert_uom_normalized = mida_cert_uom
+                    
+                    if hscode_uom != mida_cert_uom_normalized:
+                        warnings.append(
+                            ConversionWarning(
+                                invoice_item=f"Line {orig_item.line_no}: {orig_item.description[:50]}",
+                                reason=f"UOM mismatch: HSCODE {match.mida_item.hs_code} indicates UOM '{hscode_uom}' but MIDA certificate has '{match.mida_item.uom}'",
+                                severity=WarningSeverity.warning,
+                            )
+                        )
 
                 mida_matched_items.append(
                     MidaMatchedItem(
@@ -710,12 +854,12 @@ async def convert_with_multi_mida(
                         remaining_uom=match.mida_item.uom,
                         match_score=round(match.match_score, 4),
                         approved_qty=match.mida_item.approved_quantity,
+                        # HSCODE-based UOM for balance deduction
+                        hscode_uom=hscode_uom,
+                        deduction_quantity=deduction_quantity,
                     )
                 )
 
-        # Convert matcher warnings to schema warnings
-        warnings: list[ConversionWarning] = []
-        
         # Add warning about missing model numbers if any
         if matching_result.missing_model_no_count > 0:
             warnings.append(
@@ -726,8 +870,11 @@ async def convert_with_multi_mida(
                 )
             )
         
-        # Add individual matcher warnings
+        # Add individual matcher warnings (filter out UOM mismatch since we do our own HSCODE-based check)
         for warning in matching_result.warnings:
+            # Skip the matcher's UOM mismatch warnings - we have our own HSCODE-based check
+            if "UOM mismatch" in warning.reason:
+                continue
             warnings.append(
                 ConversionWarning(
                     invoice_item=warning.invoice_item,

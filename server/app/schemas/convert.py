@@ -91,6 +91,19 @@ class MidaMatchedItem(InvoiceItemBase):
         description="Match confidence score (1.0 = exact match)"
     )
     approved_qty: Decimal = Field(..., description="Original approved quantity on MIDA certificate")
+    
+    # HSCODE-based UOM for balance deduction
+    hscode_uom: Optional[str] = Field(
+        default=None,
+        description="UOM determined by HSCODE mapping table (UNIT or KGM). "
+                    "If UNIT, use quantity for balance deduction. "
+                    "If KGM, use net_weight_kg for balance deduction."
+    )
+    deduction_quantity: Optional[Decimal] = Field(
+        default=None,
+        description="The quantity to deduct from balance, calculated based on hscode_uom. "
+                    "For UNIT: uses invoice quantity. For KGM: uses net_weight_kg."
+    )
 
 
 class ConvertRequest(BaseModel):

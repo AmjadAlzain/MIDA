@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_settings
 from app.logging_config import setup_logging, get_logger
-from app.routers import mida_certificate, mida_certificates, mida_imports, convert
+from app.routers import mida_certificate, mida_certificates, mida_imports, convert, hscode_uom
 
 # Load settings
 settings = get_settings()
@@ -55,6 +55,7 @@ app.include_router(mida_certificate.router, prefix="/api/mida/certificate", tags
 app.include_router(mida_certificates.router, prefix="/api/mida/certificates", tags=["mida-crud"])
 app.include_router(mida_imports.router, prefix="/api/mida/imports", tags=["mida-imports"])
 app.include_router(convert.router, prefix="/api", tags=["convert"])
+app.include_router(hscode_uom.router, prefix="/api/hscode-uom", tags=["hscode-uom"])
 
 
 # Global exception handler to ensure JSON responses for all errors
