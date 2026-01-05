@@ -1,12 +1,13 @@
 # MIDA OCR API Deployment Guide
 
-This guide covers deploying the MIDA OCR API following 12-factor app principles.
+This guide covers deploying the MIDA OCR API with 3-Tab Classification System following 12-factor app principles.
 
 ## Table of Contents
 
 - [Environment Variables](#environment-variables)
 - [Ports](#ports)
 - [Run Commands](#run-commands)
+- [Database Migrations](#database-migrations)
 - [Docker Deployment](#docker-deployment)
 - [Docker Compose](#docker-compose)
 - [Health Check](#health-check)
@@ -22,6 +23,7 @@ This guide covers deploying the MIDA OCR API following 12-factor app principles.
 |----------|-------------|---------|
 | `AZURE_DI_ENDPOINT` | Azure Document Intelligence endpoint URL | `https://your-resource.cognitiveservices.azure.com/` |
 | `AZURE_DI_KEY` | Azure Document Intelligence API key | `your-api-key` |
+| `DATABASE_URL` | PostgreSQL connection URL | `postgresql://user:pass@host:5432/mida` |
 
 ### Optional Variables
 
@@ -33,10 +35,17 @@ This guide covers deploying the MIDA OCR API following 12-factor app principles.
 | `DEBUG` | `false` | Enable debug mode |
 | `HOST` | `0.0.0.0` | Server bind host |
 | `PORT` | `8000` | Server bind port |
-| `DATABASE_URL` | `None` | Database connection URL (if needed) |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed CORS origins |
 | `LOG_LEVEL` | `INFO` | Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL |
 | `LOG_FORMAT` | `json` | Log format: json (production) or text (development) |
+
+### MIDA API Client Variables (if using external MIDA API)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MIDA_API_BASE_URL` | - | Base URL of external MIDA API |
+| `MIDA_API_TIMEOUT_SECONDS` | `10` | Request timeout |
+| `MIDA_API_CACHE_TTL_SECONDS` | `60` | Cache TTL for API responses |
 
 ### Security Notes
 
@@ -104,6 +113,19 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ## Database Migrations
 
 **Important:** Migrations are NOT run automatically at startup. You must run them explicitly.
+
+### Migration Files
+
+The project has 8 Alembic migrations:
+
+1. `001_add_mida_certificates.py` - Certificate and item tables
+2. `002_add_import_tracking.py` - Import ledger
+3. `003_add_certificate_status.py` - Status column
+4. `004_add_declaration_form_number.py` - Declaration form field
+5. `005_add_model_number.py` - Model number field
+6. `006_add_soft_delete.py` - Soft delete flag
+7. `007_add_hscode_uom_mappings.py` - HSCODE to UOM mapping table
+8. `008_companies.py` - Companies table (HICOM, Hong Leong)
 
 ### Before First Deployment
 

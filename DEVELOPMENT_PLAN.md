@@ -1,13 +1,21 @@
 # MIDA Project – Development Plan (Azure OCR)
 
-## What we have so far (Phase 1, 2, 3 & 4 done)
+## What we have so far (Phase 1–8 done, Phase 9 in progress)
 - Repo scaffolded similar to Form-D-demo:
   - `server/` FastAPI backend
-  - `web/` simple HTML upload page
+  - `web/` simple HTML upload page with 3-tab classification UI
 - Endpoints:
   - `POST /api/mida/certificate/certificate/parse` - Production parsing
   - `POST /api/mida/certificate/certificate/parse-debug` - Debug parsing with stats
   - `POST /api/convert` - Invoice conversion with MIDA matching
+  - `POST /api/convert-multi` - Multi-certificate MIDA matching
+  - `GET /api/companies` - Get all companies for classification
+  - `POST /api/convert/classify` - 3-tab classification (Form-D, MIDA, Duties Payable)
+  - `POST /api/convert/export-classified` - K1 XLS export for classified items
+- Database:
+  - Companies table (HICOM YAMAHA MOTOR SDN BHD, HONG LEONG YAMAHA MOTOR SDN BHD)
+  - HSCODE UOM mappings table for balance deduction
+  - 8 Alembic migrations (certificates, import tracking, status, declaration form, model number, soft delete, hscode uom, companies)
 
 ## ✅ Phase 2 Completed: Certificate OCR
 
@@ -223,296 +231,210 @@ alert('Certificate data will be saved to database...');
 
 ---
 
-## Phase 6: Complete Certificate Parser Integration (TODO)
+## ✅ Phase 6 Completed: Save to Database Wiring
 
-### 6.1 Wire Save to Database Button
-- [ ] Implement `saveToDatabaseConfirmed()` to call `POST /api/mida/certificates/draft`
-- [ ] Map frontend data structure to `CertificateDraftCreateRequest` schema
-- [ ] Handle success (show certificate ID, enable "Confirm" action)
-- [ ] Handle errors (409 Conflict for confirmed certs, validation errors)
+### 6.1 ✅ Wire Save to Database Button
+- [x] Implemented `saveToDatabaseConfirmed()` to call `POST /api/mida/certificates/draft`
+- [x] Map frontend data structure to `CertificateDraftCreateRequest` schema
+- [x] Handle success (show certificate ID, enable "Confirm" action)
+- [x] Handle errors (409 Conflict for confirmed certs, validation errors)
+- [x] Fixed run_server.py to load .env file using python-dotenv
 
-### 6.2 Certificate List & Management UI
+### 6.2 Certificate List & Management (Partially Done)
+- [x] API endpoints for certificate CRUD operations
+- [ ] Add "View Saved Certificates" section in Certificate Parser tab (future)
+- [ ] Display as searchable/filterable table (future)
+
+### 6.3 Certificate Dropdown in Invoice Converter
+- [x] Certificate selection via ID input for multi-certificate matching
+- [ ] Searchable dropdown/autocomplete (future enhancement)
+
+---
+
+## ✅ Phase 7 Completed: MIDA Invoice Converter & K1 Output
+
+### 7.1 ✅ Invoice Classification Logic
+- [x] Parse uploaded invoice Excel with `parse_all_invoice_items()`
+- [x] Classify items by Form Flag column:
+  - **FORM-D** → Form-D table
+  - **Empty/Blank** → MIDA-eligible (if matched) or Duties Payable
+- [x] Support both single and multi-certificate matching
+
+### 7.2 ✅ MIDA Matching & Cross-Check
+- [x] Match MIDA-eligible items against selected certificate's items
+- [x] Matching criteria: Item Name (fuzzy similarity) + Model Number
+- [x] For each match:
+  - Get approved_quantity from certificate
+  - Calculate remaining_qty from certificate items
+  - Warn if requested qty > remaining_qty
+  - Warn if nearing limit (>90% consumed)
+
+### 7.3 ✅ K1 Output Generation (Purple Format)
+- [x] Created `generate_k1_xls_with_options()` function in `k1_export_service.py`
+- [x] Uses K1 Import Template.xls with JobCargo sheet
+- [x] Column mapping:
+  | Source | Template Column |
+  |--------|-----------------|
+  | Country Code | CountryOfOrigin |
+  | HS Code (normalized + "00" suffix) | HSCode |
+  | UOM from invoice | StatisticalUOM, DeclaredUOM |
+  | Quantity | StatisticalQty, DeclaredQty |
+  | Amount | ItemAmount |
+  | Parts Name | ItemDescription |
+  | Quantity (again) | ItemDescription2 |
+- [x] Export type settings:
+  - **form_d**: ImportDutyMethod = "Exemption", Method = "E", 100%
+  - **mida**: ImportDutyMethod = "Exemption", Method = "E", 100%
+  - **duties_payable**: ImportDutyMethod = empty, Method = empty
+- [x] SST columns per item based on `sst_exempted` field:
+  - If sst_exempted=True: SSTMethod = "Exemption", Method = "E", 100%
+  - If sst_exempted=False: Empty SST columns
+
+### 7.4 ✅ Download Flow
+- [x] Return XLS as downloadable file: `k1-{export_type}-{timestamp}.xls`
+- [x] Add "Export to K1" button in each tab of the 3-tab UI
+- [x] Generate separate files for Form-D, MIDA, and Duties Payable items
+
+---
+
+## ✅ Phase 8 Completed: Database Schema & Import Tracking
+
+### 8.1 ✅ Database Schema Design
+
+#### Table 1: `mida_certificates` (Certificate Header - Master Table)
+✅ Exists with all fields including:
+- id, certificate_number, company_name
+- exemption_start_date, exemption_end_date
+- status ('draft' or 'confirmed')
+- model_number (added in migration 005)
+- source_filename, raw_ocr_json, created_at, updated_at
+
+#### Table 2: `mida_certificate_items` (Certificate Items with Remaining Quantities)
+✅ Exists with remaining quantity columns:
+- approved_quantity, remaining_quantity
+- port_klang_qty, klia_qty, bukit_kayu_hitam_qty
+- remaining_port_klang, remaining_klia, remaining_bukit_kayu_hitam
+- is_deleted (soft delete, migration 006)
+
+#### Table 3: `mida_import_records` (Import Tracking)
+✅ Created via migration 002:
+- certificate_item_id, port, quantity_imported
+- balance_before, balance_after
+- import_date, declaration_ref, kagayaku_ref
+
+#### Table 4: `companies` (Company Configuration)
+✅ Created via migration 008:
+- name: "HICOM YAMAHA MOTOR SDN BHD" or "HONG LEONG YAMAHA MOTOR SDN BHD"
+- sst_default_behavior: "all_on" (HICOM) or "mida_only" (Hong Leong)
+- dual_flag_routing: "form_d" (HICOM) or "mida" (Hong Leong)
+
+#### Table 5: `hscode_uom_mappings` (HSCODE to UOM)
+✅ Created via migration 007:
+- hs_code (normalized, dots removed)
+- uom: "UNIT" or "KGM"
+
+### 8.2 ✅ Alembic Migrations
+All 8 migrations created and applied:
+1. `001_add_mida_certificates.py` - Certificate tables
+2. `002_add_import_tracking.py` - Import ledger
+3. `003_add_certificate_status.py` - Status column
+4. `004_add_declaration_form_number.py` - Declaration form field
+5. `005_add_model_number.py` - Model number field
+6. `006_add_soft_delete.py` - is_deleted flag
+7. `007_add_hscode_uom_mappings.py` - HSCODE UOM table
+8. `008_companies.py` - Companies table with HICOM/Hong Leong
+
+### 8.3 ✅ Service Layer Implementation
+- `mida_import_service.py` - Record imports, update balances
+- `mida_certificate_service.py` - Certificate CRUD operations
+- `company_repo.py` - Company lookups
+- `hscode_uom_repo.py` - HSCODE UOM lookups
+
+### 8.4 ✅ API Endpoints for Import Tracking
+- `POST /api/mida/imports` - Record import
+- `GET /api/mida/imports/{item_id}` - Get import history
+- Certificate endpoints in `mida_certificates.py` router
+
+---
+
+## ✅ Phase 9 Completed: 3-Tab Classification System (Form-D Integration)
+
+### Overview
+Integrated Form-D classification workflow with company-specific SST and routing rules.
+
+### 9.1 ✅ Company Model & Configuration
+- [x] Created `Company` model in `server/app/models/company.py`
+- [x] Two companies configured:
+  - **HICOM YAMAHA MOTOR SDN BHD**: sst_default='all_on', dual_flag_routing='form_d'
+  - **HONG LEONG YAMAHA MOTOR SDN BHD**: sst_default='mida_only', dual_flag_routing='mida'
+- [x] Repository: `company_repo.py` with `get_all_companies()`, `get_company_by_id()`
+
+### 9.2 ✅ Invoice Classification Service
+- [x] Created `invoice_classification_service.py` with:
+  - `parse_all_invoice_items()` - Parse ALL invoice items including Form-D flagged
+  - `classify_items()` - Classify into 3 categories based on rules
+- [x] Classification Rules:
+  | Form-D Flag | MIDA Matched | Result |
+  |-------------|--------------|--------|
+  | Yes | No | Form-D table |
+  | No | Yes | MIDA table |
+  | Yes | Yes | Depends on company (HICOM→Form-D, Hong Leong→MIDA) |
+  | No | No | Duties Payable table |
+- [x] SST Exemption Defaults:
+  - HICOM: SST ON for all items in all tables
+  - Hong Leong: SST ON only for MIDA table items
+
+### 9.3 ✅ K1 Export Service with Options
+- [x] Created `generate_k1_xls_with_options()` in `k1_export_service.py`
+- [x] Three export types: form_d, mida, duties_payable
+- [x] Per-item SST exemption support
+- [x] Import duty exemption only for Form-D and MIDA exports
+
+### 9.4 ✅ Classification API Endpoints
+- [x] `GET /api/companies` - List all companies for dropdown
+- [x] `POST /api/convert/classify` - Full classification endpoint
+  - Accepts: file, company_id, mida_certificate_ids (optional), country, port, import_date
+  - Returns: ClassifyResponse with 3 item lists + metadata
+- [x] `POST /api/convert/export-classified` - Export classified items to K1 XLS
+  - Accepts: K1ExportRequest with items, export_type, country
+  - Returns: StreamingResponse with XLS file
+
+### 9.5 ✅ Schemas for Classification
+- [x] Created `server/app/schemas/classification.py`:
+  - `ExportType` enum: form_d, mida, duties_payable
+  - `ItemTable` enum: form_d, mida, duties_payable
+  - `ClassifiedItem` - Full item with all fields and classification metadata
+  - `CompanyOut` - Company info for API response
+  - `ClassifyResponse` - Response with 3 item lists
+  - `K1ExportItem` - Item for K1 export
+  - `K1ExportRequest` - Request body for export
+
+### 9.6 ✅ Frontend 3-Tab UI
+- [x] Company dropdown populated from `/api/companies`
+- [x] 3 tabs: Form-D, MIDA, Duties Payable
+- [x] Per-item SST toggle checkbox in each table
+- [x] "Move to" dropdown to move items between tables
+- [x] "Export to K1" button in each tab
+- [x] Item counts per tab updated dynamically
+
+---
+
+# Part B — Remaining Work (Future Phases)
+## Phase 10: UI Enhancements (TODO)
+
+### 10.1 Certificate List & Management UI
 - [ ] Add "View Saved Certificates" section in Certificate Parser tab
 - [ ] Fetch certificates via `GET /api/mida/certificates/?status=draft` and `status=confirmed`
 - [ ] Display as searchable/filterable table with columns: Cert No, Company, Status, Date
 - [ ] Click to load → populate edit form (if draft) or read-only view (if confirmed)
 - [ ] Add "Confirm Certificate" button to lock drafts
 
-### 6.3 Certificate Dropdown in Invoice Converter
+### 10.2 Certificate Dropdown Enhancement
 - [ ] Replace text input with searchable dropdown/autocomplete
 - [ ] Populate from `GET /api/mida/certificates/?status=confirmed`
 - [ ] Show cert number + company name + expiry date in dropdown
 
----
-
-## Phase 7: MIDA Invoice Converter & Purple Output (TODO)
-
-### Reference: How Form-D-demo Works
-Form-D-demo (`/api/convert`) does:
-1. Upload invoice Excel → parse with pandas
-2. Filter rows where `Form Flag == "FORM-D"`
-3. Map to K1 Import Template columns (HSCode, StatisticalUOM, DeclaredUOM, StatisticalQty, etc.)
-4. Look up UOM from HSCODE.json mapping
-5. Generate XLS file using `K1 Import Template.xls` (JobCargo sheet)
-6. Return as downloadable file
-
-### 7.1 Invoice Classification Logic
-- [ ] Parse uploaded invoice Excel
-- [ ] Classify items by Form Flag column:
-  - **FORM-D** → Skip for MIDA (handled by Form-D converter)
-  - **Empty/Blank** → MIDA-eligible, proceed to matching
-  - **Other values** → Log/warn, exclude or treat as MIDA-eligible
-
-### 7.2 MIDA Matching & Cross-Check
-- [ ] Match MIDA-eligible items against selected certificate's items
-- [ ] Matching criteria: HS Code (exact/prefix) + Item Name (fuzzy similarity)
-- [ ] For each match:
-  - Get approved_quantity from certificate
-  - Calculate remaining_qty = approved - already_consumed
-  - Warn if requested qty > remaining_qty
-  - Warn if nearing limit (>90% consumed)
-
-### 7.3 Purple Output Generation (K1 Import Format)
-- [ ] Create `convert_to_k1_mida()` function (similar to Form-D-demo)
-- [ ] Use same K1 Import Template.xls with JobCargo sheet
-- [ ] Map columns:
-  | Source | Template Column |
-  |--------|-----------------|
-  | Certificate Country | Country of Origin |
-  | HS Code (normalized + "00" suffix) | HSCode |
-  | UOM from certificate | StatisticalUOM, DeclaredUOM |
-  | Quantity | StatisticalQty, DeclaredQty |
-  | Amount | ItemAmount |
-  | Parts Name | ItemDescription |
-  | Quantity (again) | ItemDescription2 |
-- [ ] Set exemption fields:
-  - ImportDutyMethod = "Exemption"
-  - ImportDutyRateExemptedPercentage = 100
-  - SSTMethod = "Exemption"
-  - SSTRateExemptedPercentage = 100
-- [ ] Leave vehicle fields blank (ExciseDutyMethod, VehicleType, etc.)
-
-### 7.4 Download Flow
-- [ ] Return XLS as downloadable file: `mida-k1-import-{timestamp}.xls`
-- [ ] Add "Download MIDA Output" button in UI after successful conversion
-- [ ] Optionally: Generate separate files for FORM-D and MIDA items
-
----
-
-## Phase 8: Database Schema & Quota Tracking System (TODO)
-
-### Overview: What Happens When "Save to Database" is Clicked
-
-When the user clicks "Save to Database" after parsing and editing a MIDA certificate, the system must:
-
-1. **Create the certificate header record** (master table)
-2. **Create certificate item records with remaining quantities** (initially = approved)
-3. **Create per-item import ledger tables** (1 for approved + 1 per active port = up to 4 tables per item)
-
----
-
-### 8.1 Database Schema Design
-
-#### Table 1: `mida_certificates` (Certificate Header - Master Table)
-Stores certificate-level metadata. **Already exists** in current models.
-
-```sql
-CREATE TABLE mida_certificates (
-  id UUID PRIMARY KEY,
-  certificate_number VARCHAR(100) UNIQUE NOT NULL,
-  company_name VARCHAR(500) NOT NULL,
-  exemption_start_date DATE,
-  exemption_end_date DATE,
-  status VARCHAR(20) DEFAULT 'draft',  -- 'draft' or 'confirmed'
-  source_filename VARCHAR(500),
-  raw_ocr_json JSONB,
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-);
-```
-
-#### Table 2: `mida_certificate_items` (Certificate Items with Remaining Quantities)
-Stores each line item with **both approved AND remaining quantities**.
-**UPDATE NEEDED**: Add remaining quantity columns (initially = approved quantities).
-
-```sql
-CREATE TABLE mida_certificate_items (
-  id UUID PRIMARY KEY,
-  certificate_id UUID REFERENCES mida_certificates(id) ON DELETE CASCADE,
-  line_no INTEGER NOT NULL,
-  hs_code VARCHAR(20) NOT NULL,
-  item_name TEXT NOT NULL,
-  uom VARCHAR(50) NOT NULL,
-  
-  -- Approved quantities (from certificate)
-  approved_quantity DECIMAL(18,3),
-  port_klang_qty DECIMAL(18,3),
-  klia_qty DECIMAL(18,3),
-  bukit_kayu_hitam_qty DECIMAL(18,3),
-  
-  -- Remaining quantities (decreases with each import)
-  remaining_quantity DECIMAL(18,3),        -- Initially = approved_quantity
-  remaining_port_klang DECIMAL(18,3),      -- Initially = port_klang_qty
-  remaining_klia DECIMAL(18,3),            -- Initially = klia_qty
-  remaining_bukit_kayu_hitam DECIMAL(18,3), -- Initially = bukit_kayu_hitam_qty
-  
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP,
-  
-  UNIQUE (certificate_id, line_no)
-);
-```
-
-#### Table 3: `mida_import_ledger` (Per-Item Import Tracking - Unified Ledger)
-Tracks each import transaction per item, per port. Similar to existing `Table1` schema.
-Each row = one import event deducting from one port's quota.
-
-```sql
-CREATE TABLE mida_import_ledger (
-  id UUID PRIMARY KEY,
-  certificate_item_id UUID REFERENCES mida_certificate_items(id) ON DELETE CASCADE,
-  
-  -- Import details
-  s_no SERIAL,                             -- Sequential number
-  import_date DATE NOT NULL,
-  declaration_reg_no VARCHAR(255),         -- ALDEC declaration reference
-  kagayaku_ref_no VARCHAR(255),            -- Internal reference (BXXXXX)
-  
-  -- Port indicator (which port this import came through)
-  port VARCHAR(50) NOT NULL,               -- 'PORT_KLANG', 'KLIA', 'BUKIT_KAYU_HITAM', or 'TOTAL'
-  
-  -- Balance tracking (like Table1 schema)
-  balance_carried_forward DECIMAL(18,3),   -- Balance before this import
-  quantity_imported DECIMAL(18,3),         -- Amount deducted in this import
-  balance_after DECIMAL(18,3),             -- Balance after this import
-  
-  -- Metadata
-  created_at TIMESTAMP DEFAULT NOW(),
-  created_by VARCHAR(100),
-  notes TEXT,
-  
-  -- Ensure item links to correct certificate via FK chain
-  CONSTRAINT fk_item FOREIGN KEY (certificate_item_id) 
-    REFERENCES mida_certificate_items(id) ON DELETE CASCADE
-);
-
--- Index for fast lookups
-CREATE INDEX ix_import_ledger_item ON mida_import_ledger(certificate_item_id);
-CREATE INDEX ix_import_ledger_port ON mida_import_ledger(port);
-CREATE INDEX ix_import_ledger_date ON mida_import_ledger(import_date);
-```
-
----
-
-### 8.2 How the Tables Relate (RDBMS Relationships)
-
-```
-┌─────────────────────────┐
-│   mida_certificates     │  (1 per MIDA certificate)
-│   - id (PK)             │
-│   - certificate_number  │
-│   - company_name        │
-│   - exemption dates     │
-└───────────┬─────────────┘
-            │ 1:N
-            ▼
-┌─────────────────────────────────────────────┐
-│        mida_certificate_items               │  (N items per certificate)
-│   - id (PK)                                 │
-│   - certificate_id (FK → mida_certificates) │
-│   - hs_code, item_name, uom                 │
-│   - approved_quantity, port_klang_qty, etc. │
-│   - remaining_quantity, remaining_port_*, etc│
-└───────────┬─────────────────────────────────┘
-            │ 1:N
-            ▼
-┌─────────────────────────────────────────────┐
-│          mida_import_ledger                 │  (N imports per item)
-│   - id (PK)                                 │
-│   - certificate_item_id (FK → items)        │
-│   - port (which port)                       │
-│   - balance_carried_forward                 │
-│   - quantity_imported                       │
-│   - balance_after                           │
-│   - import_date, declaration_reg_no         │
-└─────────────────────────────────────────────┘
-```
-
-**Key RDBMS Constraints:**
-- Same item can exist in multiple certificates → `certificate_item_id` links each ledger entry to the correct certificate
-- When an import occurs at a port, TWO ledger entries are created:
-  1. One for the specific port (e.g., `port='PORT_KLANG'`)
-  2. One for the total approved quantity (`port='TOTAL'`)
-- Remaining quantities in `mida_certificate_items` are updated via trigger or application logic
-
----
-
-### 8.3 Implementation Tasks
-
-#### 8.3.1 Update Existing Model (Add Remaining Quantity Columns)
-- [ ] Add to `MidaCertificateItem` model:
-  ```python
-  remaining_quantity: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 3), nullable=True)
-  remaining_port_klang: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 3), nullable=True)
-  remaining_klia: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 3), nullable=True)
-  remaining_bukit_kayu_hitam: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 3), nullable=True)
-  ```
-- [ ] Create Alembic migration to add these columns
-- [ ] On certificate save, initialize `remaining_* = approved_*` for all columns
-
-#### 8.3.2 Create Import Ledger Model
-- [ ] Create `MidaImportLedger` model in `app/models/mida_import_ledger.py`
-- [ ] Define PortType enum: `PORT_KLANG`, `KLIA`, `BUKIT_KAYU_HITAM`, `TOTAL`
-- [ ] Create Alembic migration for the new table
-
-#### 8.3.3 Service Layer for Import Recording
-- [ ] Create `mida_import_service.py` with functions:
-  - `record_import(certificate_item_id, port, quantity, declaration_ref, notes)`
-  - `get_item_ledger(certificate_item_id, port=None)` - get all imports for an item
-  - `get_item_balance(certificate_item_id)` - get current remaining for all ports
-- [ ] Implement balance update logic:
-  - When recording import for a port:
-    1. Get current `remaining_*` for that port
-    2. Calculate `balance_carried_forward = remaining_*`
-    3. Calculate `balance_after = balance_carried_forward - quantity_imported`
-    4. Insert ledger entry for the specific port
-    5. Insert ledger entry for TOTAL (approved_quantity)
-    6. Update `remaining_*` columns in `mida_certificate_items`
-  - All operations in single transaction
-
-#### 8.3.4 API Endpoints
-- [ ] `POST /api/mida/certificates/{cert_id}/items/{item_id}/import`
-  - Record an import for a specific item at a specific port
-  - Request body: `{port, quantity, declaration_reg_no, kagayaku_ref_no, import_date, notes}`
-- [ ] `GET /api/mida/certificates/{cert_id}/items/{item_id}/ledger`
-  - Get all import history for an item (optionally filter by port)
-- [ ] `GET /api/mida/certificates/{cert_id}/balance`
-  - Get remaining quantities for all items in certificate
-
-#### 8.3.5 Update Save to Database Flow
-- [ ] When saving certificate:
-  1. Create/update `mida_certificates` record
-  2. Create/update `mida_certificate_items` records with remaining = approved
-  3. Return certificate ID for confirmation
-
----
-
-### 8.4 Balance Calculation Rules
-
-**When an import is recorded at a port:**
-1. Deduct from that port's remaining quantity (`remaining_port_klang`, etc.)
-2. Also deduct from total remaining quantity (`remaining_quantity`)
-3. Create ledger entry for port with marker
-4. Create ledger entry for total with marker indicating which port
-
-**Validation:**
-- Cannot import more than remaining quantity
-- Cannot import if certificate is expired (check exemption_end_date)
-- Warn if remaining is near zero (<10% remaining)
-
----
-
-### 8.5 Balance Sheet Views (UI)
+### 10.3 Balance Sheet Views
 - [ ] Per-certificate summary: All items with approved/remaining for each port
 - [ ] Per-item detail: Full import history with running balance
 - [ ] Export to Excel/PDF for reporting
@@ -520,23 +442,129 @@ CREATE INDEX ix_import_ledger_date ON mida_import_ledger(import_date);
 
 ---
 
-### 8.6 ALDEC Integration (Future)
+## Phase 11: ALDEC Integration (TODO)
+
+### 11.1 Post-ALDEC Workflow
 - [ ] After ALDEC approval → user inputs BXXXXX (kagayaku_ref_no)
 - [ ] Link imports to ALDEC declaration reference
 - [ ] Support batch import from ALDEC export file
+
+### 11.2 Declaration Reference Tracking
+- [ ] Add declaration_reg_no field validation
+- [ ] Auto-generate sequential kagayaku_ref_no
 
 ---
 
 ## Summary of Remaining Work
 
-| Phase | Description | Priority | Effort |
-|-------|-------------|----------|--------|
-| 6.1 | Wire Save to Database button | 🔴 High | Small |
-| 6.2 | Certificate list & management UI | 🟡 Medium | Medium |
-| 6.3 | Certificate dropdown in converter | 🟡 Medium | Small |
-| 7.1-7.4 | MIDA invoice converter + K1 output | 🔴 High | Large |
-| 8.1 | Database schema (remaining qty columns + ledger table) | 🔴 High | Medium |
-| 8.2-8.3 | Import recording service + API endpoints | 🔴 High | Large |
-| 8.4 | Balance calculation & validation | 🟡 Medium | Medium |
-| 8.5 | Balance sheet views (UI) | 🟡 Medium | Large |
-| 8.6 | ALDEC integration | 🟢 Low | Medium |
+| Phase | Description | Priority | Effort | Status |
+|-------|-------------|----------|--------|--------|
+| 10.1 | Certificate list & management UI | 🟡 Medium | Medium | TODO |
+| 10.2 | Certificate dropdown in converter | 🟡 Medium | Small | TODO |
+| 10.3 | Balance sheet views (UI) | 🟡 Medium | Large | TODO |
+| 11.1 | ALDEC post-approval workflow | 🟢 Low | Medium | TODO |
+| 11.2 | Declaration reference tracking | 🟢 Low | Small | TODO |
+
+---
+
+## Current Codebase Structure
+
+```
+server/
+├── app/
+│   ├── main.py                          # FastAPI app entry point
+│   ├── config.py                        # 12-factor settings
+│   ├── logging_config.py                # Structured logging
+│   ├── clients/
+│   │   └── mida_client.py               # MIDA API client with caching
+│   ├── db/
+│   │   ├── base.py                      # SQLAlchemy Base
+│   │   ├── mixins.py                    # UUID, Timestamp mixins
+│   │   └── session.py                   # Database session
+│   ├── models/
+│   │   ├── company.py                   # Company model (SST rules)
+│   │   ├── hscode_uom_mapping.py        # HSCODE to UOM mapping
+│   │   └── mida_certificate.py          # Certificate & items
+│   ├── repositories/
+│   │   ├── company_repo.py              # Company queries
+│   │   ├── hscode_uom_repo.py           # HSCODE UOM queries
+│   │   ├── mida_certificate_repo.py     # Certificate queries
+│   │   └── mida_import_repo.py          # Import record queries
+│   ├── routers/
+│   │   ├── convert.py                   # Main conversion endpoints
+│   │   ├── hscode_uom.py                # HSCODE UOM endpoints
+│   │   ├── mida_certificate.py          # Certificate parsing
+│   │   ├── mida_certificates.py         # Certificate CRUD
+│   │   └── mida_imports.py              # Import tracking
+│   ├── schemas/
+│   │   ├── classification.py            # 3-tab classification schemas
+│   │   ├── convert.py                   # Conversion schemas
+│   │   ├── mida_certificate.py          # Certificate schemas
+│   │   └── mida_import.py               # Import schemas
+│   └── services/
+│       ├── azure_di_client.py           # Azure Document Intelligence
+│       ├── invoice_classification_service.py  # Classification logic
+│       ├── k1_export_service.py         # K1 XLS generation
+│       ├── mida_certificate_service.py  # Certificate CRUD
+│       ├── mida_import_service.py       # Import recording
+│       ├── mida_matcher.py              # Invoice-to-MIDA matching
+│       └── mida_matching_service.py     # Invoice parsing
+├── alembic/
+│   └── versions/
+│       ├── 001_add_mida_certificates.py
+│       ├── 002_add_import_tracking.py
+│       ├── 003_add_certificate_status.py
+│       ├── 004_add_declaration_form_number.py
+│       ├── 005_add_model_number.py
+│       ├── 006_add_soft_delete.py
+│       ├── 007_add_hscode_uom_mappings.py
+│       └── 008_companies.py
+├── templates/
+│   └── K1_Import_Template.xls           # K1 export template
+├── run_server.py                        # Quick server startup
+└── requirements.txt
+
+web/
+└── index.html                           # Frontend with 3-tab UI
+```
+
+---
+
+## API Endpoint Summary
+
+### Conversion Endpoints (`/api/convert/...`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/companies` | List all companies for dropdown |
+| POST | `/api/convert` | Single certificate MIDA matching |
+| POST | `/api/convert-multi` | Multi-certificate MIDA matching |
+| POST | `/api/convert/classify` | 3-tab classification (Form-D, MIDA, Duties Payable) |
+| POST | `/api/convert/export` | Export non-FORM-D items to K1 XLS |
+| POST | `/api/convert/export-mida` | Export MIDA matched items to K1 XLS |
+| POST | `/api/convert/export-classified` | Export classified items to K1 XLS |
+
+### Certificate Endpoints (`/api/mida/certificates/...`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/mida/certificates/` | List certificates with pagination |
+| GET | `/api/mida/certificates/{id}` | Get certificate by ID |
+| POST | `/api/mida/certificates/draft` | Create or replace draft |
+| PUT | `/api/mida/certificates/{id}` | Update draft by ID |
+| POST | `/api/mida/certificates/{id}/confirm` | Confirm certificate |
+
+### Import Endpoints (`/api/mida/imports/...`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/mida/imports` | Record import |
+| GET | `/api/mida/imports/{item_id}` | Get import history |
+
+### Certificate Parsing (`/api/mida/certificate/...`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/mida/certificate/parse` | Parse certificate PDF |
+| POST | `/api/mida/certificate/parse-debug` | Parse with debug info |
+
+### HSCODE UOM Endpoints (`/api/hscode-uom/...`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hscode-uom/{hs_code}` | Get UOM for HSCODE |
