@@ -237,6 +237,9 @@ def parse_invoice_file(
     columns = list(df.columns)
     item_no_col = _find_column(columns, ITEM_NO_CANDIDATES)
     invoice_no_col = _find_column(columns, INVOICE_NO_CANDIDATES)
+    # Fallback: if invoice_no column not found by header, use second column (index 1)
+    if invoice_no_col is None and len(columns) > 1:
+        invoice_no_col = columns[1]
     parts_no_col = _find_column(columns, PARTS_NO_CANDIDATES)
     model_no_col = _find_column(columns, MODEL_NO_CANDIDATES)
     hs_col = _find_column(columns, HS_CODE_CANDIDATES)

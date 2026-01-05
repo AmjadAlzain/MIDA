@@ -1111,16 +1111,31 @@
                                     <th>Invoice Part Name</th>
                                     <th>Model No</th>
                                     <th>Qty</th>
+                                    <th>Net Wt (Kg)</th>
                                     <th>Certificate</th>
                                     <th>MIDA Line</th>
                                     <th>MIDA Item</th>
                                     <th>MIDA HS Code</th>
                                     <th>Remaining</th>
+                                    <th>Deduction</th>
                                     <th>Score</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Balance Sheet Update Section (appears after MIDA matching) -->
+                    <div id="databaseUpdateSection" class="hidden" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+                        <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="declarationNumber" style="font-weight: 600; color: #555; font-size: 0.85rem;">Declaration Form Reg No</label>
+                                <input type="text" id="declarationNumber" placeholder="e.g., Bxxxxxx" style="width: 180px; padding: 0.5rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;">
+                            </div>
+                            <button id="updateDatabaseBtn" style="background: #3498db; color: white; border: none; border-radius: 4px; padding: 0.6rem 1.2rem; cursor: pointer; font-weight: 600;" onclick="updateDatabase()">
+                                📊 Update Balance Sheet
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -1157,15 +1172,6 @@
                         <button id="exportK1Btn" class="toggle-btn" style="background: #27ae60; color: white; border-color: #27ae60; padding: 0.6rem 1.2rem;" onclick="exportK1Xls()">
                             📥 Export K1 XLS
                         </button>
-                        <div id="databaseUpdateSection" class="hidden" style="display: flex; gap: 0.75rem; align-items: flex-end;">
-                            <div class="form-group" style="margin: 0;">
-                                <label for="declarationNumber" style="font-weight: 600; color: #555; font-size: 0.85rem;">Declaration Form Reg No</label>
-                                <input type="text" id="declarationNumber" placeholder="e.g., Bxxxxxx" style="width: 160px; padding: 0.5rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;">
-                            </div>
-                            <button id="updateDatabaseBtn" style="background: #3498db; color: white; border: 1px solid #3498db; border-radius: 4px; padding: 0.6rem 1.2rem; cursor: pointer;" onclick="updateDatabase()">
-                                💾 Update Database
-                            </button>
-                        </div>
                     </div>
                 </div>
                 
@@ -1797,22 +1803,30 @@
                 return;
             }
             
+            // Check for items with missing deduction quantity (HSCODE not found errors)
+            const itemsWithErrors = matchedItemsForDatabase.filter(item => item.deduction_quantity === null || item.deduction_quantity === undefined);
+            if (itemsWithErrors.length > 0) {
+                const errorItems = itemsWithErrors.map(item => `Line ${item.invoice_line}: ${item.description?.substring(0, 30) || 'Unknown'}`).join('\n');
+                alert(`❌ Cannot update balance sheet. The following items have HSCODE errors (UOM could not be determined):\n\n${errorItems}\n\nPlease resolve these errors before updating.`);
+                return;
+            }
+            
             const updateBtn = document.getElementById('updateDatabaseBtn');
             const originalText = updateBtn.textContent;
             updateBtn.disabled = true;
             updateBtn.textContent = '⏳ Saving...';
             
             try {
-                // Build import records from matched items
+                // Build import records from matched items using deduction_quantity (based on hscode_uom)
                 const importRecords = matchedItemsForDatabase.map(item => ({
                     certificate_item_id: item.mida_item_id,
                     import_date: importDate,
                     declaration_form_reg_no: declarationNumber || null,
                     invoice_number: item.invoice_number || 'UNKNOWN',
                     invoice_line: item.invoice_line,
-                    quantity_imported: item.quantity,
+                    quantity_imported: item.deduction_quantity,  // Use deduction_quantity (respects hscode_uom)
                     port: port,
-                    remarks: `Matched with score ${item.match_score}`
+                    remarks: `Matched with score ${item.match_score}, UOM: ${item.hscode_uom || 'N/A'}`
                 }));
                 
                 const response = await fetch(`${API_BASE}/api/mida/imports/bulk`, {
@@ -1820,7 +1834,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(importRecords)
+                    body: JSON.stringify({ records: importRecords })
                 });
                 
                 const data = await response.json();
@@ -1836,13 +1850,18 @@
                 }
                 
                 // Success
-                alert(`✅ Successfully saved ${data.length} import records to the database!`);
+                alert(`✅ Successfully saved ${data.length} import records to the database!\n\nRedirecting to Database View to see updated balances...`);
                 updateBtn.textContent = '✅ Saved!';
                 
-                // Reset after 2 seconds
+                // Clear matched items since they've been saved
+                matchedItemsForDatabase = [];
+                
+                // Redirect to Database View tab after a short delay
                 setTimeout(() => {
                     updateBtn.textContent = originalText;
-                }, 2000);
+                    // Switch to database tab to show updated balances
+                    switchTab('database');
+                }, 1500);
                 
             } catch (error) {
                 console.error('Database update error:', error);
@@ -2044,7 +2063,7 @@
                 // Show database update section
                 if (databaseUpdateSection) {
                     databaseUpdateSection.classList.remove('hidden');
-                    databaseUpdateSection.style.display = 'flex';
+                    databaseUpdateSection.style.display = 'block';
                 }
                 
                 // Store matched items for database update (with certificate info for multi-cert)
@@ -2055,7 +2074,11 @@
                     invoice_number: item.invoice_no || 'UNKNOWN',
                     invoice_line: item.line_no,
                     quantity: parseFloat(item.quantity) || 0,
-                    match_score: item.match_score
+                    net_weight_kg: item.net_weight_kg ? parseFloat(item.net_weight_kg) : null,
+                    hscode_uom: item.hscode_uom,
+                    deduction_quantity: item.deduction_quantity ? parseFloat(item.deduction_quantity) : null,
+                    match_score: item.match_score,
+                    description: item.description
                 }));
                 
                 // Store matched items for export (with MIDA HS codes)
@@ -2158,17 +2181,24 @@
                 const scoreClass = item.match_score >= 0.95 ? 'high' : 
                                    item.match_score >= 0.8 ? 'medium' : 'low';
                 
+                // Determine deduction display
+                const deductionDisplay = item.deduction_quantity !== null && item.deduction_quantity !== undefined
+                    ? `${parseFloat(item.deduction_quantity).toFixed(2)} ${item.hscode_uom || ''}`
+                    : '<span style="color: #e74c3c;">⚠️ Error</span>';
+                
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${item.line_no}</td>
                     <td>${escapeHtml(item.description)}</td>
                     <td>${escapeHtml(item.model_no || '-')}</td>
                     <td>${item.quantity}</td>
+                    <td>${item.net_weight_kg ? parseFloat(item.net_weight_kg).toFixed(2) : '-'}</td>
                     <td><small>${escapeHtml(item.mida_certificate_number || '-')}</small></td>
                     <td>${item.mida_line_no}</td>
                     <td>${escapeHtml(item.mida_item_name)}</td>
                     <td><code>${escapeHtml(item.mida_hs_code)}</code></td>
                     <td>${item.remaining_qty} ${item.remaining_uom}</td>
+                    <td>${deductionDisplay}</td>
                     <td><span class="match-score ${scoreClass}">${(item.match_score * 100).toFixed(0)}%</span></td>
                 `;
                 tbody.appendChild(row);

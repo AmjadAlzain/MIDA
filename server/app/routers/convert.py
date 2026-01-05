@@ -544,6 +544,9 @@ async def convert_with_mida(
                         uom=orig_item.uom,
                         amount=orig_item.amount,
                         net_weight_kg=orig_item.net_weight_kg,
+                        parts_no=orig_item.parts_no,
+                        invoice_no=orig_item.invoice_no,
+                        model_no=orig_item.model_no,
                         # MIDA matching fields
                         mida_item_id=match.mida_item.item_id,
                         mida_line_no=match.mida_item.line_no,
@@ -842,6 +845,8 @@ async def convert_with_multi_mida(
                         uom=orig_item.uom,
                         amount=orig_item.amount,
                         net_weight_kg=orig_item.net_weight_kg,
+                        parts_no=orig_item.parts_no,
+                        invoice_no=orig_item.invoice_no,
                         model_no=orig_item.model_no,
                         # MIDA matching fields
                         mida_item_id=match.mida_item.item_id,
