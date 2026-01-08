@@ -59,7 +59,7 @@ class InvoiceItemBase(BaseModel):
     hs_code: str = Field(default="", description="HS tariff code")
     description: str = Field(..., description="Item description (from Parts Name column)")
     quantity: Decimal = Field(..., ge=0, description="Invoice quantity")
-    uom: str = Field(default="UNT", description="Unit of measure")
+    uom: str = Field(default="", description="Unit of measure (populated from HSCODE_UOM lookup)")
     amount: Optional[Decimal] = Field(default=None, description="Amount in USD")
     net_weight_kg: Optional[Decimal] = Field(default=None, description="Net weight in KG")
     parts_no: Optional[str] = Field(default=None, description="Parts number")
@@ -212,7 +212,7 @@ class MidaExportItem(BaseModel):
     hs_code: str = Field(..., description="HS code from MIDA certificate")
     description: str = Field(..., description="Item description")
     quantity: Decimal = Field(..., ge=0, description="Invoice quantity")
-    uom: str = Field(default="UNT", description="Unit of measure")
+    uom: str = Field(..., description="Unit of measure from HSCODE_UOM lookup")
     amount: Optional[Decimal] = Field(default=None, description="Amount in USD")
     net_weight_kg: Optional[Decimal] = Field(default=None, description="Net weight in KG")
 

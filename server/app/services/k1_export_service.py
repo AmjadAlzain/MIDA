@@ -144,7 +144,20 @@ def generate_k1_xls(items: list[dict], country: str = "MY") -> bytes:
     # Extract and transform item data
     hs_codes = [_format_hs_code(item.get("hs_code", "")) for item in items]
     descriptions = [str(item.get("description", "")) for item in items]
-    uoms = [str(item.get("uom", "UNT")).upper() for item in items]
+    uoms = [str(item.get("uom") or "").upper() for item in items]
+    
+    # Normalize UOMs to KGM or UNT for K1 format (keep empty if not found)
+    normalized_uoms = []
+    for uom in uoms:
+        if uom in ("KGM", "KG", "KGS", "KILOGRAM", "KILOGRAMS"):
+            normalized_uoms.append("KGM")
+        elif uom in ("UNIT", "UNT", "UNITS", "PCS", "PC", "PIECE", "EA", "EACH"):
+            normalized_uoms.append("UNT")
+        else:
+            # Keep empty if UOM not found/recognized
+            normalized_uoms.append("")
+    uoms = normalized_uoms
+    
     quantities = [_to_float(item.get("quantity", 0)) for item in items]
     amounts = [_to_float(item.get("amount", 0)) for item in items]
     net_weights = [_to_float(item.get("net_weight_kg", 0)) for item in items]
@@ -311,19 +324,23 @@ def generate_k1_xls_with_options(
     hs_codes = [_format_hs_code(item.get("hs_code", "")) for item in items]
     descriptions = [str(item.get("description", "")) for item in items]
     descriptions2 = [str(item.get("description2", item.get("quantity", ""))) for item in items]
-    uoms = [str(item.get("uom", "UNT")).upper() for item in items]
+    uoms = [str(item.get("uom") or "").upper() for item in items]
+    
     quantities = [_to_float(item.get("quantity", 0)) for item in items]
     amounts = [_to_float(item.get("amount", 0)) for item in items]
     net_weights = [_to_float(item.get("net_weight_kg", 0)) for item in items]
     sst_exemptions = [item.get("sst_exempted", False) for item in items]
 
-    # Normalize UOMs to KGM or UNT
+    # Normalize UOMs to KGM or UNT for K1 format (keep empty if not found)
     normalized_uoms = []
     for uom in uoms:
         if uom in ("KGM", "KG", "KGS", "KILOGRAM", "KILOGRAMS"):
             normalized_uoms.append("KGM")
-        else:
+        elif uom in ("UNIT", "UNT", "UNITS", "PCS", "PC", "PIECE", "EA", "EACH"):
             normalized_uoms.append("UNT")
+        else:
+            # Keep empty if UOM not found/recognized
+            normalized_uoms.append("")
     uoms = normalized_uoms
 
     # Calculate statistical/declared quantities based on UOM

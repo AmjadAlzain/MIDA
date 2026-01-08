@@ -19,6 +19,36 @@ class HscodeNotFoundError(Exception):
     pass
 
 
+def normalize_uom_value(uom: str) -> str:
+    """
+    Normalize UOM value to standard format.
+    
+    - KGM variations (KGM, KG, KGS, KILOGRAM, etc.) -> "KGM"
+    - UNIT variations (UNIT, UNT, UNITS, PCS, etc.) -> "UNT"
+    
+    Args:
+        uom: Raw UOM value from database
+        
+    Returns:
+        Normalized UOM: "KGM" or "UNT"
+    """
+    if not uom:
+        return ""
+    
+    uom_upper = uom.upper().strip()
+    
+    # KGM variations
+    if uom_upper in ("KGM", "KG", "KGS", "KILOGRAM", "KILOGRAMS"):
+        return "KGM"
+    
+    # UNIT variations - convert to UNT
+    if uom_upper in ("UNIT", "UNT", "UNITS", "PCS", "PC", "PIECE", "PIECES", "EA", "EACH", "NOS", "NO"):
+        return "UNT"
+    
+    # Default: return as-is (uppercase)
+    return uom_upper
+
+
 def get_uom_by_hscode(db: Session, hs_code: str) -> str:
     """
     Get the UOM for a given HSCODE.
@@ -38,34 +68,49 @@ def get_uom_by_hscode(db: Session, hs_code: str) -> str:
     Raises:
         HscodeNotFoundError: If no matching or similar HSCODE is found in the mapping table
     """
+    # Normalize input HSCODE (remove dots and whitespace)
     normalized = normalize_hscode(hs_code)
-    
+
     if not normalized:
         raise HscodeNotFoundError(f"Invalid HSCODE: '{hs_code}'")
-    
+
+    # Stripped form: remove trailing zeros for comparison only
     normalized_stripped = normalized.rstrip('0')
-    
-    # First try exact match by stripping trailing zeros from both sides
-    stmt = select(HscodeUomMapping.uom).where(
-        func.rtrim(HscodeUomMapping.hs_code, '0') == normalized_stripped
-    )
-    result = db.execute(stmt).scalar_one_or_none()
-    
-    if result is not None:
-        return result
-    
-    # No exact match - find most similar HSCODE by longest common prefix
-    # Try progressively shorter prefixes until we find a match
-    for prefix_len in range(len(normalized_stripped) - 1, 0, -1):
-        prefix = normalized_stripped[:prefix_len]
-        # Find HSCODEs where the stripped version starts with this prefix
-        stmt = select(HscodeUomMapping.hs_code, HscodeUomMapping.uom).where(
-            func.rtrim(HscodeUomMapping.hs_code, '0').like(f"{prefix}%")
-        ).limit(1)
-        row = db.execute(stmt).first()
-        if row:
-            return row.uom
-    
+
+    # Fetch all mappings and compare using stripped forms to be robust
+    mappings = db.execute(select(HscodeUomMapping)).scalars().all()
+    if not mappings:
+        raise HscodeNotFoundError(f"HSCODE mapping table is empty")
+
+    # First prefer exact stripped match (b.stripped == a.stripped)
+    for m in mappings:
+        try:
+            db_norm = normalize_hscode(m.hs_code).rstrip('0')
+        except Exception:
+            db_norm = normalize_hscode(m.hs_code)
+        if db_norm == normalized_stripped:
+            return normalize_uom_value(m.uom)
+
+    # No exact stripped match — fallback to longest common-stripped-prefix
+    best_match = None
+    best_prefix_len = 0
+    for m in mappings:
+        db_norm = normalize_hscode(m.hs_code).rstrip('0')
+        # compute common prefix length between normalized_stripped and db_norm
+        maxlen = min(len(normalized_stripped), len(db_norm))
+        common = 0
+        for i in range(maxlen):
+            if normalized_stripped[i] == db_norm[i]:
+                common += 1
+            else:
+                break
+        if common > best_prefix_len:
+            best_prefix_len = common
+            best_match = m
+
+    if best_match and best_prefix_len > 0:
+        return normalize_uom_value(best_match.uom)
+
     raise HscodeNotFoundError(f"HSCODE '{hs_code}' (normalized: '{normalized}') not found in UOM mapping table")
 
 

@@ -191,7 +191,8 @@ def parse_all_invoice_items(file_bytes: bytes) -> list[dict]:
         except Exception:
             quantity = Decimal(0)
 
-        uom = str(row.get(uom_col, "UNT") or "UNT").strip() if uom_col else "UNT"
+        # UOM is left empty - will be populated from HSCODE_UOM lookup after MIDA matching
+        uom = ""
 
         amount = None
         if amount_col:

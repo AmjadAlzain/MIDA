@@ -52,7 +52,7 @@ class ClassifiedItem(BaseModel):
     hs_code: str = Field(default="", description="HS tariff code from invoice")
     description: str = Field(..., description="Item description (Parts Name)")
     quantity: Decimal = Field(..., ge=0, description="Invoice quantity")
-    uom: str = Field(default="UNT", description="Unit of measure")
+    uom: str = Field(default="", description="Unit of measure from HSCODE_UOM lookup (may be empty if not found)")
     amount: Optional[Decimal] = Field(default=None, description="Amount in USD")
     net_weight_kg: Optional[Decimal] = Field(default=None, description="Net weight in KG")
     parts_no: Optional[str] = Field(default=None, description="Parts number")
@@ -155,7 +155,7 @@ class K1ExportItem(BaseModel):
     description: str = Field(..., description="Item description (Parts Name)")
     description2: str = Field(default="", description="Secondary description (Quantity)")
     quantity: Decimal = Field(..., ge=0, description="Quantity for StatisticalQty/DeclaredQty")
-    uom: str = Field(default="UNT", description="UOM (KGM or UNT)")
+    uom: str = Field(default="", description="UOM from HSCODE_UOM lookup (KGM or UNIT, may be empty)")
     amount: Optional[Decimal] = Field(default=None, description="Amount in USD")
     net_weight_kg: Optional[Decimal] = Field(default=None, description="Net weight in KG")
     

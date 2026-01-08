@@ -1356,6 +1356,7 @@
                                         <th>Parts Name</th>
                                         <th>HS Code</th>
                                         <th>Qty</th>
+                                        <th>UOM</th>
                                         <th>Net Wt (Kg)</th>
                                         <th>Amount (USD)</th>
                                         <th>SST Exempt</th>
@@ -1376,6 +1377,7 @@
                                         <th>Line</th>
                                         <th>Parts Name</th>
                                         <th>MIDA HS Code</th>
+                                        <th>UOM</th>
                                         <th>Certificate</th>
                                         <th>Remaining</th>
                                         <th>Deduction</th>
@@ -1415,6 +1417,7 @@
                                         <th>Parts Name</th>
                                         <th>HS Code</th>
                                         <th>Qty</th>
+                                        <th>UOM</th>
                                         <th>Net Wt (Kg)</th>
                                         <th>Amount (USD)</th>
                                         <th>SST Exempt</th>
@@ -2317,6 +2320,7 @@
                         <td>${item.line_no || index + 1}</td>
                         <td>${escapeHtml(item.description || item.parts_name || '')}</td>
                         <td>${escapeHtml(item.mida_hs_code || item.hs_code || '')}</td>
+                        <td>${escapeHtml(item.uom || '')}</td>
                         <td>${escapeHtml(item.mida_certificate_number || '-')}</td>
                         <td>${item.remaining_qty != null ? parseFloat(item.remaining_qty).toLocaleString() : '-'}</td>
                         <td>${item.deduction_quantity != null ? parseFloat(item.deduction_quantity).toLocaleString() : '-'}</td>
@@ -2346,6 +2350,7 @@
                         <td>${escapeHtml(item.description || item.parts_name || '')}</td>
                         <td>${escapeHtml(item.hs_code || '')}</td>
                         <td>${item.quantity != null ? parseFloat(item.quantity).toLocaleString() : ''}</td>
+                        <td>${escapeHtml(item.uom || '')}</td>
                         <td>${item.net_weight_kg != null ? parseFloat(item.net_weight_kg).toFixed(2) : ''}</td>
                         <td>${item.amount != null ? parseFloat(item.amount).toFixed(2) : ''}</td>
                         <td>

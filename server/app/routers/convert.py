@@ -1383,6 +1383,40 @@ async def classify_invoice(
                         "severity": warning.severity.value,
                     })
 
+    # ===== UOM LOOKUP (after MIDA matching, before classification) =====
+    # Now that all HSCODEs are finalized (including MIDA HS codes), look up UOM for each item
+    # For MIDA-matched items, use the MIDA HSCODE; for others, use the invoice HSCODE
+    for item in invoice_items:
+        line_no = item.get("line_no")
+        mida_match = mida_matches.get(line_no)
+        
+        # Use MIDA HSCODE if matched, otherwise use invoice HSCODE
+        if mida_match and mida_match.get("mida_hs_code"):
+            hs_code = mida_match["mida_hs_code"]
+        else:
+            hs_code = item.get("hs_code", "")
+        
+        if hs_code:
+            try:
+                uom_from_hscode = get_uom_by_hscode(db, hs_code)
+                item["uom"] = uom_from_hscode
+            except HscodeNotFoundError:
+                # Keep UOM as empty string, add warning
+                item["uom"] = ""
+                warnings.append({
+                    "invoice_item": f"Line {line_no}",
+                    "reason": f"HSCODE '{hs_code}' not found in HSCODE_UOM mapping table - UOM left empty",
+                    "severity": "warning",
+                })
+        else:
+            # No HSCODE available, keep UOM as empty string, add warning
+            item["uom"] = ""
+            warnings.append({
+                "invoice_item": f"Line {line_no}",
+                "reason": "No HSCODE available - UOM left empty",
+                "severity": "warning",
+            })
+
     # Classify items into 3 categories
     form_d_items, mida_items, duties_payable_items = classify_items(
         invoice_items, company, mida_matches
@@ -1418,6 +1452,10 @@ Export items from any of the 3 classification tables (Form-D, MIDA, Duties Payab
 **SST columns are set per item based on sst_exempted field:**
 - If sst_exempted=True: SSTMethod=Exemption, Method=E, Percentage=100
 - If sst_exempted=False: Empty SST columns
+
+**UOM is determined from HSCODE mapping table:**
+- Each item's UOM (StatisticalUOM, DeclaredUOM) is looked up by HSCODE
+- Falls back to invoice UOM if HSCODE not found in mapping table
 """,
     responses={
         200: {"description": "K1 Import XLS file"},
@@ -1427,27 +1465,37 @@ Export items from any of the 3 classification tables (Form-D, MIDA, Duties Payab
 )
 async def export_classified_k1_xls(
     request: K1ExportRequest,
+    db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """
     Export classified items to K1 Import XLS format.
 
     This endpoint handles all 3 export types (Form-D, MIDA, Duties Payable)
     with appropriate duty/SST column settings.
+    
+    UOM is looked up from HSCODE mapping table for each item.
     """
-    # Convert items to dict list for K1 export
-    items_for_export = [
-        {
+    # Convert items to dict list for K1 export, looking up UOM from HSCODE table
+    items_for_export = []
+    for item in request.items:
+        # Look up UOM from HSCODE mapping table
+        uom_from_hscode = item.uom  # Default to item's UOM
+        try:
+            uom_from_hscode = get_uom_by_hscode(db, item.hs_code)
+            logger.debug(f"HSCODE {item.hs_code} -> UOM: {uom_from_hscode}")
+        except HscodeNotFoundError:
+            logger.warning(f"HSCODE {item.hs_code} not found in UOM mapping table, using invoice UOM: {item.uom}")
+        
+        items_for_export.append({
             "hs_code": item.hs_code,
             "description": item.description,
             "description2": item.description2,
             "quantity": item.quantity,
-            "uom": item.uom,
+            "uom": uom_from_hscode,  # Use UOM from HSCODE lookup
             "amount": item.amount,
             "net_weight_kg": item.net_weight_kg,
             "sst_exempted": item.sst_exempted,
-        }
-        for item in request.items
-    ]
+        })
 
     try:
         # Generate K1 XLS with options
