@@ -73,6 +73,7 @@ from app.services.mida_certificate_service import (
     get_certificates_by_ids,
 )
 from app.repositories.hscode_uom_repo import get_uom_by_hscode, HscodeNotFoundError
+from app.repositories.hscode_master_repo import lookup_by_part_name
 from app.repositories.company_repo import get_all_companies, get_company_by_id
 from app.schemas.convert import (
     ConversionWarning,
@@ -1383,12 +1384,45 @@ async def classify_invoice(
                         "severity": warning.severity.value,
                     })
 
+    # ===== HSCODE LOOKUP BY PART NAME (for items without HSCODE) =====
+    # Before UOM lookup, try to assign HSCODE to items that don't have one
+    # by matching their description/part name against the HSCODE master table
+    for item in invoice_items:
+        line_no = item.get("line_no")
+        mida_match = mida_matches.get(line_no)
+        
+        # Check if item already has an HSCODE (from MIDA match or invoice)
+        has_mida_hscode = mida_match and mida_match.get("mida_hs_code")
+        invoice_hscode = item.get("hs_code", "")
+        # Treat "None", empty strings, and whitespace-only as no HSCODE
+        has_invoice_hscode = bool(invoice_hscode and invoice_hscode.strip() and invoice_hscode.strip().lower() != "none")
+        
+        if not has_mida_hscode and not has_invoice_hscode:
+            # No HSCODE - try to find one by matching part name
+            description = item.get("description", "")
+            if description:
+                lookup_result = lookup_by_part_name(description, fuzzy_threshold=0.85, db=db)
+                if lookup_result:
+                    # Found a match - assign HSCODE and UOM directly
+                    item["hs_code"] = lookup_result.hs_code
+                    item["uom"] = lookup_result.uom
+                    match_type = "exact" if lookup_result.is_exact_match else f"fuzzy ({lookup_result.match_score:.2f})"
+                    warnings.append({
+                        "invoice_item": f"Line {line_no}",
+                        "reason": f"HSCODE '{lookup_result.hs_code}' and UOM '{lookup_result.uom}' assigned from HSCODE Master by {match_type} match on part name '{lookup_result.part_name}'",
+                        "severity": "info",
+                    })
+
     # ===== UOM LOOKUP (after MIDA matching, before classification) =====
     # Now that all HSCODEs are finalized (including MIDA HS codes), look up UOM for each item
     # For MIDA-matched items, use the MIDA HSCODE; for others, use the invoice HSCODE
     for item in invoice_items:
         line_no = item.get("line_no")
         mida_match = mida_matches.get(line_no)
+        
+        # Skip items that already have UOM assigned (from HSCODE Master lookup above)
+        if item.get("uom"):
+            continue
         
         # Use MIDA HSCODE if matched, otherwise use invoice HSCODE
         if mida_match and mida_match.get("mida_hs_code"):

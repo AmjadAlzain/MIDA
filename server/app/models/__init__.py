@@ -9,6 +9,7 @@ from app.models.mida_certificate import (
     ImportPort,
 )
 from app.models.company import Company
+from app.models.hscode_master import HscodeMaster
 
 __all__ = [
     "CertificateStatus",
@@ -18,4 +19,5 @@ __all__ = [
     "QuantityStatus",
     "ImportPort",
     "Company",
+    "HscodeMaster",
 ]

@@ -2316,9 +2316,12 @@
                 
                 if (tableName === 'mida') {
                     // MIDA table has different columns
+                    // Format parts name with MIDA line number: "Water Pump (25)"
+                    const partsName = item.description || item.parts_name || '';
+                    const midaLineDisplay = item.mida_line_no ? `${partsName} (${item.mida_line_no})` : partsName;
                     tr.innerHTML = `
                         <td>${item.line_no || index + 1}</td>
-                        <td>${escapeHtml(item.description || item.parts_name || '')}</td>
+                        <td>${escapeHtml(midaLineDisplay)}</td>
                         <td>${escapeHtml(item.mida_hs_code || item.hs_code || '')}</td>
                         <td>${escapeHtml(item.uom || '')}</td>
                         <td>${escapeHtml(item.mida_certificate_number || '-')}</td>
