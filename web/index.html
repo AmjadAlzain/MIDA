@@ -1046,6 +1046,21 @@
             background: #fff3a0 !important;
         }
         
+        /* Toggle all SST button */
+        .toggle-all-sst-btn {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 4px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: white;
+            margin-left: 0.5rem;
+        }
+        .toggle-all-sst-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
         /* Move item dropdown */
         .move-dropdown {
             position: relative;
@@ -1359,7 +1374,7 @@
                                         <th>UOM</th>
                                         <th>Net Wt (Kg)</th>
                                         <th>Amount (USD)</th>
-                                        <th>SST Exempt</th>
+                                        <th>SST Exempt <button class="toggle-all-sst-btn" onclick="toggleAllSST('form_d')" title="Toggle All">☑</button></th>
                                         <th>Move</th>
                                     </tr>
                                 </thead>
@@ -1382,7 +1397,7 @@
                                         <th>Remaining</th>
                                         <th>Deduction</th>
                                         <th>Score</th>
-                                        <th>SST Exempt</th>
+                                        <th>SST Exempt <button class="toggle-all-sst-btn" onclick="toggleAllSST('mida')" title="Toggle All">☑</button></th>
                                         <th>Move</th>
                                     </tr>
                                 </thead>
@@ -1420,7 +1435,7 @@
                                         <th>UOM</th>
                                         <th>Net Wt (Kg)</th>
                                         <th>Amount (USD)</th>
-                                        <th>SST Exempt</th>
+                                        <th>SST Exempt <button class="toggle-all-sst-btn" onclick="toggleAllSST('duties_payable')" title="Toggle All">☑</button></th>
                                         <th>Move</th>
                                     </tr>
                                 </thead>
@@ -2250,9 +2265,38 @@
             
             if (item) {
                 item.sst_exempted = !item.sst_exempted;
-                item.manually_moved = true;  // Mark as modified
+                // Check if new value matches the default - if so, reset the manual flag
+                if (item.sst_exempted === item.sst_exempted_default) {
+                    item.sst_manually_changed = false;
+                } else {
+                    item.sst_manually_changed = true;
+                }
                 renderClassificationTable(currentTable);
             }
+        }
+        
+        // Toggle all SST exemptions in a table
+        function toggleAllSST(tableName) {
+            const tableKey = tableName + '_items';
+            const items = classificationData[tableKey];
+            
+            if (items.length === 0) return;
+            
+            // Determine new state: if any are OFF, turn all ON; otherwise turn all OFF
+            const anyOff = items.some(item => !item.sst_exempted);
+            const newState = anyOff;  // Turn all ON if any are OFF
+            
+            items.forEach(item => {
+                item.sst_exempted = newState;
+                // Check if new value matches the default - if so, reset the manual flag
+                if (item.sst_exempted === item.sst_exempted_default) {
+                    item.sst_manually_changed = false;
+                } else {
+                    item.sst_manually_changed = true;
+                }
+            });
+            
+            renderClassificationTable(tableName);
         }
         
         // Move item to a different table
@@ -2270,10 +2314,33 @@
             
             const item = sourceItems.splice(itemIndex, 1)[0];
             
-            // Mark as manually moved and modified
-            item.manually_moved = true;
-            item.original_table = item.original_table || sourceTable;  // Remember original
+            // Remember original table if not set
+            item.original_table = item.original_table || sourceTable;
             item.current_table = targetTable;
+            
+            // Check if item is back at original table - if so, reset manually_moved
+            if (targetTable === item.original_table) {
+                item.manually_moved = false;
+            } else {
+                item.manually_moved = true;
+            }
+            
+            // Auto-update SST exemption based on destination table (if not manually changed)
+            if (!item.sst_manually_changed) {
+                const company = classificationData.company;
+                // Get SST default for target table
+                // HICOM (all_on) = all tables have SST exempted
+                // Others (mida_only) = only MIDA table has SST exempted
+                let newSstDefault;
+                if (company && company.sst_default_behavior === 'all_on') {
+                    newSstDefault = false;  // HICOM: all SST exemption = No
+                } else {
+                    // Hong Leong / mida_only: MIDA = Yes, Form-D & Duties Payable = No
+                    newSstDefault = (targetTable === 'mida');
+                }
+                item.sst_exempted = newSstDefault;
+                item.sst_exempted_default = newSstDefault;
+            }
             
             // Add to target
             classificationData[targetKey].push(item);
@@ -2309,8 +2376,8 @@
             items.forEach((item, index) => {
                 const tr = document.createElement('tr');
                 
-                // Add modified class if manually changed
-                if (item.manually_moved) {
+                // Add modified class if manually changed (table move OR SST change)
+                if (item.manually_moved || item.sst_manually_changed) {
                     tr.classList.add('modified-row');
                 }
                 
@@ -2348,10 +2415,12 @@
                     `;
                 } else {
                     // Form-D and Duties Payable tables
+                    // For HS code: use hs_code, or fallback to mida_hs_code (remove dots for consistency)
+                    const displayHsCode = item.hs_code || (item.mida_hs_code ? item.mida_hs_code.replace(/\./g, '') : '');
                     tr.innerHTML = `
                         <td>${item.line_no || index + 1}</td>
                         <td>${escapeHtml(item.description || item.parts_name || '')}</td>
-                        <td>${escapeHtml(item.hs_code || '')}</td>
+                        <td>${escapeHtml(displayHsCode)}</td>
                         <td>${item.quantity != null ? parseFloat(item.quantity).toLocaleString() : ''}</td>
                         <td>${escapeHtml(item.uom || '')}</td>
                         <td>${item.net_weight_kg != null ? parseFloat(item.net_weight_kg).toFixed(2) : ''}</td>
