@@ -594,6 +594,152 @@
         }
         
         /* ==========================================
+           Row Action Buttons (Add/Delete Rows)
+           ========================================== */
+        
+        /* Actions column - hidden by default, shown in edit mode */
+        .actions-column {
+            display: none;
+            width: 90px;
+            min-width: 90px;
+        }
+        .actions-column.visible {
+            display: table-cell;
+        }
+        
+        /* Row action buttons */
+        .row-actions {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .row-actions.visible {
+            opacity: 1;
+        }
+        .row-action-btn {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-insert-row {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-insert-row:hover {
+            background: #219a52;
+        }
+        .btn-delete-row {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-delete-row:hover {
+            background: #c0392b;
+        }
+        .btn-delete-row:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        /* Add row between rows button (appears between rows) */
+        .add-row-divider {
+            display: none;
+            height: 0;
+            position: relative;
+        }
+        .add-row-divider.visible {
+            display: table-row;
+        }
+        .add-row-divider td {
+            padding: 0 !important;
+            border: none !important;
+            position: relative;
+            height: 24px;
+        }
+        .add-row-btn-container {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        .btn-add-row-between {
+            padding: 2px 12px;
+            font-size: 0.75rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.7;
+        }
+        .btn-add-row-between:hover {
+            background: #2980b9;
+            opacity: 1;
+        }
+        
+        /* Undo Toast Notification */
+        .undo-toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2c3e50;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            animation: slideUp 0.3s ease;
+        }
+        .undo-toast.hiding {
+            animation: slideDown 0.3s ease forwards;
+        }
+        @keyframes slideUp {
+            from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+        @keyframes slideDown {
+            from { transform: translateX(-50%) translateY(0); opacity: 1; }
+            to { transform: translateX(-50%) translateY(100px); opacity: 0; }
+        }
+        .undo-toast .toast-message {
+            font-size: 0.95rem;
+        }
+        .undo-toast .btn-undo {
+            padding: 6px 14px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .undo-toast .btn-undo:hover {
+            background: #2980b9;
+        }
+        .undo-toast .toast-dismiss {
+            padding: 4px 8px;
+            background: transparent;
+            color: #95a5a6;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        .undo-toast .toast-dismiss:hover {
+            color: white;
+        }
+        
+        /* ==========================================
            Database View Tab Styles
            ========================================== */
         
@@ -1633,6 +1779,7 @@
                                 <th>Port Klang</th>
                                 <th>KLIA</th>
                                 <th>Bukit Kayu Hitam</th>
+                                <th class="actions-column" id="actionsColumnHeader">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="certItemsBody">
@@ -3404,11 +3551,17 @@
                         <td class="editable-cell" data-field="port_klang_qty">${portKlangQty}</td>
                         <td class="editable-cell" data-field="klia_qty">${kliaQty}</td>
                         <td class="editable-cell" data-field="bukit_kayu_hitam_qty">${bukitKayuHitamQty}</td>
+                        <td class="actions-column">
+                            <div class="row-actions">
+                                <button class="row-action-btn btn-insert-row" onclick="insertRowAfter(${index})" title="Insert row below">+</button>
+                                <button class="row-action-btn btn-delete-row" onclick="deleteRow(${index})" title="Delete row">🗑️</button>
+                            </div>
+                        </td>
                     `;
                     tbody.appendChild(row);
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #7f8c8d;">No items found in certificate</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #7f8c8d;">No items found in certificate</td></tr>';
             }
             
             // Show warnings if any
@@ -3495,10 +3648,20 @@
                 const itemName = row.querySelector('[data-field="item_name"]')?.textContent.trim() || '';
                 const approvedQty = row.querySelector('[data-field="approved_quantity"]')?.textContent.trim() || '';
                 const uom = row.querySelector('[data-field="uom"]')?.textContent.trim() || '';
+                const portKlang = row.querySelector('[data-field="port_klang_qty"]')?.textContent.trim() || '';
+                const klia = row.querySelector('[data-field="klia_qty"]')?.textContent.trim() || '';
+                const bukitKayuHitam = row.querySelector('[data-field="bukit_kayu_hitam_qty"]')?.textContent.trim() || '';
                 
                 // Clear previous cell highlighting
                 row.classList.remove('missing-data-row');
                 row.querySelectorAll('.missing-field').forEach(cell => cell.classList.remove('missing-field'));
+                
+                // Skip completely empty rows - they will be auto-deleted on save
+                const allFieldsEmpty = !lineNo && !hsCode && !itemName && !approvedQty && 
+                                       !uom && !portKlang && !klia && !bukitKayuHitam;
+                if (allFieldsEmpty) {
+                    return; // Skip validation for completely empty rows
+                }
                 
                 const rowMissing = [];
                 
@@ -3681,6 +3844,29 @@
                 }
             });
             
+            // Show/hide actions column and row action buttons
+            const actionsColumnHeader = document.getElementById('actionsColumnHeader');
+            const actionsColumns = document.querySelectorAll('#certItemsBody .actions-column');
+            const rowActions = document.querySelectorAll('#certItemsBody .row-actions');
+            
+            if (isEditMode) {
+                // Show actions column
+                if (actionsColumnHeader) actionsColumnHeader.classList.add('visible');
+                actionsColumns.forEach(col => col.classList.add('visible'));
+                rowActions.forEach(actions => actions.classList.add('visible'));
+                
+                // Update delete button states
+                updateDeleteButtonStates();
+            } else {
+                // Hide actions column
+                if (actionsColumnHeader) actionsColumnHeader.classList.remove('visible');
+                actionsColumns.forEach(col => col.classList.remove('visible'));
+                rowActions.forEach(actions => actions.classList.remove('visible'));
+                
+                // Dismiss any undo toast when exiting edit mode
+                dismissUndoToast();
+            }
+            
             updateEditButtons();
             hideElement('saveSuccess');
         }
@@ -3778,6 +3964,298 @@
             
             // Re-render the display with the original data
             displayParsedCertificate(parsedCertificateData);
+        }
+        
+        // ==========================================
+        // Row Manipulation Functions
+        // ==========================================
+        
+        // Track deleted row for undo
+        let lastDeletedRow = null;
+        let undoToastTimeout = null;
+        
+        // Insert a new empty row after the specified index
+        function insertRowAfter(afterIndex) {
+            const tbody = document.getElementById('certItemsBody');
+            const rows = tbody.querySelectorAll('tr[data-index]');
+            
+            // Find the row to insert after
+            let insertAfterRow = null;
+            rows.forEach(row => {
+                if (parseInt(row.dataset.index) === afterIndex) {
+                    insertAfterRow = row;
+                }
+            });
+            
+            if (!insertAfterRow) {
+                console.error('Could not find row with index:', afterIndex);
+                return;
+            }
+            
+            // Create a new empty row
+            const newRow = document.createElement('tr');
+            newRow.dataset.index = 'new'; // Temporary index
+            
+            // Calculate a new line number (after the current row's line number)
+            const currentLineNo = parseInt(insertAfterRow.querySelector('[data-field="line_no"]')?.textContent.trim()) || 0;
+            const newLineNo = currentLineNo + 1;
+            
+            newRow.innerHTML = `
+                <td class="editable-cell editing" data-field="line_no" contenteditable="true">${newLineNo}</td>
+                <td class="editable-cell editing" data-field="hs_code" contenteditable="true"></td>
+                <td class="editable-cell editing" data-field="item_name" contenteditable="true"></td>
+                <td class="editable-cell editing" data-field="approved_quantity" contenteditable="true"></td>
+                <td class="editable-cell editing" data-field="uom" contenteditable="true"></td>
+                <td class="editable-cell editing" data-field="port_klang_qty" contenteditable="true"></td>
+                <td class="editable-cell editing" data-field="klia_qty" contenteditable="true"></td>
+                <td class="editable-cell editing" data-field="bukit_kayu_hitam_qty" contenteditable="true"></td>
+                <td class="actions-column visible">
+                    <div class="row-actions visible">
+                        <button class="row-action-btn btn-insert-row" onclick="insertRowAfter(this)" title="Insert row below">+</button>
+                        <button class="row-action-btn btn-delete-row" onclick="deleteRow(this)" title="Delete row">🗑️</button>
+                    </div>
+                </td>
+            `;
+            
+            // Insert after the target row
+            insertAfterRow.after(newRow);
+            
+            // Re-index all rows
+            reindexRows();
+            
+            // Update delete button states
+            updateDeleteButtonStates();
+            
+            // Focus on the HS Code cell of the new row
+            const hsCodeCell = newRow.querySelector('[data-field="hs_code"]');
+            if (hsCodeCell) {
+                hsCodeCell.focus();
+            }
+        }
+        
+        // Delete a row by index or element
+        function deleteRow(indexOrElement) {
+            const tbody = document.getElementById('certItemsBody');
+            const rows = tbody.querySelectorAll('tr[data-index]');
+            
+            // Check minimum row constraint
+            if (rows.length <= 1) {
+                alert('Cannot delete the last row. At least one row is required.');
+                return;
+            }
+            
+            let rowToDelete = null;
+            
+            if (typeof indexOrElement === 'number') {
+                // Find by index
+                rows.forEach(row => {
+                    if (parseInt(row.dataset.index) === indexOrElement) {
+                        rowToDelete = row;
+                    }
+                });
+            } else {
+                // Find by button element (get parent row)
+                rowToDelete = indexOrElement.closest('tr[data-index]');
+            }
+            
+            if (!rowToDelete) {
+                console.error('Could not find row to delete');
+                return;
+            }
+            
+            // Store for undo
+            const deletedIndex = parseInt(rowToDelete.dataset.index);
+            const deletedHtml = rowToDelete.outerHTML;
+            const nextSibling = rowToDelete.nextElementSibling;
+            
+            lastDeletedRow = {
+                html: deletedHtml,
+                index: deletedIndex,
+                nextSibling: nextSibling,
+                parentElement: tbody
+            };
+            
+            // Remove the row
+            rowToDelete.remove();
+            
+            // Re-index remaining rows
+            reindexRows();
+            
+            // Update delete button states
+            updateDeleteButtonStates();
+            
+            // Show undo toast
+            showUndoToast('Row deleted');
+        }
+        
+        // Re-index all rows in the table
+        function reindexRows() {
+            const tbody = document.getElementById('certItemsBody');
+            const rows = tbody.querySelectorAll('tr[data-index]');
+            
+            rows.forEach((row, index) => {
+                row.dataset.index = index;
+                
+                // Update onclick handlers for the action buttons
+                const insertBtn = row.querySelector('.btn-insert-row');
+                const deleteBtn = row.querySelector('.btn-delete-row');
+                
+                if (insertBtn) {
+                    insertBtn.onclick = () => insertRowAfter(index);
+                }
+                if (deleteBtn) {
+                    deleteBtn.onclick = () => deleteRow(index);
+                }
+            });
+        }
+        
+        // Update delete button states (disable if only one row)
+        function updateDeleteButtonStates() {
+            const tbody = document.getElementById('certItemsBody');
+            const rows = tbody.querySelectorAll('tr[data-index]');
+            const deleteButtons = tbody.querySelectorAll('.btn-delete-row');
+            
+            deleteButtons.forEach(btn => {
+                if (rows.length <= 1) {
+                    btn.disabled = true;
+                    btn.title = 'Cannot delete - at least one row required';
+                } else {
+                    btn.disabled = false;
+                    btn.title = 'Delete row';
+                }
+            });
+        }
+        
+        // Show undo toast notification
+        function showUndoToast(message) {
+            // Remove existing toast if any
+            const existingToast = document.querySelector('.undo-toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+            
+            // Clear existing timeout
+            if (undoToastTimeout) {
+                clearTimeout(undoToastTimeout);
+            }
+            
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = 'undo-toast';
+            toast.innerHTML = `
+                <span class="toast-message">${escapeHtml(message)}</span>
+                <button class="btn-undo" onclick="undoDelete()">Undo</button>
+                <button class="toast-dismiss" onclick="dismissUndoToast()">&times;</button>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Auto-dismiss after 5 seconds
+            undoToastTimeout = setTimeout(() => {
+                dismissUndoToast();
+            }, 5000);
+        }
+        
+        // Dismiss undo toast
+        function dismissUndoToast() {
+            const toast = document.querySelector('.undo-toast');
+            if (toast) {
+                toast.classList.add('hiding');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }
+            lastDeletedRow = null;
+            if (undoToastTimeout) {
+                clearTimeout(undoToastTimeout);
+                undoToastTimeout = null;
+            }
+        }
+        
+        // Undo the last delete action
+        function undoDelete() {
+            if (!lastDeletedRow) {
+                console.error('No row to restore');
+                return;
+            }
+            
+            const { html, nextSibling, parentElement } = lastDeletedRow;
+            
+            // Create a temporary container to parse the HTML
+            const temp = document.createElement('tbody');
+            temp.innerHTML = html;
+            const restoredRow = temp.firstElementChild;
+            
+            // Insert the restored row
+            if (nextSibling && nextSibling.parentElement === parentElement) {
+                parentElement.insertBefore(restoredRow, nextSibling);
+            } else {
+                parentElement.appendChild(restoredRow);
+            }
+            
+            // Re-index all rows
+            reindexRows();
+            
+            // Make sure the restored row is editable if we're in edit mode
+            if (isEditMode) {
+                const cells = restoredRow.querySelectorAll('.editable-cell');
+                cells.forEach(cell => {
+                    cell.contentEditable = 'true';
+                    cell.classList.add('editing');
+                });
+                
+                // Show action buttons
+                const actionsCol = restoredRow.querySelector('.actions-column');
+                const rowActions = restoredRow.querySelector('.row-actions');
+                if (actionsCol) actionsCol.classList.add('visible');
+                if (rowActions) rowActions.classList.add('visible');
+            }
+            
+            // Update delete button states
+            updateDeleteButtonStates();
+            
+            // Dismiss the toast
+            dismissUndoToast();
+        }
+        
+        // Check if a row is completely empty (all data cells are empty)
+        function isRowEmpty(row) {
+            const fields = ['line_no', 'hs_code', 'item_name', 'approved_quantity', 'uom', 'port_klang_qty', 'klia_qty', 'bukit_kayu_hitam_qty'];
+            
+            for (const field of fields) {
+                const cell = row.querySelector(`[data-field="${field}"]`);
+                if (cell && cell.textContent.trim() !== '') {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        // Remove empty rows from the table (used before save)
+        function removeEmptyRows() {
+            const tbody = document.getElementById('certItemsBody');
+            const rows = tbody.querySelectorAll('tr[data-index]');
+            let removedCount = 0;
+            
+            // Don't remove if it would leave no rows
+            const nonEmptyRows = Array.from(rows).filter(row => !isRowEmpty(row));
+            if (nonEmptyRows.length === 0 && rows.length > 0) {
+                // Keep at least one row even if empty
+                return 0;
+            }
+            
+            rows.forEach(row => {
+                if (isRowEmpty(row) && nonEmptyRows.length > 0) {
+                    row.remove();
+                    removedCount++;
+                }
+            });
+            
+            if (removedCount > 0) {
+                reindexRows();
+            }
+            
+            return removedCount;
         }
         
         // Show save to database confirmation modal
@@ -3945,9 +4423,10 @@
             const fileInput = document.getElementById('pdfInput');
             const sourceFilename = fileInput.files[0]?.name || null;
             
-            // Build items array from the table
+            // Build items array from the table, filtering out completely empty rows
             const items = [];
             const rows = document.querySelectorAll('#certItemsBody tr[data-index]');
+            let lineNumber = 1; // Sequential line numbering for non-empty rows
             
             rows.forEach((row) => {
                 const lineNoText = row.querySelector('[data-field="line_no"]')?.textContent.trim() || '';
@@ -3959,8 +4438,17 @@
                 const kliaText = row.querySelector('[data-field="klia_qty"]')?.textContent.trim() || '';
                 const bukitKayuHitamText = row.querySelector('[data-field="bukit_kayu_hitam_qty"]')?.textContent.trim() || '';
                 
+                // Check if row is completely empty (all cells empty)
+                const allFieldsEmpty = !lineNoText && !hsCode && !itemName && !approvedQtyText && 
+                                       !uom && !portKlangText && !kliaText && !bukitKayuHitamText;
+                
+                // Skip completely empty rows
+                if (allFieldsEmpty) {
+                    return; // Skip this row
+                }
+                
                 const item = {
-                    line_no: parseInt(lineNoText) || (items.length + 1),
+                    line_no: lineNumber++, // Use sequential numbering (1, 2, 3...)
                     hs_code: hsCode,
                     item_name: itemName,
                     approved_quantity: approvedQtyText ? parseFloat(approvedQtyText) : null,
