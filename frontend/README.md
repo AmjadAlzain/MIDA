@@ -101,9 +101,16 @@ Make sure the FastAPI backend is running on `http://localhost:8000`. The Vite de
 
 ### Certificate Parser
 - Upload MIDA certificate PDFs
-- OCR-powered data extraction
-- Edit and validate parsed data
-- Save certificates to database
+- OCR-powered data extraction via Azure Document Intelligence
+- **Validation Warnings System**:
+  - 🔴 **Errors (blocking)**: Missing required fields, duplicate line numbers
+  - 🟡 **Warnings**: Missing optional fields, quantity discrepancies
+  - 🔵 **Info**: Port allocation suggestions
+- **Port Allocation Editing**: Edit Port Klang, KLIA, Bukit Kayu Hitam quantities
+- **Quantity Discrepancy Detection**: Alerts when Approved Qty ≠ Sum of Station quantities
+- Visual field highlighting for missing/problematic data
+- Card view and table view for editing items
+- Preview before saving to database
 
 ### Database View
 - View all certificates with pagination
@@ -113,13 +120,16 @@ Make sure the FastAPI backend is running on `http://localhost:8000`. The Vite de
 
 ### Certificate Details
 - Full certificate information
+- **Port Allocation Display**: Shows approved/remaining quantities per port
 - List of items with quantity tracking
-- Edit certificate details
+- Edit certificate details including port-wise quantities
 - Navigate to import records
 
 ### Import Records
 - Track imports against certificate items
-- Add new import declarations
+- **Port Balance Breakdown**: Shows remaining balance per port
+- Add new import declarations with port selection
+- Edit and delete existing import records
 - View quantity balance in real-time
 
 ## 🔧 Configuration

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import {
   FileSearch,
@@ -11,6 +11,9 @@ import {
   Trash2,
   TableIcon,
   LayoutList,
+  AlertTriangle,
+  AlertCircle,
+  Info,
 } from 'lucide-react';
 import {
   Button,
@@ -28,6 +31,14 @@ import { certificateService } from '@/services';
 import { ParsedCertificate, ParsedCertificateItem, SaveCertificateRequest } from '@/types';
 import { formatNumber, formatDate } from '@/utils';
 
+// Validation types
+interface ValidationWarning {
+  type: 'error' | 'warning' | 'info';
+  field?: string;
+  itemIndex?: number;
+  message: string;
+}
+
 export function CertificateParser() {
   // State
   const [file, setFile] = useState<File | null>(null);
@@ -37,6 +48,113 @@ export function CertificateParser() {
   const [isSaving, setIsSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  // Validation logic
+  const validationWarnings = useMemo((): ValidationWarning[] => {
+    if (!editedData) return [];
+    
+    const warnings: ValidationWarning[] = [];
+    
+    // OCR warnings from backend
+    if (editedData.warnings && editedData.warnings.length > 0) {
+      editedData.warnings.forEach((w) => {
+        warnings.push({ type: 'warning', message: `OCR: ${w}` });
+      });
+    }
+    
+    // Header field validation
+    if (!editedData.mida_no || editedData.mida_no.trim() === '') {
+      warnings.push({ type: 'error', field: 'mida_no', message: 'Certificate Number is required' });
+    }
+    if (!editedData.company_name || editedData.company_name.trim() === '') {
+      warnings.push({ type: 'error', field: 'company_name', message: 'Company Name is required' });
+    }
+    if (!editedData.model_number || editedData.model_number.trim() === '') {
+      warnings.push({ type: 'warning', field: 'model_number', message: 'Model Number is missing (usually required)' });
+    }
+    if (!editedData.exemption_start) {
+      warnings.push({ type: 'warning', field: 'exemption_start', message: 'Exemption Start Date is missing' });
+    }
+    if (!editedData.exemption_end) {
+      warnings.push({ type: 'warning', field: 'exemption_end', message: 'Exemption End Date is missing' });
+    }
+    
+    // Item validation
+    if (editedData.items.length === 0) {
+      warnings.push({ type: 'error', message: 'At least one item is required' });
+    }
+    
+    editedData.items.forEach((item, index) => {
+      const lineLabel = `Item #${item.line_no || index + 1}`;
+      
+      // Required field checks
+      if (!item.hs_code || item.hs_code.trim() === '') {
+        warnings.push({ type: 'error', itemIndex: index, field: 'hs_code', message: `${lineLabel}: HS Code is required` });
+      }
+      if (!item.item_name || item.item_name.trim() === '') {
+        warnings.push({ type: 'error', itemIndex: index, field: 'item_name', message: `${lineLabel}: Item Name is required` });
+      }
+      if (!item.uom || item.uom.trim() === '') {
+        warnings.push({ type: 'error', itemIndex: index, field: 'uom', message: `${lineLabel}: UOM is required` });
+      }
+      if (!item.approved_quantity || item.approved_quantity <= 0) {
+        warnings.push({ type: 'error', itemIndex: index, field: 'approved_quantity', message: `${lineLabel}: Approved Quantity must be greater than 0` });
+      }
+      
+      // Quantity discrepancy check
+      const stationSplit = item.station_split || {};
+      const portKlang = stationSplit.PORT_KLANG || 0;
+      const klia = stationSplit.KLIA || 0;
+      const bukitKayuHitam = stationSplit.BUKIT_KAYU_HITAM || 0;
+      const stationSum = portKlang + klia + bukitKayuHitam;
+      
+      // Only check if at least one station has a value
+      const hasStationValues = portKlang > 0 || klia > 0 || bukitKayuHitam > 0;
+      if (hasStationValues) {
+        const approvedQty = item.approved_quantity || 0;
+        const difference = Math.abs(approvedQty - stationSum);
+        if (difference > 0.01) {
+          warnings.push({
+            type: 'warning',
+            itemIndex: index,
+            message: `${lineLabel}: Quantity mismatch - Approved (${formatNumber(approvedQty)}) ≠ Station Sum (${formatNumber(stationSum)}). Difference: ${formatNumber(approvedQty - stationSum)}`,
+          });
+        }
+      } else if (item.approved_quantity > 0) {
+        // No station split defined but has approved quantity
+        warnings.push({
+          type: 'info',
+          itemIndex: index,
+          message: `${lineLabel}: No port allocation specified. Total quantity (${formatNumber(item.approved_quantity)}) not split across stations.`,
+        });
+      }
+    });
+    
+    // Check for duplicate line numbers
+    const lineNumbers = editedData.items.map((i) => i.line_no);
+    const duplicates = lineNumbers.filter((v, i, a) => a.indexOf(v) !== i);
+    if (duplicates.length > 0) {
+      warnings.push({
+        type: 'error',
+        message: `Duplicate line numbers found: ${[...new Set(duplicates)].join(', ')}`,
+      });
+    }
+    
+    return warnings;
+  }, [editedData]);
+
+  // Separate warnings by type
+  const errorCount = validationWarnings.filter((w) => w.type === 'error').length;
+  const warningCount = validationWarnings.filter((w) => w.type === 'warning').length;
+  const infoCount = validationWarnings.filter((w) => w.type === 'info').length;
+  const hasBlockingErrors = errorCount > 0;
+
+  // Check if a specific field has an error
+  const getFieldError = (field: string, itemIndex?: number): boolean => {
+    return validationWarnings.some(
+      (w) => w.type === 'error' && w.field === field && w.itemIndex === itemIndex
+    );
+  };
 
   // Handle file parse
   const handleParse = async () => {
@@ -70,6 +188,20 @@ export function CertificateParser() {
       if (!prev) return null;
       const items = [...prev.items];
       items[index] = { ...items[index], [field]: value };
+      return { ...prev, items };
+    });
+  };
+
+  // Handle station split (port allocation) changes
+  const handleStationSplitChange = (index: number, port: 'PORT_KLANG' | 'KLIA' | 'BUKIT_KAYU_HITAM', value: number) => {
+    setEditedData((prev) => {
+      if (!prev) return null;
+      const items = [...prev.items];
+      const currentSplit = items[index].station_split || {};
+      items[index] = {
+        ...items[index],
+        station_split: { ...currentSplit, [port]: value },
+      };
       return { ...prev, items };
     });
   };
@@ -109,15 +241,18 @@ export function CertificateParser() {
   const handleSave = async () => {
     if (!editedData) return;
 
-    // Validation
-    if (!editedData.mida_no || !editedData.company_name) {
-      toast.error('Certificate number and company name are required');
+    // Block save if there are validation errors
+    if (hasBlockingErrors) {
+      toast.error(`Cannot save: ${errorCount} error(s) must be fixed first`);
       return;
     }
 
-    if (editedData.items.length === 0) {
-      toast.error('At least one item is required');
-      return;
+    // Show warning about non-blocking issues
+    if (warningCount > 0) {
+      const proceed = window.confirm(
+        `There are ${warningCount} warning(s). Do you want to proceed anyway?`
+      );
+      if (!proceed) return;
     }
 
     setIsSaving(true);
@@ -202,6 +337,13 @@ export function CertificateParser() {
           <CardHeader
             action={
               <div className="flex items-center gap-2">
+                {/* Validation status indicator */}
+                {hasBlockingErrors && (
+                  <span className="text-red-600 text-sm flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    Fix errors to save
+                  </span>
+                )}
                 <Button
                   variant="secondary"
                   onClick={() => setShowPreview(true)}
@@ -210,10 +352,12 @@ export function CertificateParser() {
                   Preview
                 </Button>
                 <Button
-                  variant="success"
+                  variant={hasBlockingErrors ? 'secondary' : 'success'}
                   onClick={handleSave}
                   isLoading={isSaving}
+                  disabled={hasBlockingErrors}
                   leftIcon={<Save className="w-4 h-4" />}
+                  title={hasBlockingErrors ? 'Fix all errors before saving' : 'Save certificate to database'}
                 >
                   Save Certificate
                 </Button>
@@ -222,6 +366,14 @@ export function CertificateParser() {
           >
             <CardTitle icon={<FileText className="w-5 h-5 text-blue-600" />}>
               Certificate Details
+              {validationWarnings.length > 0 && (
+                <Badge 
+                  variant={hasBlockingErrors ? 'danger' : 'warning'} 
+                  className="ml-2"
+                >
+                  {validationWarnings.length} issue{validationWarnings.length !== 1 ? 's' : ''}
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
 
@@ -232,17 +384,22 @@ export function CertificateParser() {
               value={editedData.mida_no}
               onChange={(e) => handleFieldChange('mida_no', e.target.value)}
               required
+              error={getFieldError('mida_no') ? 'Required' : undefined}
+              className={getFieldError('mida_no') ? 'border-red-500' : ''}
             />
             <Input
               label="Company Name"
               value={editedData.company_name}
               onChange={(e) => handleFieldChange('company_name', e.target.value)}
               required
+              error={getFieldError('company_name') ? 'Required' : undefined}
+              className={getFieldError('company_name') ? 'border-red-500' : ''}
             />
             <Input
               label="Model Number"
               value={editedData.model_number || ''}
               onChange={(e) => handleFieldChange('model_number', e.target.value)}
+              className={validationWarnings.some(w => w.field === 'model_number') ? 'border-yellow-500' : ''}
             />
           </div>
 
@@ -252,14 +409,70 @@ export function CertificateParser() {
               type="date"
               value={editedData.exemption_start || ''}
               onChange={(e) => handleFieldChange('exemption_start', e.target.value)}
+              className={validationWarnings.some(w => w.field === 'exemption_start') ? 'border-yellow-500' : ''}
             />
             <Input
               label="Exemption End"
               type="date"
               value={editedData.exemption_end || ''}
               onChange={(e) => handleFieldChange('exemption_end', e.target.value)}
+              className={validationWarnings.some(w => w.field === 'exemption_end') ? 'border-yellow-500' : ''}
             />
           </div>
+
+          {/* Validation Warnings Section */}
+          {validationWarnings.length > 0 && (
+            <div className="mb-6 space-y-3">
+              {/* Summary badges */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {errorCount > 0 && (
+                  <div className="flex items-center gap-1.5 bg-red-100 text-red-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <AlertCircle className="w-4 h-4" />
+                    {errorCount} Error{errorCount !== 1 ? 's' : ''} (must fix)
+                  </div>
+                )}
+                {warningCount > 0 && (
+                  <div className="flex items-center gap-1.5 bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <AlertTriangle className="w-4 h-4" />
+                    {warningCount} Warning{warningCount !== 1 ? 's' : ''}
+                  </div>
+                )}
+                {infoCount > 0 && (
+                  <div className="flex items-center gap-1.5 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <Info className="w-4 h-4" />
+                    {infoCount} Info
+                  </div>
+                )}
+              </div>
+
+              {/* Detailed warnings list */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 max-h-64 overflow-y-auto">
+                <div className="space-y-2">
+                  {validationWarnings.map((warning, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-2 text-sm p-2 rounded ${
+                        warning.type === 'error'
+                          ? 'bg-red-50 text-red-700 border-l-4 border-red-500'
+                          : warning.type === 'warning'
+                          ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500'
+                          : 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
+                      }`}
+                    >
+                      {warning.type === 'error' ? (
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      ) : warning.type === 'warning' ? (
+                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      )}
+                      <span>{warning.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Items Section */}
           <div className="border-t border-gray-200 pt-6">
@@ -315,7 +528,7 @@ export function CertificateParser() {
                       </Button>
                     </div>
 
-                    <div className="grid md:grid-cols-4 gap-4">
+                    <div className="grid md:grid-cols-4 gap-4 mb-4">
                       <Input
                         label="HS Code"
                         value={item.hs_code}
@@ -342,6 +555,30 @@ export function CertificateParser() {
                         required
                       />
                     </div>
+                    {/* Port Allocation */}
+                    <div className="bg-white rounded border border-gray-200 p-3">
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Port Allocation</p>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <Input
+                          label="Port Klang"
+                          type="number"
+                          value={item.station_split?.PORT_KLANG || 0}
+                          onChange={(e) => handleStationSplitChange(index, 'PORT_KLANG', parseFloat(e.target.value) || 0)}
+                        />
+                        <Input
+                          label="KLIA"
+                          type="number"
+                          value={item.station_split?.KLIA || 0}
+                          onChange={(e) => handleStationSplitChange(index, 'KLIA', parseFloat(e.target.value) || 0)}
+                        />
+                        <Input
+                          label="Bukit Kayu Hitam"
+                          type="number"
+                          value={item.station_split?.BUKIT_KAYU_HITAM || 0}
+                          onChange={(e) => handleStationSplitChange(index, 'BUKIT_KAYU_HITAM', parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
 
@@ -362,9 +599,12 @@ export function CertificateParser() {
                       <th className="px-3 py-3 text-left font-semibold w-16">#</th>
                       <th className="px-3 py-3 text-left font-semibold">HS Code</th>
                       <th className="px-3 py-3 text-left font-semibold">Item Name</th>
-                      <th className="px-3 py-3 text-right font-semibold w-32">Quantity</th>
-                      <th className="px-3 py-3 text-left font-semibold w-24">UOM</th>
-                      <th className="px-3 py-3 text-center font-semibold w-20">Actions</th>
+                      <th className="px-3 py-3 text-right font-semibold w-28">Quantity</th>
+                      <th className="px-3 py-3 text-left font-semibold w-20">UOM</th>
+                      <th className="px-3 py-3 text-right font-semibold w-24">Port Klang</th>
+                      <th className="px-3 py-3 text-right font-semibold w-24">KLIA</th>
+                      <th className="px-3 py-3 text-right font-semibold w-24">BKH</th>
+                      <th className="px-3 py-3 text-center font-semibold w-16">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -407,6 +647,33 @@ export function CertificateParser() {
                             className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                           />
                         </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            value={item.station_split?.PORT_KLANG || 0}
+                            onChange={(e) => handleStationSplitChange(index, 'PORT_KLANG', parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                            title="Port Klang Quantity"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            value={item.station_split?.KLIA || 0}
+                            onChange={(e) => handleStationSplitChange(index, 'KLIA', parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                            title="KLIA Quantity"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            value={item.station_split?.BUKIT_KAYU_HITAM || 0}
+                            onChange={(e) => handleStationSplitChange(index, 'BUKIT_KAYU_HITAM', parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                            title="Bukit Kayu Hitam Quantity"
+                          />
+                        </td>
                         <td className="px-3 py-2 text-center">
                           <Button
                             variant="ghost"
@@ -421,7 +688,7 @@ export function CertificateParser() {
                     ))}
                     {editedData.items.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                           No items added yet. Click "Add Item" to add certificate items.
                         </td>
                       </tr>
@@ -475,6 +742,9 @@ export function CertificateParser() {
                       <th className="px-3 py-2 text-left">Item Name</th>
                       <th className="px-3 py-2 text-right">Quantity</th>
                       <th className="px-3 py-2 text-left">UOM</th>
+                      <th className="px-3 py-2 text-right">Port Klang</th>
+                      <th className="px-3 py-2 text-right">KLIA</th>
+                      <th className="px-3 py-2 text-right">BKH</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -485,6 +755,9 @@ export function CertificateParser() {
                         <td className="px-3 py-2">{item.item_name}</td>
                         <td className="px-3 py-2 text-right">{formatNumber(item.approved_quantity)}</td>
                         <td className="px-3 py-2">{item.uom}</td>
+                        <td className="px-3 py-2 text-right">{formatNumber(item.station_split?.PORT_KLANG || 0)}</td>
+                        <td className="px-3 py-2 text-right">{formatNumber(item.station_split?.KLIA || 0)}</td>
+                        <td className="px-3 py-2 text-right">{formatNumber(item.station_split?.BUKIT_KAYU_HITAM || 0)}</td>
                       </tr>
                     ))}
                   </tbody>

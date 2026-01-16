@@ -21,15 +21,34 @@
   - `POST /api/convert/export-classified` - K1 XLS export for classified items
 - Frontend Pages:
   - Database View - Certificate list with search, pagination, soft/hard delete
-  - Certificate Details - View/edit certificate items with port-wise balances
-  - Item Imports - View/add import records per item
+  - Certificate Details - View/edit certificate items with port-wise balances and port allocation display
+  - Item Imports - View/add import records per item with port breakdown
   - Invoice Converter - 3-tab classification with K1 export
-  - Certificate Parser - PDF upload with OCR parsing
+  - Certificate Parser - PDF upload with OCR parsing, validation warnings, and port allocation editing
 - Database:
   - Companies table (HICOM YAMAHA MOTOR SDN BHD, HONG LEONG YAMAHA MOTOR SDN BHD)
   - HSCODE UOM mappings table for balance deduction
   - HSCODE Master table with 25,000+ entries
   - 9 Alembic migrations (certificates, import tracking, status, declaration form, model number, soft delete, hscode uom, companies, hscode master)
+
+## ✅ Phase 11 Completed: UI Enhancements
+
+### Port Allocation Display
+- **Certificate Details Page**: Added "Port Allocation (Approved / Remaining)" column showing per-port breakdown
+- **Item Imports Page**: Added port allocation summary card with Port Klang, KLIA, Bukit Kayu Hitam breakdown
+- **Edit Mode**: Added editable port quantity fields (Port Klang, KLIA, BKH) when editing certificate items
+
+### Certificate Parser Validation System
+- **Real-time Validation**: Validates data as user edits
+- **Error Types**:
+  - 🔴 Errors (blocking): Missing Certificate Number, Company Name, HS Code, Item Name, UOM, Approved Quantity, duplicate line numbers
+  - 🟡 Warnings: Missing Model Number, exemption dates, OCR warnings, quantity mismatches
+  - 🔵 Info: No port allocation specified
+- **Visual Highlighting**: Red/yellow borders on fields with issues
+- **Quantity Discrepancy Detection**: Alerts when Approved Qty ≠ Sum of Station quantities
+- **Save Protection**: Blocks saving when there are blocking errors, prompts for warnings
+- **Port Allocation Editing**: Card view and table view now include editable port quantity fields
+- **Preview Modal**: Shows port allocation in preview before saving
 
 ## ✅ Phase 2 Completed: Certificate OCR
 

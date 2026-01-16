@@ -363,9 +363,12 @@ export function CertificateDetails() {
                   <th className="px-3 py-3 text-left font-semibold w-16">Line #</th>
                   <th className="px-3 py-3 text-left font-semibold">HS Code</th>
                   <th className="px-3 py-3 text-left font-semibold">Item Name</th>
-                  <th className="px-3 py-3 text-right font-semibold w-32">Approved Qty</th>
-                  <th className="px-3 py-3 text-left font-semibold w-24">UOM</th>
-                  <th className="px-3 py-3 text-center font-semibold w-20">Actions</th>
+                  <th className="px-3 py-3 text-right font-semibold w-28">Approved Qty</th>
+                  <th className="px-3 py-3 text-left font-semibold w-20">UOM</th>
+                  <th className="px-3 py-3 text-right font-semibold w-24">Port Klang</th>
+                  <th className="px-3 py-3 text-right font-semibold w-24">KLIA</th>
+                  <th className="px-3 py-3 text-right font-semibold w-24">BKH</th>
+                  <th className="px-3 py-3 text-center font-semibold w-16">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -408,6 +411,33 @@ export function CertificateDetails() {
                         className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                       />
                     </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={item.port_klang_qty || 0}
+                        onChange={(e) => handleItemChange(index, 'port_klang_qty', parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                        title="Port Klang Quantity"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={item.klia_qty || 0}
+                        onChange={(e) => handleItemChange(index, 'klia_qty', parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                        title="KLIA Quantity"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={item.bukit_kayu_hitam_qty || 0}
+                        onChange={(e) => handleItemChange(index, 'bukit_kayu_hitam_qty', parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                        title="Bukit Kayu Hitam Quantity"
+                      />
+                    </td>
                     <td className="px-3 py-2 text-center">
                       <Button
                         variant="ghost"
@@ -437,6 +467,7 @@ export function CertificateDetails() {
                   <th className="px-4 py-3 text-right font-semibold">Approved Qty</th>
                   <th className="px-4 py-3 text-right font-semibold">Remaining</th>
                   <th className="px-4 py-3 text-left font-semibold">UOM</th>
+                  <th className="px-4 py-3 text-center font-semibold">Port Allocation (Approved / Remaining)</th>
                   <th className="px-4 py-3 text-center font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -465,6 +496,58 @@ export function CertificateDetails() {
                         {formatNumber(remainingQty)}
                       </td>
                       <td className="px-4 py-3">{item.uom}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1 text-xs">
+                          {(item.port_klang_qty > 0 || (balance?.remaining_port_klang ?? 0) > 0) && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">Port Klang:</span>
+                              <span>
+                                <span className="text-gray-700">{formatNumber(item.port_klang_qty)}</span>
+                                <span className="text-gray-400 mx-1">/</span>
+                                <span className={cn(
+                                  'font-medium',
+                                  (balance?.remaining_port_klang ?? item.port_klang_qty) > 0 ? 'text-green-600' : 'text-red-600'
+                                )}>
+                                  {formatNumber(balance?.remaining_port_klang ?? item.port_klang_qty)}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {(item.klia_qty > 0 || (balance?.remaining_klia ?? 0) > 0) && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">KLIA:</span>
+                              <span>
+                                <span className="text-gray-700">{formatNumber(item.klia_qty)}</span>
+                                <span className="text-gray-400 mx-1">/</span>
+                                <span className={cn(
+                                  'font-medium',
+                                  (balance?.remaining_klia ?? item.klia_qty) > 0 ? 'text-green-600' : 'text-red-600'
+                                )}>
+                                  {formatNumber(balance?.remaining_klia ?? item.klia_qty)}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {(item.bukit_kayu_hitam_qty > 0 || (balance?.remaining_bukit_kayu_hitam ?? 0) > 0) && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">BKH:</span>
+                              <span>
+                                <span className="text-gray-700">{formatNumber(item.bukit_kayu_hitam_qty)}</span>
+                                <span className="text-gray-400 mx-1">/</span>
+                                <span className={cn(
+                                  'font-medium',
+                                  (balance?.remaining_bukit_kayu_hitam ?? item.bukit_kayu_hitam_qty) > 0 ? 'text-green-600' : 'text-red-600'
+                                )}>
+                                  {formatNumber(balance?.remaining_bukit_kayu_hitam ?? item.bukit_kayu_hitam_qty)}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {item.port_klang_qty === 0 && item.klia_qty === 0 && item.bukit_kayu_hitam_qty === 0 && (
+                            <span className="text-gray-400 italic">No port split</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-center">
                         <Button
                           variant="ghost"

@@ -264,13 +264,13 @@ export function ItemImports() {
       {/* Item Summary */}
       <Card>
         <div className="flex items-start justify-between">
-          <div>
+          <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <Badge variant="purple">Line #{currentItem.line_no}</Badge>
               <span className="font-mono text-blue-600 text-lg">{currentItem.hs_code}</span>
             </div>
-            <p className="text-gray-700 mb-2">{currentItem.item_name}</p>
-            <div className="flex items-center gap-6 text-sm">
+            <p className="text-gray-700 mb-3">{currentItem.item_name}</p>
+            <div className="flex items-center gap-6 text-sm mb-4">
               <span className="text-gray-500">
                 Approved: <strong>{formatNumber(currentItem.approved_quantity)}</strong>{' '}
                 {currentItem.uom}
@@ -279,9 +279,46 @@ export function ItemImports() {
                 Remaining: <strong>{formatNumber(remainingBalance)}</strong> {currentItem.uom}
               </span>
             </div>
+            
+            {/* Port Allocation Breakdown */}
+            <div className="bg-gray-50 rounded-lg p-3 mt-2">
+              <p className="text-xs font-semibold text-gray-600 mb-2">Port Allocation (Approved / Remaining)</p>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="flex flex-col">
+                  <span className="text-gray-500 text-xs">Port Klang</span>
+                  <span>
+                    <span className="text-gray-700">{formatNumber(currentItem.port_klang_qty ?? 0)}</span>
+                    <span className="text-gray-400 mx-1">/</span>
+                    <span className={(currentItem.remaining_port_klang ?? 0) > 0 ? 'text-green-600 font-medium' : (currentItem.remaining_port_klang ?? 0) < 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
+                      {formatNumber(currentItem.remaining_port_klang ?? 0)}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-500 text-xs">KLIA</span>
+                  <span>
+                    <span className="text-gray-700">{formatNumber(currentItem.klia_qty ?? 0)}</span>
+                    <span className="text-gray-400 mx-1">/</span>
+                    <span className={(currentItem.remaining_klia ?? 0) > 0 ? 'text-green-600 font-medium' : (currentItem.remaining_klia ?? 0) < 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
+                      {formatNumber(currentItem.remaining_klia ?? 0)}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-500 text-xs">Bukit Kayu Hitam</span>
+                  <span>
+                    <span className="text-gray-700">{formatNumber(currentItem.bukit_kayu_hitam_qty ?? 0)}</span>
+                    <span className="text-gray-400 mx-1">/</span>
+                    <span className={(currentItem.remaining_bukit_kayu_hitam ?? 0) > 0 ? 'text-green-600 font-medium' : (currentItem.remaining_bukit_kayu_hitam ?? 0) < 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
+                      {formatNumber(currentItem.remaining_bukit_kayu_hitam ?? 0)}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-4">
             <Button
               variant="secondary"
               onClick={() => navigate(`/database/certificates/${certId}`)}

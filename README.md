@@ -26,9 +26,14 @@ MIDA Certificate OCR + Invoice Matching + 3-Tab Classification System + Quota Tr
 ### Modern React Frontend
 - **Database Management**: View, search, and manage MIDA certificates with pagination
 - **Certificate Details**: View/edit certificate items with remaining balances per port
-- **Import Tracking**: Record and view import history for each certificate item
+- **Port Allocation Display**: Visual breakdown of approved/remaining quantities per port (Port Klang, KLIA, Bukit Kayu Hitam)
+- **Import Tracking**: Record and view import history for each certificate item with port-specific balances
 - **Invoice Converter**: Classify invoices with 3-tab UI and K1 export
-- **Certificate Parser**: Upload PDF certificates for OCR parsing and saving
+- **Certificate Parser**: Upload PDF certificates for OCR parsing with validation warnings
+  - Real-time validation (errors, warnings, info messages)
+  - Missing field detection and highlighting
+  - Quantity discrepancy checks (Approved Qty vs Station Sum)
+  - OCR warning display from backend
 
 ## Project Structure
 
