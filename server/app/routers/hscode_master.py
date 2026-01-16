@@ -5,6 +5,7 @@ Provides API endpoints for managing HSCODE Master data (Part Name to HSCODE/UOM 
 """
 
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -54,11 +55,11 @@ class LookupResponse(BaseModel):
     """Response for part name lookup."""
     
     found: bool = Field(..., description="Whether a match was found")
-    part_name: str | None = Field(None, description="Matched part name from master data")
-    hs_code: str | None = Field(None, description="HSCODE for the matched part")
-    uom: str | None = Field(None, description="UOM for the matched part (UNIT or KGM)")
-    match_score: float | None = Field(None, description="Match score (1.0 = exact match)")
-    is_exact_match: bool | None = Field(None, description="Whether match was exact")
+    part_name: Optional[str] = Field(None, description="Matched part name from master data")
+    hs_code: Optional[str] = Field(None, description="HSCODE for the matched part")
+    uom: Optional[str] = Field(None, description="UOM for the matched part (UNIT or KGM)")
+    match_score: Optional[float] = Field(None, description="Match score (1.0 = exact match)")
+    is_exact_match: Optional[bool] = Field(None, description="Whether match was exact")
 
 
 @router.post(

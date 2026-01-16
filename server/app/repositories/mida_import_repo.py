@@ -72,6 +72,70 @@ def get_import_record_by_id(
     return db.get(MidaImportRecord, record_id)
 
 
+def update_import_record(
+    db: Session,
+    record_id: UUID,
+    import_date: Optional[date] = None,
+    declaration_form_reg_no: Optional[str] = None,
+    invoice_number: Optional[str] = None,
+    invoice_line: Optional[int] = None,
+    quantity_imported: Optional[Decimal] = None,
+    port: Optional[str] = None,
+    remarks: Optional[str] = None,
+) -> Optional[MidaImportRecord]:
+    """
+    Update an existing import record.
+    
+    Note: Changing quantity_imported will require recalculating balances
+    for all subsequent imports on this item/port.
+    """
+    record = db.get(MidaImportRecord, record_id)
+    if not record:
+        return None
+    
+    if import_date is not None:
+        record.import_date = import_date
+    if declaration_form_reg_no is not None:
+        record.declaration_form_reg_no = declaration_form_reg_no
+    if invoice_number is not None:
+        record.invoice_number = invoice_number
+    if invoice_line is not None:
+        record.invoice_line = invoice_line
+    if remarks is not None:
+        record.remarks = remarks
+    if quantity_imported is not None:
+        # Recalculate balance
+        old_qty = record.quantity_imported
+        qty_diff = quantity_imported - old_qty
+        record.quantity_imported = quantity_imported
+        record.balance_after = record.balance_after - qty_diff
+    if port is not None:
+        record.port = port
+    
+    db.flush()
+    db.refresh(record)
+    return record
+
+
+def delete_import_record(
+    db: Session,
+    record_id: UUID,
+) -> bool:
+    """
+    Delete an import record.
+    
+    Note: This will NOT automatically recalculate balances for the item.
+    The caller should handle balance recalculation if needed.
+    """
+    record = db.get(MidaImportRecord, record_id)
+    if not record:
+        return False
+    
+    db.delete(record)
+    db.flush()
+    return True
+
+
 def get_import_record_with_context(
     db: Session,
     record_id: UUID,

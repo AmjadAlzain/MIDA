@@ -1,0 +1,16 @@
+
+============================================================
+MIDA Server Starting...
+============================================================
+
+  Web UI:  http://localhost:8000
+  API Docs: http://localhost:8000/docs
+
+============================================================
+
+{"timestamp": "2025-12-29T05:54:00.166589+00:00", "level": "INFO", "logger": "app.main", "message": "Starting application", "app_name": "MIDA OCR API", "version": "1.0.0", "environment": "development"}
+*** No CODEPAGE record, no encoding_override: will use 'iso-8859-1'
+*** No CODEPAGE record, no encoding_override: will use 'iso-8859-1'
+{"timestamp": "2025-12-29T05:54:21.372733+00:00", "level": "INFO", "logger": "app.routers.convert", "message": "Parsed 6 filtered items and 73 full items"}
+{"timestamp": "2025-12-29T05:54:21.605087+00:00", "level": "ERROR", "logger": "app.routers.convert", "message": "Unexpected error during conversion: list index out of range"}
+{"timestamp": "2025-12-29T05:54:21.605087+00:00", "level": "ERROR", "logger": "app.routers.convert", "message": "Traceback (most recent call last):\n  File \"F:\\Projects\\MIDA\\server\\app\\routers\\convert.py\", line 446, in convert_with_mida\n    orig_item = invoice_items[match.invoice_item.line_no - 1]\nIndexError: list index out of range\n"}

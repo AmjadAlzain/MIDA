@@ -1347,9 +1347,418 @@
         .stat-item.duties .stat-value {
             color: #e67e22;
         }
+        
+        /* ==========================================
+           CRUD Modal and Form Styles
+           ========================================== */
+        
+        /* Add Certificate/Item buttons */
+        .btn-add {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+        }
+        .btn-add:hover { background: #219a52; }
+        
+        /* Edit button */
+        .btn-action-edit {
+            background: #3498db !important;
+            color: white;
+        }
+        .btn-action-edit:hover { background: #2980b9 !important; }
+        
+        /* Large modal for forms */
+        .modal-content.large {
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        /* Form sections */
+        .form-section {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        .form-section-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        /* Form grid */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .form-grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        .form-grid-4 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        
+        /* Form field */
+        .form-field {
+            margin-bottom: 0.75rem;
+        }
+        .form-field label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+        .form-field input,
+        .form-field select {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.95rem;
+        }
+        .form-field input:focus,
+        .form-field select:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        .form-field input.error,
+        .form-field select.error {
+            border-color: #e74c3c;
+        }
+        .form-field .field-error {
+            color: #e74c3c;
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+        }
+        
+        /* Items table in edit form */
+        .items-form-container {
+            margin-top: 1rem;
+        }
+        .items-form-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .items-form-table th {
+            background: #2c3e50;
+            color: white;
+            padding: 0.6rem;
+            text-align: left;
+            font-size: 0.8rem;
+        }
+        .items-form-table td {
+            padding: 0.5rem;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+        }
+        .items-form-table input {
+            width: 100%;
+            padding: 0.4rem;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 0.85rem;
+        }
+        .items-form-table input:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        .items-form-table input.error {
+            border-color: #e74c3c;
+            background: #fef0f0;
+        }
+        .items-form-table .line-no-cell {
+            width: 50px;
+            text-align: center;
+        }
+        .items-form-table .qty-cell {
+            width: 100px;
+        }
+        .items-form-table .action-cell {
+            width: 50px;
+            text-align: center;
+        }
+        
+        /* Row action buttons */
+        .btn-row-delete {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0.3rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .btn-row-delete:hover { background: #c0392b; }
+        
+        /* Add item row button */
+        .btn-add-row {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+        .btn-add-row:hover { background: #219a52; }
+        
+        /* Toolbar above table */
+        .table-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .table-toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .table-toolbar-title {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
+        
+        /* Confirm item deletion modal */
+        .item-delete-info {
+            background: #fef0f0;
+            border: 1px solid #f5c6cb;
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+        }
+        .item-delete-info p {
+            margin: 0.25rem 0;
+        }
+        
+        /* ==========================================
+           Workflow Navigation History System
+           ========================================== */
+        
+        /* Global navigation header */
+        .nav-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        .nav-back-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .nav-back-btn:hover:not(:disabled) {
+            background: rgba(255,255,255,0.25);
+            transform: translateX(-2px);
+        }
+        .nav-back-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .nav-back-btn .back-arrow {
+            font-size: 1.1rem;
+        }
+        .nav-back-btn .back-text {
+            display: none;
+        }
+        @media (min-width: 600px) {
+            .nav-back-btn .back-text {
+                display: inline;
+            }
+        }
+        
+        /* Workflow breadcrumb trail */
+        .workflow-breadcrumb {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            flex: 1;
+            color: rgba(255,255,255,0.7);
+            font-size: 0.85rem;
+        }
+        .workflow-crumb {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .workflow-crumb-link {
+            color: rgba(255,255,255,0.8);
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .workflow-crumb-link:hover {
+            background: rgba(255,255,255,0.15);
+            color: white;
+        }
+        .workflow-crumb-active {
+            color: white;
+            font-weight: 600;
+            background: rgba(52, 152, 219, 0.4);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+        .workflow-crumb-separator {
+            color: rgba(255,255,255,0.4);
+            margin: 0 0.25rem;
+        }
+        
+        /* Workflow status indicator */
+        .workflow-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.75rem;
+            background: rgba(39, 174, 96, 0.2);
+            border: 1px solid rgba(39, 174, 96, 0.4);
+            border-radius: 20px;
+            color: #82e0aa;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .workflow-status.has-changes {
+            background: rgba(241, 196, 15, 0.2);
+            border-color: rgba(241, 196, 15, 0.4);
+            color: #f9e79f;
+        }
+        .workflow-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Keyboard shortcut hint */
+        .nav-shortcut-hint {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.5);
+            margin-left: auto;
+            display: none;
+        }
+        @media (min-width: 768px) {
+            .nav-shortcut-hint {
+                display: block;
+            }
+        }
+        .nav-shortcut-hint kbd {
+            background: rgba(255,255,255,0.15);
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 0.7rem;
+            margin: 0 0.1rem;
+        }
+        
+        /* Unsaved changes warning */
+        .unsaved-warning-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f39c12;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            z-index: 3000;
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDownFromTop {
+            from { transform: translateX(-50%) translateY(-100px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+        .unsaved-warning-toast .warning-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .unsaved-warning-toast button {
+            padding: 0.4rem 0.8rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .unsaved-warning-toast .btn-save-continue {
+            background: white;
+            color: #f39c12;
+        }
+        .unsaved-warning-toast .btn-discard {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .unsaved-warning-toast .btn-cancel-nav {
+            background: transparent;
+            color: rgba(255,255,255,0.8);
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
+    <!-- Global Navigation Header -->
+    <div class="nav-header" id="navHeader">
+        <button class="nav-back-btn" id="globalBackBtn" onclick="workflowHistory.goBack()" disabled title="Go back (Alt+←)">
+            <span class="back-arrow">←</span>
+            <span class="back-text">Back</span>
+        </button>
+        <div class="workflow-breadcrumb" id="workflowBreadcrumb">
+            <span class="workflow-crumb-active">🏠 Home</span>
+        </div>
+        <div class="workflow-status" id="workflowStatus" style="display: none;">
+            <span class="workflow-status-dot"></span>
+            <span id="workflowStatusText">Saved</span>
+        </div>
+        <div class="nav-shortcut-hint">
+            <kbd>Alt</kbd>+<kbd>←</kbd> Back
+        </div>
+    </div>
+
     <h1>🏭 MIDA Certificate System</h1>
     
     <!-- Tabs -->
@@ -1842,6 +2251,15 @@
                 
                 <!-- Active Certificates Table -->
                 <div id="activeCertificatesSection">
+                    <!-- Toolbar -->
+                    <div class="table-toolbar">
+                        <div class="table-toolbar-left">
+                            <span class="table-toolbar-title">📋 MIDA Certificates</span>
+                        </div>
+                        <button class="btn-add" onclick="showAddCertificateModal()">
+                            ➕ Add Certificate
+                        </button>
+                    </div>
                     <div style="overflow-x: auto;">
                         <table id="certificatesTable">
                             <thead>
@@ -1943,21 +2361,31 @@
                     </div>
                 </div>
                 
-                <h3>📦 Certificate Items</h3>
-                
-                <!-- Quantity Toggle -->
-                <div class="qty-toggle-container">
-                    <span class="qty-toggle-label">Display Quantities:</span>
-                    <div class="qty-toggle-switch">
-                        <button class="qty-toggle-btn active" id="toggleApproved" onclick="toggleQuantityView('approved')">Approved (Total)</button>
-                        <button class="qty-toggle-btn" id="toggleRemaining" onclick="toggleQuantityView('remaining')">Remaining</button>
+                <!-- Items Table Header with Toolbar -->
+                <div class="table-toolbar">
+                    <div class="table-toolbar-left">
+                        <span class="table-toolbar-title">📦 Certificate Items</span>
+                        <!-- Quantity Toggle -->
+                        <div class="qty-toggle-switch" style="margin-left: 1rem;">
+                            <button class="qty-toggle-btn active" id="toggleApproved" onclick="toggleQuantityView('approved')">Approved</button>
+                            <button class="qty-toggle-btn" id="toggleRemaining" onclick="toggleQuantityView('remaining')">Remaining</button>
+                        </div>
                     </div>
-                    <span style="font-size: 0.85rem; color: #7f8c8d;">
-                        <span class="qty-status-normal">●</span> Normal &nbsp;
-                        <span class="qty-status-warning">●</span> Depleting &nbsp;
-                        <span class="qty-status-depleted">●</span> Depleted &nbsp;
-                        <span class="qty-status-overdrawn">●</span> Overdrawn
-                    </span>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <button class="btn-action btn-action-edit" onclick="showEditCertificateModal()" title="Edit Certificate Header">
+                            ✏️ Edit Certificate
+                        </button>
+                        <button class="btn-add" onclick="showAddItemModal()">
+                            ➕ Add Item
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 0.5rem; font-size: 0.85rem; color: #7f8c8d;">
+                    <span class="qty-status-normal">●</span> Normal &nbsp;
+                    <span class="qty-status-warning">●</span> Depleting &nbsp;
+                    <span class="qty-status-depleted">●</span> Depleted &nbsp;
+                    <span class="qty-status-overdrawn">●</span> Overdrawn
                 </div>
                 
                 <div style="overflow-x: auto;">
@@ -1973,6 +2401,7 @@
                                 <th class="number-cell">KLIA</th>
                                 <th class="number-cell">Bukit Kayu Hitam</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="itemsTableBody">
@@ -2074,6 +2503,552 @@
         // Use relative URL when served from same origin, or localhost for local file access
         const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
         
+        // ==========================================
+        // Workflow Navigation History System
+        // ==========================================
+        
+        /**
+         * WorkflowHistory - A comprehensive navigation history and state management system
+         * 
+         * Features:
+         * - Tracks navigation through tabs, sub-views, and drill-downs
+         * - Saves state snapshots before major operations
+         * - Supports "go back" with proper state restoration
+         * - Handles unsaved changes with user prompts
+         * - Keyboard shortcuts (Alt+← for back, Escape to cancel)
+         * 
+         * State Categories:
+         * - Navigation: current tab, sub-view, database drill-down level
+         * - Form Data: classification results, parsed certificate data
+         * - Selections: selected company, certificates, items
+         * - UI State: scroll positions, active filters, expanded sections
+         */
+        class WorkflowHistory {
+            constructor() {
+                this.stack = [];  // Navigation history stack
+                this.maxStackSize = 50;  // Prevent memory issues
+                this.hasUnsavedChanges = false;
+                this.unsavedChangeContext = null;  // What has unsaved changes
+                this.pendingNavigation = null;  // Stores nav action if user needs to confirm
+                this.isNavigating = false;  // Prevent recursive navigation
+                
+                // Initialize with home state
+                this.pushState({
+                    type: 'tab',
+                    tab: 'converter',
+                    label: '📄 Invoice Converter',
+                    timestamp: Date.now()
+                });
+                
+                // Set up keyboard shortcuts
+                this.setupKeyboardShortcuts();
+                
+                // Set up beforeunload warning
+                this.setupBeforeUnload();
+            }
+            
+            /**
+             * Get the current state (top of stack)
+             */
+            getCurrentState() {
+                return this.stack[this.stack.length - 1] || null;
+            }
+            
+            /**
+             * Get the previous state (for go back)
+             */
+            getPreviousState() {
+                return this.stack.length > 1 ? this.stack[this.stack.length - 2] : null;
+            }
+            
+            /**
+             * Push a new navigation state onto the stack
+             * @param {Object} state - The state to push
+             */
+            pushState(state) {
+                // Don't push duplicate states
+                const current = this.getCurrentState();
+                if (current && this.areStatesEqual(current, state)) {
+                    return;
+                }
+                
+                // Add metadata
+                state.timestamp = state.timestamp || Date.now();
+                state.scrollY = window.scrollY;
+                
+                this.stack.push(state);
+                
+                // Trim stack if too large
+                if (this.stack.length > this.maxStackSize) {
+                    this.stack = this.stack.slice(-this.maxStackSize);
+                }
+                
+                this.updateUI();
+            }
+            
+            /**
+             * Replace the current state (for updates without creating new history)
+             */
+            replaceState(state) {
+                if (this.stack.length > 0) {
+                    state.timestamp = Date.now();
+                    state.scrollY = window.scrollY;
+                    this.stack[this.stack.length - 1] = state;
+                    this.updateUI();
+                }
+            }
+            
+            /**
+             * Go back to the previous state
+             * @returns {boolean} Whether navigation occurred
+             */
+            async goBack() {
+                if (this.isNavigating) return false;
+                if (this.stack.length <= 1) return false;
+                
+                // Check for unsaved changes
+                if (this.hasUnsavedChanges) {
+                    const shouldContinue = await this.promptUnsavedChanges();
+                    if (!shouldContinue) return false;
+                }
+                
+                this.isNavigating = true;
+                
+                try {
+                    // Pop current state
+                    const currentState = this.stack.pop();
+                    const previousState = this.getCurrentState();
+                    
+                    if (!previousState) {
+                        this.stack.push(currentState); // Restore if no previous
+                        return false;
+                    }
+                    
+                    // Restore the previous state
+                    await this.restoreState(previousState, currentState);
+                    
+                    this.updateUI();
+                    return true;
+                } finally {
+                    this.isNavigating = false;
+                }
+            }
+            
+            /**
+             * Navigate to a specific point in history (for breadcrumb clicks)
+             * @param {number} index - The stack index to navigate to
+             */
+            async navigateToIndex(index) {
+                if (this.isNavigating) return;
+                if (index < 0 || index >= this.stack.length - 1) return;
+                
+                // Check for unsaved changes
+                if (this.hasUnsavedChanges) {
+                    const shouldContinue = await this.promptUnsavedChanges();
+                    if (!shouldContinue) return;
+                }
+                
+                this.isNavigating = true;
+                
+                try {
+                    // Pop states until we reach the target
+                    const targetState = this.stack[index];
+                    const currentState = this.getCurrentState();
+                    this.stack = this.stack.slice(0, index + 1);
+                    
+                    await this.restoreState(targetState, currentState);
+                    this.updateUI();
+                } finally {
+                    this.isNavigating = false;
+                }
+            }
+            
+            /**
+             * Restore a state - navigate UI to match the state
+             */
+            async restoreState(state, fromState) {
+                switch (state.type) {
+                    case 'tab':
+                        this.restoreTabState(state);
+                        break;
+                    case 'database-certificates':
+                        this.restoreDatabaseCertificatesState(state);
+                        break;
+                    case 'database-items':
+                        await this.restoreDatabaseItemsState(state);
+                        break;
+                    case 'database-imports':
+                        await this.restoreDatabaseImportsState(state);
+                        break;
+                    case 'classification-result':
+                        this.restoreClassificationState(state);
+                        break;
+                    case 'parser-result':
+                        this.restoreParserState(state);
+                        break;
+                }
+                
+                // Restore scroll position
+                if (state.scrollY !== undefined) {
+                    setTimeout(() => window.scrollTo(0, state.scrollY), 100);
+                }
+            }
+            
+            /**
+             * Restore tab navigation state
+             */
+            restoreTabState(state) {
+                // Use the internal switch without pushing to history
+                this.switchTabInternal(state.tab);
+                
+                // Restore sub-state if any
+                if (state.subView) {
+                    this.restoreSubView(state);
+                }
+            }
+            
+            /**
+             * Restore database certificates view
+             */
+            restoreDatabaseCertificatesState(state) {
+                this.switchTabInternal('database');
+                
+                // Show certificates view
+                hideElement('itemsView');
+                hideElement('importsView');
+                showElement('certificatesView');
+                
+                // Restore sub-tab (active/deleted)
+                if (state.subTab === 'deleted') {
+                    switchDbSubTab('deleted');
+                } else {
+                    switchDbSubTab('active');
+                }
+                
+                // Restore page if saved
+                if (state.page) {
+                    dbState.certificatesPage = state.page;
+                    loadCertificates(state.page);
+                }
+            }
+            
+            /**
+             * Restore database items view
+             */
+            async restoreDatabaseItemsState(state) {
+                this.switchTabInternal('database');
+                
+                // Ensure we have the certificate
+                if (state.certificate) {
+                    dbState.selectedCertificate = state.certificate;
+                    
+                    // Update UI
+                    document.getElementById('infoCertNumber').textContent = state.certificate.certificate_number || '-';
+                    document.getElementById('infoCertCompany').textContent = state.certificate.company_name || '-';
+                    document.getElementById('infoCertModelNumber').textContent = state.certificate.model_number || '-';
+                    document.getElementById('infoCertPeriod').textContent = 
+                        `${formatDate(state.certificate.exemption_start_date)} - ${formatDate(state.certificate.exemption_end_date)}`;
+                    document.getElementById('infoCertStatus').innerHTML = 
+                        `<span class="status-badge ${state.certificate.status}">${state.certificate.status}</span>`;
+                    
+                    updateBreadcrumb('items', { certificateNumber: state.certificate.certificate_number });
+                }
+                
+                hideElement('certificatesView');
+                hideElement('importsView');
+                showElement('itemsView');
+                
+                // Restore quantity view
+                if (state.quantityView) {
+                    toggleQuantityView(state.quantityView);
+                }
+                
+                // Reload items if we have a certificate
+                if (state.certificate?.id) {
+                    await loadCertificateItems(state.certificate.id, state.page || 1);
+                }
+            }
+            
+            /**
+             * Restore database imports view
+             */
+            async restoreDatabaseImportsState(state) {
+                this.switchTabInternal('database');
+                
+                // Restore certificate and item context
+                if (state.certificate) {
+                    dbState.selectedCertificate = state.certificate;
+                }
+                if (state.item) {
+                    dbState.selectedItem = state.item;
+                    
+                    // Update info card
+                    document.getElementById('infoItemCert').textContent = 
+                        dbState.selectedCertificate?.certificate_number || state.item.certificate_number || '-';
+                    document.getElementById('infoItemHsCode').textContent = state.item.hs_code || state.item.item_hs_code || '-';
+                    document.getElementById('infoItemName').textContent = state.item.item_name || '-';
+                    document.getElementById('infoItemUom').textContent = state.item.uom || state.item.item_uom || '-';
+                    
+                    updateBreadcrumb('imports', {
+                        certificateNumber: dbState.selectedCertificate?.certificate_number || state.item.certificate_number,
+                        itemName: state.item.item_name || `Line ${state.item.line_no}`
+                    });
+                }
+                
+                hideElement('certificatesView');
+                hideElement('itemsView');
+                showElement('importsView');
+                
+                // Restore port filter
+                if (state.port) {
+                    document.querySelectorAll('.port-filter-btn').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.port === state.port);
+                    });
+                    dbState.currentPort = state.port;
+                }
+                
+                // Reload imports
+                if (state.item?.item_id) {
+                    await loadImportRecords(state.item.item_id, state.port || 'all', state.page || 1);
+                }
+            }
+            
+            /**
+             * Restore classification results state
+             */
+            restoreClassificationState(state) {
+                this.switchTabInternal('converter');
+                
+                // Restore classification data if saved
+                if (state.classificationData) {
+                    // classificationData is the global variable used for classification results
+                    classificationData.form_d_items = state.classificationData.form_d || [];
+                    classificationData.mida_items = state.classificationData.mida || [];
+                    classificationData.duties_payable_items = state.classificationData.duties_payable || [];
+                    
+                    // Re-render tables
+                    renderClassificationTable('form_d');
+                    renderClassificationTable('mida');
+                    renderClassificationTable('duties_payable');
+                    updateTabCounts();
+                    
+                    // Show results section
+                    showElement('converterResults');
+                    showElement('classificationSection');
+                    
+                    // Switch to active classification tab
+                    if (state.activeClassificationTab) {
+                        switchClassificationTab(state.activeClassificationTab);
+                    }
+                }
+            }
+            
+            /**
+             * Restore parser results state
+             */
+            restoreParserState(state) {
+                this.switchTabInternal('parser');
+                
+                if (state.parsedData) {
+                    displayParsedCertificate(state.parsedData);
+                }
+            }
+            
+            /**
+             * Internal tab switch that doesn't push to history
+             */
+            switchTabInternal(tabName) {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                
+                const tabContent = document.querySelector(`.tab-content#${tabName}-tab`);
+                const tabButton = document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`);
+                
+                if (tabContent) tabContent.classList.add('active');
+                if (tabButton) tabButton.classList.add('active');
+            }
+            
+            /**
+             * Compare two states for equality (to prevent duplicates)
+             */
+            areStatesEqual(a, b) {
+                if (a.type !== b.type) return false;
+                if (a.tab !== b.tab) return false;
+                if (a.type === 'database-items' && a.certificate?.id !== b.certificate?.id) return false;
+                if (a.type === 'database-imports' && a.item?.item_id !== b.item?.item_id) return false;
+                return true;
+            }
+            
+            /**
+             * Mark that there are unsaved changes
+             */
+            setUnsavedChanges(hasChanges, context = null) {
+                this.hasUnsavedChanges = hasChanges;
+                this.unsavedChangeContext = context;
+                this.updateWorkflowStatus();
+            }
+            
+            /**
+             * Prompt user about unsaved changes
+             * @returns {Promise<boolean>} True if user wants to continue (discard changes)
+             */
+            async promptUnsavedChanges() {
+                return new Promise((resolve) => {
+                    const context = this.unsavedChangeContext || 'this page';
+                    const result = confirm(
+                        `You have unsaved changes in ${context}.\n\n` +
+                        `Do you want to discard these changes and go back?`
+                    );
+                    
+                    if (result) {
+                        this.hasUnsavedChanges = false;
+                        this.unsavedChangeContext = null;
+                        this.updateWorkflowStatus();
+                    }
+                    
+                    resolve(result);
+                });
+            }
+            
+            /**
+             * Update the navigation UI (back button, breadcrumbs)
+             */
+            updateUI() {
+                this.updateBackButton();
+                this.updateBreadcrumbs();
+                this.updateWorkflowStatus();
+            }
+            
+            /**
+             * Update the back button state
+             */
+            updateBackButton() {
+                const backBtn = document.getElementById('globalBackBtn');
+                if (backBtn) {
+                    const canGoBack = this.stack.length > 1;
+                    backBtn.disabled = !canGoBack;
+                    
+                    // Update tooltip
+                    const prevState = this.getPreviousState();
+                    if (prevState) {
+                        backBtn.title = `Go back to ${prevState.label || 'previous page'} (Alt+←)`;
+                    } else {
+                        backBtn.title = 'No previous page';
+                    }
+                }
+            }
+            
+            /**
+             * Update the workflow breadcrumbs
+             */
+            updateBreadcrumbs() {
+                const breadcrumb = document.getElementById('workflowBreadcrumb');
+                if (!breadcrumb) return;
+                
+                let html = '';
+                
+                this.stack.forEach((state, index) => {
+                    const isLast = index === this.stack.length - 1;
+                    const label = state.label || state.type;
+                    
+                    if (index > 0) {
+                        html += '<span class="workflow-crumb-separator">›</span>';
+                    }
+                    
+                    html += '<span class="workflow-crumb">';
+                    if (isLast) {
+                        html += `<span class="workflow-crumb-active">${escapeHtml(label)}</span>`;
+                    } else {
+                        html += `<span class="workflow-crumb-link" onclick="workflowHistory.navigateToIndex(${index})">${escapeHtml(label)}</span>`;
+                    }
+                    html += '</span>';
+                });
+                
+                breadcrumb.innerHTML = html;
+            }
+            
+            /**
+             * Update workflow status indicator
+             */
+            updateWorkflowStatus() {
+                const statusEl = document.getElementById('workflowStatus');
+                const statusText = document.getElementById('workflowStatusText');
+                
+                if (!statusEl || !statusText) return;
+                
+                if (this.hasUnsavedChanges) {
+                    statusEl.style.display = 'flex';
+                    statusEl.classList.add('has-changes');
+                    statusText.textContent = 'Unsaved changes';
+                } else {
+                    statusEl.style.display = 'none';
+                    statusEl.classList.remove('has-changes');
+                }
+            }
+            
+            /**
+             * Set up keyboard shortcuts
+             */
+            setupKeyboardShortcuts() {
+                document.addEventListener('keydown', async (e) => {
+                    // Alt + Left Arrow = Go Back
+                    if (e.altKey && e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        await this.goBack();
+                    }
+                    
+                    // Escape = Cancel current operation or go back
+                    if (e.key === 'Escape') {
+                        // Check if a modal is open
+                        const openModal = document.querySelector('.modal-overlay.active');
+                        if (openModal) {
+                            // Let the modal handle its own escape
+                            return;
+                        }
+                        
+                        // Check if in edit mode
+                        const editBtn = document.getElementById('editBtn');
+                        const cancelBtn = document.getElementById('cancelBtn');
+                        if (cancelBtn && !cancelBtn.classList.contains('hidden')) {
+                            e.preventDefault();
+                            cancelEdit();
+                            return;
+                        }
+                    }
+                });
+            }
+            
+            /**
+             * Set up beforeunload warning for unsaved changes
+             */
+            setupBeforeUnload() {
+                window.addEventListener('beforeunload', (e) => {
+                    if (this.hasUnsavedChanges) {
+                        e.preventDefault();
+                        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                        return e.returnValue;
+                    }
+                });
+            }
+            
+            /**
+             * Clear history (for full reset)
+             */
+            clear() {
+                this.stack = [];
+                this.hasUnsavedChanges = false;
+                this.unsavedChangeContext = null;
+                this.updateUI();
+            }
+        }
+        
+        // Create global instance
+        const workflowHistory = new WorkflowHistory();
+        
+        // ==========================================
+        // End Workflow History System
+        // ==========================================
+        
         // Set default import date to today
         document.addEventListener('DOMContentLoaded', async function() {
             const importDateInput = document.getElementById('importDate');
@@ -2084,15 +3059,35 @@
             
             // Load companies on page load
             await loadCompanies();
+            
+            // Initialize workflow history UI
+            workflowHistory.updateUI();
         });
         
-        // Tab switching
+        // Tab switching - Enhanced with history tracking
         function switchTab(tabName) {
+            // Get current tab for comparison
+            const currentTab = document.querySelector('.tab.active');
+            const currentTabName = currentTab ? currentTab.textContent.trim() : '';
+            
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             
             document.querySelector(`.tab-content#${tabName}-tab`).classList.add('active');
             document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            
+            // Push to history
+            const tabLabels = {
+                'converter': '📄 Invoice Converter',
+                'parser': '🔍 Certificate Parser',
+                'database': '🗄️ Database View'
+            };
+            
+            workflowHistory.pushState({
+                type: 'tab',
+                tab: tabName,
+                label: tabLabels[tabName] || tabName
+            });
         }
         
         // Store all certificates for the selected company (for filtering)
@@ -2492,6 +3487,9 @@
             // Add to target
             classificationData[targetKey].push(item);
             
+            // Track that we have unsaved changes in classification
+            workflowHistory.setUnsavedChanges(true, 'classification results');
+            
             // Re-render both tables and update counts
             renderClassificationTable(sourceTable);
             renderClassificationTable(targetTable);
@@ -2677,6 +3675,20 @@
             
             // Switch to Form-D tab by default
             switchClassificationTab('form-d');
+            
+            // Track in workflow history - classification results are a significant state
+            workflowHistory.pushState({
+                type: 'classification-result',
+                tab: 'converter',
+                label: '📊 Classification Results',
+                classificationData: {
+                    form_d: classificationData.form_d_items,
+                    mida: classificationData.mida_items,
+                    duties_payable: classificationData.duties_payable_items,
+                    nextId: Date.now()
+                },
+                activeClassificationTab: 'form-d'
+            });
         }
         
         // Classify Invoice - Main function for classification
@@ -2921,6 +3933,9 @@
                 // Success
                 alert(`✅ Successfully saved ${data.length} import records to the database!\n\nRedirecting to Database View to see updated balances...`);
                 updateBtn.textContent = '✅ Updated!';
+                
+                // Clear unsaved changes since data was saved to database
+                workflowHistory.setUnsavedChanges(false);
                 
                 setTimeout(() => {
                     updateBtn.textContent = originalText;
@@ -3585,6 +4600,14 @@
             
             // Validate quantity discrepancies after parse
             validateQuantityDiscrepancies();
+            
+            // Track in workflow history - parsed certificate is a significant state
+            workflowHistory.pushState({
+                type: 'parser-result',
+                tab: 'parser',
+                label: `📋 ${data.mida_no || 'Parsed Certificate'}`,
+                parsedData: data
+            });
         }
         
         // Validate missing required fields (blocks save to database)
@@ -3786,6 +4809,11 @@
             // Store current data before editing
             if (isEditMode) {
                 originalCertificateData = JSON.parse(JSON.stringify(parsedCertificateData));
+                // Track unsaved changes when entering edit mode
+                workflowHistory.setUnsavedChanges(true, 'certificate editor');
+            } else {
+                // Clear unsaved changes when exiting edit mode
+                workflowHistory.setUnsavedChanges(false);
             }
             
             // Handle non-date header fields (certificate number, company name, model number)
@@ -3961,6 +4989,9 @@
             
             // Exit edit mode
             isEditMode = false;
+            
+            // Clear unsaved changes
+            workflowHistory.setUnsavedChanges(false);
             
             // Re-render the display with the original data
             displayParsedCertificate(parsedCertificateData);
@@ -4488,6 +5519,9 @@
                 ? 'The certificate has been updated in the database.'
                 : 'The certificate has been saved to the database.';
             
+            // Clear unsaved changes since data was saved to database
+            workflowHistory.setUnsavedChanges(false);
+            
             detailsEl.innerHTML = `
                 <div class="info-card" style="margin-top: 1rem;">
                     <div class="info-card-grid">
@@ -4800,26 +5834,33 @@
             
             tbody.innerHTML = '';
             
-            dbState.certificates.forEach(cert => {
+            dbState.certificates.forEach((cert, index) => {
                 const row = document.createElement('tr');
                 row.className = 'clickable-row';
                 row.dataset.id = cert.id;
                 
                 const statusBadge = `<span class="status-badge ${cert.status}">${cert.status}</span>`;
+                const isExpired = cert.status === 'expired';
                 
                 row.innerHTML = `
-                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${escapeHtml(cert.certificate_number || '-')}</td>
-                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${escapeHtml(cert.company_name || '-')}</td>
-                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${formatDate(cert.exemption_start_date)}</td>
-                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${formatDate(cert.exemption_end_date)}</td>
-                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${statusBadge}</td>
-                    <td onclick="selectCertificate(dbState.certificates.find(c => c.id === '${cert.id}'))">${cert.items?.length || '-'}</td>
+                    <td onclick="selectCertificate(dbState.certificates[${index}])">${escapeHtml(cert.certificate_number || '-')}</td>
+                    <td onclick="selectCertificate(dbState.certificates[${index}])">${escapeHtml(cert.company_name || '-')}</td>
+                    <td onclick="selectCertificate(dbState.certificates[${index}])">${formatDate(cert.exemption_start_date)}</td>
+                    <td onclick="selectCertificate(dbState.certificates[${index}])">${formatDate(cert.exemption_end_date)}</td>
+                    <td onclick="selectCertificate(dbState.certificates[${index}])">${statusBadge}</td>
+                    <td onclick="selectCertificate(dbState.certificates[${index}])">${cert.items?.length || '-'}</td>
                     <td>
+                        <button class="btn-action btn-action-edit" onclick="event.stopPropagation(); selectAndEditCertificate(dbState.certificates[${index}])" title="Edit Certificate" style="margin-right: 0.25rem;" ${isExpired ? 'disabled' : ''}>✏️</button>
                         <button class="btn-action btn-action-delete" onclick="event.stopPropagation(); showDeleteCertModal('${cert.id}', '${escapeHtml(cert.certificate_number)}', '${escapeHtml(cert.company_name)}')" title="Delete Certificate">🗑️</button>
                     </td>
                 `;
                 tbody.appendChild(row);
             });
+        }
+        
+        function selectAndEditCertificate(cert) {
+            dbState.selectedCertificate = cert;
+            showEditCertificateModal();
         }
         
         function selectCertificate(cert) {
@@ -4841,6 +5882,15 @@
             // Show items view
             hideElement('certificatesView');
             showElement('itemsView');
+            
+            // Track in workflow history
+            workflowHistory.pushState({
+                type: 'database-items',
+                tab: 'database',
+                label: `📦 ${cert.certificate_number || 'Items'}`,
+                certificate: cert,
+                quantityView: dbState.quantityView
+            });
             
             // Load items for this certificate
             loadCertificateItems(cert.id);
@@ -4935,7 +5985,7 @@
             if (dbState.items.length === 0) {
                 renderEmptyState(
                     'itemsTableBody',
-                    9,
+                    10,
                     '📦',
                     'No items found for this certificate',
                     'This certificate has no associated items.'
@@ -4946,11 +5996,10 @@
             tbody.innerHTML = '';
             // Server-side pagination: items are already paginated by the API
             
-            dbState.items.forEach(item => {
+            dbState.items.forEach((item, index) => {
                 const row = document.createElement('tr');
                 row.className = 'clickable-row';
                 row.dataset.id = item.item_id;
-                row.onclick = () => selectItem(item);
                 
                 const statusClass = getStatusClass(item.quantity_status);
                 const statusBadge = `<span class="status-badge ${item.quantity_status || 'normal'}">${item.quantity_status || 'normal'}</span>`;
@@ -4968,16 +6017,23 @@
                     return statusCls ? `<span class="${statusCls}">${formatNumber(value)}</span>` : formatNumber(value);
                 };
                 
+                // Store item reference for action buttons
+                const itemJson = JSON.stringify(item).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                
                 row.innerHTML = `
-                    <td>${item.line_no || '-'}</td>
-                    <td>${escapeHtml(item.hs_code || item.item_hs_code || '-')}</td>
-                    <td>${escapeHtml(item.item_name || '-')}</td>
-                    <td>${escapeHtml(item.uom || item.item_uom || '-')}</td>
-                    <td class="number-cell ${statusClass}">${formatNumber(totalQty)}</td>
-                    <td class="number-cell ${statusClass}">${formatNumber(portKlangQty)}</td>
-                    <td class="number-cell ${statusClass}">${formatNumber(kliaQty)}</td>
-                    <td class="number-cell ${statusClass}">${formatNumber(bukitQty)}</td>
-                    <td>${statusBadge}</td>
+                    <td onclick="selectItem(dbState.items[${index}])">${item.line_no || '-'}</td>
+                    <td onclick="selectItem(dbState.items[${index}])">${escapeHtml(item.hs_code || item.item_hs_code || '-')}</td>
+                    <td onclick="selectItem(dbState.items[${index}])">${escapeHtml(item.item_name || '-')}</td>
+                    <td onclick="selectItem(dbState.items[${index}])">${escapeHtml(item.uom || item.item_uom || '-')}</td>
+                    <td class="number-cell ${statusClass}" onclick="selectItem(dbState.items[${index}])">${formatNumber(totalQty)}</td>
+                    <td class="number-cell ${statusClass}" onclick="selectItem(dbState.items[${index}])">${formatNumber(portKlangQty)}</td>
+                    <td class="number-cell ${statusClass}" onclick="selectItem(dbState.items[${index}])">${formatNumber(kliaQty)}</td>
+                    <td class="number-cell ${statusClass}" onclick="selectItem(dbState.items[${index}])">${formatNumber(bukitQty)}</td>
+                    <td onclick="selectItem(dbState.items[${index}])">${statusBadge}</td>
+                    <td>
+                        <button class="btn-action btn-action-edit" onclick="event.stopPropagation(); showEditItemModal(dbState.items[${index}])" title="Edit Item" style="margin-right: 0.25rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;">✏️</button>
+                        <button class="btn-action btn-action-delete" onclick="event.stopPropagation(); showDeleteItemModal(dbState.items[${index}])" title="Delete Item" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">🗑️</button>
+                    </td>
                 `;
                 tbody.appendChild(row);
             });
@@ -5009,6 +6065,16 @@
             // Show imports view
             hideElement('itemsView');
             showElement('importsView');
+            
+            // Track in workflow history
+            workflowHistory.pushState({
+                type: 'database-imports',
+                tab: 'database',
+                label: `📥 ${item.item_name || 'Line ' + item.line_no}`,
+                certificate: dbState.selectedCertificate,
+                item: item,
+                port: 'all'
+            });
             
             // Load imports for this item
             loadImportRecords(item.item_id);
@@ -5142,6 +6208,14 @@
             hideElement('importsView');
             showElement('certificatesView');
             
+            // Track in workflow history
+            workflowHistory.pushState({
+                type: 'database-certificates',
+                tab: 'database',
+                label: '📋 Certificates',
+                subTab: 'active'
+            });
+            
             // Reload certificates to ensure fresh data
             loadCertificates(dbState.certificatesPage);
         }
@@ -5155,9 +6229,18 @@
             
             hideElement('importsView');
             showElement('itemsView');
+            
+            // Track in workflow history (going back to items from imports)
+            workflowHistory.pushState({
+                type: 'database-items',
+                tab: 'database',
+                label: `📦 ${dbState.selectedCertificate?.certificate_number || 'Items'}`,
+                certificate: dbState.selectedCertificate,
+                quantityView: dbState.quantityView
+            });
         }
         
-        // Override switchTab to initialize database view
+        // Override switchTab to initialize database view and track history
         const originalSwitchTab = switchTab;
         switchTab = function(tabName) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -5166,9 +6249,28 @@
             document.querySelector(`.tab-content#${tabName}-tab`).classList.add('active');
             document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
             
-            // Initialize database view when switching to it
+            // Track in workflow history
+            const tabLabels = {
+                'converter': '📄 Invoice Converter',
+                'parser': '🔍 Certificate Parser',
+                'database': '🗄️ Database View'
+            };
+            
+            // For database tab, push certificates state
             if (tabName === 'database') {
+                workflowHistory.pushState({
+                    type: 'database-certificates',
+                    tab: 'database',
+                    label: tabLabels[tabName],
+                    subTab: 'active'
+                });
                 initDatabaseView();
+            } else {
+                workflowHistory.pushState({
+                    type: 'tab',
+                    tab: tabName,
+                    label: tabLabels[tabName] || tabName
+                });
             }
         };
         
@@ -5456,6 +6558,713 @@
                 hideElement('dbLoading');
             }
         }
+        
+        // ==========================================
+        // Certificate CRUD Operations
+        // ==========================================
+        
+        let addCertItemCounter = 0;
+        let editCertItemCounter = 0;
+        
+        // --- Add Certificate ---
+        function showAddCertificateModal() {
+            // Reset form
+            document.getElementById('addCertNumber').value = '';
+            document.getElementById('addCertCompany').value = '';
+            document.getElementById('addCertModelNumber').value = '';
+            document.getElementById('addCertStartDate').value = '';
+            document.getElementById('addCertEndDate').value = '';
+            document.getElementById('addCertError').classList.add('hidden');
+            
+            // Clear and add one empty item row
+            const tbody = document.getElementById('addCertItemsBody');
+            tbody.innerHTML = '';
+            addCertItemCounter = 0;
+            addNewItemRowToAdd();
+            
+            document.getElementById('addCertificateModal').classList.add('active');
+        }
+        
+        function hideAddCertificateModal() {
+            document.getElementById('addCertificateModal').classList.remove('active');
+        }
+        
+        function addNewItemRowToAdd() {
+            addCertItemCounter++;
+            const tbody = document.getElementById('addCertItemsBody');
+            const row = document.createElement('tr');
+            row.id = `addItemRow_${addCertItemCounter}`;
+            row.innerHTML = `
+                <td class="line-no-cell">
+                    <input type="number" class="item-line-no" value="${addCertItemCounter}" min="1" style="width: 50px; text-align: center;">
+                </td>
+                <td><input type="text" class="item-hs-code" placeholder="HS Code"></td>
+                <td><input type="text" class="item-name" placeholder="Item Name"></td>
+                <td><input type="text" class="item-uom" placeholder="UOM" style="width: 70px;"></td>
+                <td class="qty-cell"><input type="number" class="item-total-qty" step="0.001" min="0" placeholder="0"></td>
+                <td class="qty-cell"><input type="number" class="item-pk-qty" step="0.001" min="0" placeholder="0"></td>
+                <td class="qty-cell"><input type="number" class="item-klia-qty" step="0.001" min="0" placeholder="0"></td>
+                <td class="qty-cell"><input type="number" class="item-bkh-qty" step="0.001" min="0" placeholder="0"></td>
+                <td class="action-cell">
+                    <button type="button" class="btn-row-delete" onclick="removeItemRow('addItemRow_${addCertItemCounter}', 'addCertItemsBody')">✕</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        }
+        
+        function removeItemRow(rowId, tbodyId) {
+            const tbody = document.getElementById(tbodyId);
+            const row = document.getElementById(rowId);
+            if (row && tbody.children.length > 1) {
+                row.remove();
+            } else if (tbody.children.length === 1) {
+                alert('You must have at least one item.');
+            }
+        }
+        
+        function collectItemsFromTable(tbodyId) {
+            const tbody = document.getElementById(tbodyId);
+            const rows = tbody.querySelectorAll('tr');
+            const items = [];
+            
+            rows.forEach(row => {
+                const lineNo = parseInt(row.querySelector('.item-line-no')?.value) || 0;
+                const hsCode = row.querySelector('.item-hs-code')?.value?.trim() || '';
+                const itemName = row.querySelector('.item-name')?.value?.trim() || '';
+                const uom = row.querySelector('.item-uom')?.value?.trim() || '';
+                const totalQty = parseFloat(row.querySelector('.item-total-qty')?.value) || null;
+                const pkQty = parseFloat(row.querySelector('.item-pk-qty')?.value) || null;
+                const kliaQty = parseFloat(row.querySelector('.item-klia-qty')?.value) || null;
+                const bkhQty = parseFloat(row.querySelector('.item-bkh-qty')?.value) || null;
+                
+                items.push({
+                    line_no: lineNo,
+                    hs_code: hsCode,
+                    item_name: itemName,
+                    uom: uom,
+                    approved_quantity: totalQty,
+                    port_klang_qty: pkQty,
+                    klia_qty: kliaQty,
+                    bukit_kayu_hitam_qty: bkhQty
+                });
+            });
+            
+            return items;
+        }
+        
+        function validateCertificateForm(certNumber, company, modelNumber, items) {
+            const errors = [];
+            
+            if (!certNumber) errors.push('Certificate Number is required.');
+            if (!company) errors.push('Company Name is required.');
+            if (!modelNumber) errors.push('Model Number is required.');
+            
+            if (items.length === 0) {
+                errors.push('At least one item is required.');
+            } else {
+                items.forEach((item, idx) => {
+                    if (!item.hs_code) errors.push(`Item ${idx + 1}: HS Code is required.`);
+                    if (!item.item_name) errors.push(`Item ${idx + 1}: Item Name is required.`);
+                    if (!item.uom) errors.push(`Item ${idx + 1}: UOM is required.`);
+                    if (item.line_no <= 0) errors.push(`Item ${idx + 1}: Line number must be positive.`);
+                });
+                
+                // Check for duplicate line numbers
+                const lineNos = items.map(i => i.line_no);
+                const duplicates = lineNos.filter((v, i, a) => a.indexOf(v) !== i);
+                if (duplicates.length > 0) {
+                    errors.push(`Duplicate line numbers found: ${[...new Set(duplicates)].join(', ')}`);
+                }
+            }
+            
+            return errors;
+        }
+        
+        async function submitAddCertificate() {
+            const certNumber = document.getElementById('addCertNumber').value.trim();
+            const company = document.getElementById('addCertCompany').value.trim();
+            const modelNumber = document.getElementById('addCertModelNumber').value.trim();
+            const startDate = document.getElementById('addCertStartDate').value || null;
+            const endDate = document.getElementById('addCertEndDate').value || null;
+            
+            const items = collectItemsFromTable('addCertItemsBody');
+            const errors = validateCertificateForm(certNumber, company, modelNumber, items);
+            
+            if (errors.length > 0) {
+                document.getElementById('addCertErrorText').innerHTML = errors.join('<br>');
+                document.getElementById('addCertError').classList.remove('hidden');
+                return;
+            }
+            
+            document.getElementById('addCertError').classList.add('hidden');
+            
+            const payload = {
+                header: {
+                    certificate_number: certNumber,
+                    company_name: company,
+                    model_number: modelNumber,
+                    exemption_start_date: startDate,
+                    exemption_end_date: endDate,
+                    source_filename: null
+                },
+                items: items
+            };
+            
+            try {
+                showElement('dbLoading');
+                hideAddCertificateModal();
+                
+                const response = await fetch(`${API_BASE}/api/mida/certificates/draft`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                const result = await response.json();
+                showCrudSuccess('Certificate Added', `Certificate "${certNumber}" has been created successfully.`);
+                loadCertificates(1);
+                
+            } catch (error) {
+                console.error('Error adding certificate:', error);
+                showDbError('Error adding certificate: ' + error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        // --- Edit Certificate ---
+        function showEditCertificateModal() {
+            const cert = dbState.selectedCertificate;
+            if (!cert) {
+                showDbError('No certificate selected.');
+                return;
+            }
+            
+            // Check if certificate is expired
+            if (cert.status === 'expired') {
+                showDbError('Expired certificates cannot be edited.');
+                return;
+            }
+            
+            // Populate header fields
+            document.getElementById('editCertId').value = cert.id;
+            document.getElementById('editCertNumber').value = cert.certificate_number || '';
+            document.getElementById('editCertCompany').value = cert.company_name || '';
+            document.getElementById('editCertModelNumber').value = cert.model_number || '';
+            document.getElementById('editCertStartDate').value = cert.exemption_start_date || '';
+            document.getElementById('editCertEndDate').value = cert.exemption_end_date || '';
+            document.getElementById('editCertError').classList.add('hidden');
+            
+            // Populate items
+            const tbody = document.getElementById('editCertItemsBody');
+            tbody.innerHTML = '';
+            editCertItemCounter = 0;
+            
+            const items = cert.items || [];
+            if (items.length === 0) {
+                addNewItemRowToEdit();
+            } else {
+                items.forEach(item => {
+                    addItemRowToEdit(item);
+                });
+            }
+            
+            document.getElementById('editCertificateModal').classList.add('active');
+        }
+        
+        function hideEditCertificateModal() {
+            document.getElementById('editCertificateModal').classList.remove('active');
+        }
+        
+        function addItemRowToEdit(item = null) {
+            editCertItemCounter++;
+            const tbody = document.getElementById('editCertItemsBody');
+            const row = document.createElement('tr');
+            row.id = `editItemRow_${editCertItemCounter}`;
+            
+            const lineNo = item?.line_no || editCertItemCounter;
+            const hsCode = item?.hs_code || '';
+            const itemName = item?.item_name || '';
+            const uom = item?.uom || '';
+            const totalQty = item?.approved_quantity ?? '';
+            const pkQty = item?.port_klang_qty ?? '';
+            const kliaQty = item?.klia_qty ?? '';
+            const bkhQty = item?.bukit_kayu_hitam_qty ?? '';
+            
+            row.innerHTML = `
+                <td class="line-no-cell">
+                    <input type="number" class="item-line-no" value="${lineNo}" min="1" style="width: 50px; text-align: center;">
+                </td>
+                <td><input type="text" class="item-hs-code" value="${escapeHtml(hsCode)}" placeholder="HS Code"></td>
+                <td><input type="text" class="item-name" value="${escapeHtml(itemName)}" placeholder="Item Name"></td>
+                <td><input type="text" class="item-uom" value="${escapeHtml(uom)}" placeholder="UOM" style="width: 70px;"></td>
+                <td class="qty-cell"><input type="number" class="item-total-qty" value="${totalQty}" step="0.001" min="0" placeholder="0"></td>
+                <td class="qty-cell"><input type="number" class="item-pk-qty" value="${pkQty}" step="0.001" min="0" placeholder="0"></td>
+                <td class="qty-cell"><input type="number" class="item-klia-qty" value="${kliaQty}" step="0.001" min="0" placeholder="0"></td>
+                <td class="qty-cell"><input type="number" class="item-bkh-qty" value="${bkhQty}" step="0.001" min="0" placeholder="0"></td>
+                <td class="action-cell">
+                    <button type="button" class="btn-row-delete" onclick="removeItemRow('editItemRow_${editCertItemCounter}', 'editCertItemsBody')">✕</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        }
+        
+        function addNewItemRowToEdit() {
+            addItemRowToEdit(null);
+        }
+        
+        async function submitEditCertificate() {
+            const certId = document.getElementById('editCertId').value;
+            const certNumber = document.getElementById('editCertNumber').value.trim();
+            const company = document.getElementById('editCertCompany').value.trim();
+            const modelNumber = document.getElementById('editCertModelNumber').value.trim();
+            const startDate = document.getElementById('editCertStartDate').value || null;
+            const endDate = document.getElementById('editCertEndDate').value || null;
+            
+            const items = collectItemsFromTable('editCertItemsBody');
+            const errors = validateCertificateForm(certNumber, company, modelNumber, items);
+            
+            if (errors.length > 0) {
+                document.getElementById('editCertErrorText').innerHTML = errors.join('<br>');
+                document.getElementById('editCertError').classList.remove('hidden');
+                return;
+            }
+            
+            document.getElementById('editCertError').classList.add('hidden');
+            
+            const payload = {
+                header: {
+                    certificate_number: certNumber,
+                    company_name: company,
+                    model_number: modelNumber,
+                    exemption_start_date: startDate,
+                    exemption_end_date: endDate,
+                    source_filename: null
+                },
+                items: items
+            };
+            
+            try {
+                showElement('dbLoading');
+                hideEditCertificateModal();
+                
+                const response = await fetch(`${API_BASE}/api/mida/certificates/${certId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                // Update the selected certificate in state
+                dbState.selectedCertificate = result;
+                
+                // Update the info card
+                document.getElementById('infoCertNumber').textContent = result.certificate_number || '-';
+                document.getElementById('infoCertCompany').textContent = result.company_name || '-';
+                document.getElementById('infoCertModelNumber').textContent = result.model_number || '-';
+                document.getElementById('infoCertPeriod').textContent = 
+                    `${formatDate(result.exemption_start_date)} - ${formatDate(result.exemption_end_date)}`;
+                document.getElementById('infoCertStatus').innerHTML = 
+                    `<span class="status-badge ${result.status}">${result.status}</span>`;
+                
+                showCrudSuccess('Certificate Updated', `Certificate "${certNumber}" has been updated successfully.`);
+                loadCertificateItems(certId, 1);
+                
+            } catch (error) {
+                console.error('Error updating certificate:', error);
+                showDbError('Error updating certificate: ' + error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        // ==========================================
+        // Item CRUD Operations (Single Item)
+        // ==========================================
+        
+        // --- Add Single Item ---
+        function showAddItemModal() {
+            const cert = dbState.selectedCertificate;
+            if (!cert) {
+                showDbError('No certificate selected.');
+                return;
+            }
+            
+            if (cert.status === 'expired') {
+                showDbError('Cannot add items to expired certificates.');
+                return;
+            }
+            
+            document.getElementById('addItemCertNumber').textContent = cert.certificate_number;
+            
+            // Calculate next line number
+            const maxLineNo = dbState.items?.length > 0 
+                ? Math.max(...dbState.items.map(i => i.line_no || 0)) 
+                : 0;
+            
+            document.getElementById('addItemLineNo').value = maxLineNo + 1;
+            document.getElementById('addItemHsCode').value = '';
+            document.getElementById('addItemName').value = '';
+            document.getElementById('addItemUom').value = '';
+            document.getElementById('addItemTotalQty').value = '';
+            document.getElementById('addItemPortKlang').value = '';
+            document.getElementById('addItemKlia').value = '';
+            document.getElementById('addItemBkh').value = '';
+            document.getElementById('addItemError').classList.add('hidden');
+            
+            document.getElementById('addItemModal').classList.add('active');
+        }
+        
+        function hideAddItemModal() {
+            document.getElementById('addItemModal').classList.remove('active');
+        }
+        
+        async function submitAddItem() {
+            const cert = dbState.selectedCertificate;
+            if (!cert) return;
+            
+            const lineNo = parseInt(document.getElementById('addItemLineNo').value) || 0;
+            const hsCode = document.getElementById('addItemHsCode').value.trim();
+            const itemName = document.getElementById('addItemName').value.trim();
+            const uom = document.getElementById('addItemUom').value.trim();
+            const totalQty = parseFloat(document.getElementById('addItemTotalQty').value) || null;
+            const pkQty = parseFloat(document.getElementById('addItemPortKlang').value) || null;
+            const kliaQty = parseFloat(document.getElementById('addItemKlia').value) || null;
+            const bkhQty = parseFloat(document.getElementById('addItemBkh').value) || null;
+            
+            // Validate
+            const errors = [];
+            if (lineNo <= 0) errors.push('Line number must be positive.');
+            if (!hsCode) errors.push('HS Code is required.');
+            if (!itemName) errors.push('Item Name is required.');
+            if (!uom) errors.push('UOM is required.');
+            
+            if (errors.length > 0) {
+                document.getElementById('addItemErrorText').innerHTML = errors.join('<br>');
+                document.getElementById('addItemError').classList.remove('hidden');
+                return;
+            }
+            
+            // To add a single item, we need to update the entire certificate
+            // First, get the current certificate data
+            try {
+                showElement('dbLoading');
+                hideAddItemModal();
+                
+                const certResponse = await fetch(`${API_BASE}/api/mida/certificates/${cert.id}`);
+                if (!certResponse.ok) throw new Error('Failed to fetch certificate data');
+                
+                const currentCert = await certResponse.json();
+                
+                // Add new item to items array
+                const newItem = {
+                    line_no: lineNo,
+                    hs_code: hsCode,
+                    item_name: itemName,
+                    uom: uom,
+                    approved_quantity: totalQty,
+                    port_klang_qty: pkQty,
+                    klia_qty: kliaQty,
+                    bukit_kayu_hitam_qty: bkhQty
+                };
+                
+                const updatedItems = [...(currentCert.items || []).map(i => ({
+                    line_no: i.line_no,
+                    hs_code: i.hs_code,
+                    item_name: i.item_name,
+                    uom: i.uom,
+                    approved_quantity: i.approved_quantity,
+                    port_klang_qty: i.port_klang_qty,
+                    klia_qty: i.klia_qty,
+                    bukit_kayu_hitam_qty: i.bukit_kayu_hitam_qty
+                })), newItem];
+                
+                const payload = {
+                    header: {
+                        certificate_number: currentCert.certificate_number,
+                        company_name: currentCert.company_name,
+                        model_number: currentCert.model_number,
+                        exemption_start_date: currentCert.exemption_start_date,
+                        exemption_end_date: currentCert.exemption_end_date,
+                        source_filename: currentCert.source_filename
+                    },
+                    items: updatedItems
+                };
+                
+                const response = await fetch(`${API_BASE}/api/mida/certificates/${cert.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                const result = await response.json();
+                dbState.selectedCertificate = result;
+                
+                showCrudSuccess('Item Added', `Item "${itemName}" has been added to the certificate.`);
+                loadCertificateItems(cert.id, 1);
+                
+            } catch (error) {
+                console.error('Error adding item:', error);
+                showDbError('Error adding item: ' + error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        // --- Edit Single Item ---
+        function showEditItemModal(item) {
+            const cert = dbState.selectedCertificate;
+            if (!cert) {
+                showDbError('No certificate selected.');
+                return;
+            }
+            
+            if (cert.status === 'expired') {
+                showDbError('Cannot edit items in expired certificates.');
+                return;
+            }
+            
+            document.getElementById('editItemCertNumber').textContent = cert.certificate_number;
+            document.getElementById('editItemId').value = item.item_id || item.id;
+            document.getElementById('editItemLineNo').value = item.line_no || '';
+            document.getElementById('editItemHsCode').value = item.hs_code || item.item_hs_code || '';
+            document.getElementById('editItemName').value = item.item_name || '';
+            document.getElementById('editItemUom').value = item.uom || item.item_uom || '';
+            document.getElementById('editItemTotalQty').value = item.approved_quantity ?? '';
+            document.getElementById('editItemPortKlang').value = item.port_klang_qty ?? '';
+            document.getElementById('editItemKlia').value = item.klia_qty ?? '';
+            document.getElementById('editItemBkh').value = item.bukit_kayu_hitam_qty ?? '';
+            document.getElementById('editItemError').classList.add('hidden');
+            
+            document.getElementById('editItemModal').classList.add('active');
+        }
+        
+        function hideEditItemModal() {
+            document.getElementById('editItemModal').classList.remove('active');
+        }
+        
+        async function submitEditItem() {
+            const cert = dbState.selectedCertificate;
+            if (!cert) return;
+            
+            const itemId = document.getElementById('editItemId').value;
+            const lineNo = parseInt(document.getElementById('editItemLineNo').value) || 0;
+            const hsCode = document.getElementById('editItemHsCode').value.trim();
+            const itemName = document.getElementById('editItemName').value.trim();
+            const uom = document.getElementById('editItemUom').value.trim();
+            const totalQty = parseFloat(document.getElementById('editItemTotalQty').value) || null;
+            const pkQty = parseFloat(document.getElementById('editItemPortKlang').value) || null;
+            const kliaQty = parseFloat(document.getElementById('editItemKlia').value) || null;
+            const bkhQty = parseFloat(document.getElementById('editItemBkh').value) || null;
+            
+            // Validate
+            const errors = [];
+            if (lineNo <= 0) errors.push('Line number must be positive.');
+            if (!hsCode) errors.push('HS Code is required.');
+            if (!itemName) errors.push('Item Name is required.');
+            if (!uom) errors.push('UOM is required.');
+            
+            if (errors.length > 0) {
+                document.getElementById('editItemErrorText').innerHTML = errors.join('<br>');
+                document.getElementById('editItemError').classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                showElement('dbLoading');
+                hideEditItemModal();
+                
+                const certResponse = await fetch(`${API_BASE}/api/mida/certificates/${cert.id}`);
+                if (!certResponse.ok) throw new Error('Failed to fetch certificate data');
+                
+                const currentCert = await certResponse.json();
+                
+                // Update the specific item
+                const updatedItems = (currentCert.items || []).map(i => {
+                    if (i.id === itemId) {
+                        return {
+                            line_no: lineNo,
+                            hs_code: hsCode,
+                            item_name: itemName,
+                            uom: uom,
+                            approved_quantity: totalQty,
+                            port_klang_qty: pkQty,
+                            klia_qty: kliaQty,
+                            bukit_kayu_hitam_qty: bkhQty
+                        };
+                    }
+                    return {
+                        line_no: i.line_no,
+                        hs_code: i.hs_code,
+                        item_name: i.item_name,
+                        uom: i.uom,
+                        approved_quantity: i.approved_quantity,
+                        port_klang_qty: i.port_klang_qty,
+                        klia_qty: i.klia_qty,
+                        bukit_kayu_hitam_qty: i.bukit_kayu_hitam_qty
+                    };
+                });
+                
+                const payload = {
+                    header: {
+                        certificate_number: currentCert.certificate_number,
+                        company_name: currentCert.company_name,
+                        model_number: currentCert.model_number,
+                        exemption_start_date: currentCert.exemption_start_date,
+                        exemption_end_date: currentCert.exemption_end_date,
+                        source_filename: currentCert.source_filename
+                    },
+                    items: updatedItems
+                };
+                
+                const response = await fetch(`${API_BASE}/api/mida/certificates/${cert.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                const result = await response.json();
+                dbState.selectedCertificate = result;
+                
+                showCrudSuccess('Item Updated', `Item "${itemName}" has been updated.`);
+                loadCertificateItems(cert.id, dbState.itemsPage);
+                
+            } catch (error) {
+                console.error('Error updating item:', error);
+                showDbError('Error updating item: ' + error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        // --- Delete Single Item ---
+        function showDeleteItemModal(item) {
+            const cert = dbState.selectedCertificate;
+            if (!cert) {
+                showDbError('No certificate selected.');
+                return;
+            }
+            
+            if (cert.status === 'expired') {
+                showDbError('Cannot delete items from expired certificates.');
+                return;
+            }
+            
+            document.getElementById('deleteItemId').value = item.item_id || item.id;
+            document.getElementById('deleteItemLineNo').textContent = item.line_no || '-';
+            document.getElementById('deleteItemHsCode').textContent = item.hs_code || item.item_hs_code || '-';
+            document.getElementById('deleteItemName').textContent = item.item_name || '-';
+            
+            document.getElementById('deleteItemModal').classList.add('active');
+        }
+        
+        function hideDeleteItemModal() {
+            document.getElementById('deleteItemModal').classList.remove('active');
+        }
+        
+        async function confirmDeleteItem() {
+            const cert = dbState.selectedCertificate;
+            if (!cert) return;
+            
+            const itemId = document.getElementById('deleteItemId').value;
+            
+            try {
+                showElement('dbLoading');
+                hideDeleteItemModal();
+                
+                const certResponse = await fetch(`${API_BASE}/api/mida/certificates/${cert.id}`);
+                if (!certResponse.ok) throw new Error('Failed to fetch certificate data');
+                
+                const currentCert = await certResponse.json();
+                
+                // Remove the item
+                const updatedItems = (currentCert.items || [])
+                    .filter(i => i.id !== itemId)
+                    .map(i => ({
+                        line_no: i.line_no,
+                        hs_code: i.hs_code,
+                        item_name: i.item_name,
+                        uom: i.uom,
+                        approved_quantity: i.approved_quantity,
+                        port_klang_qty: i.port_klang_qty,
+                        klia_qty: i.klia_qty,
+                        bukit_kayu_hitam_qty: i.bukit_kayu_hitam_qty
+                    }));
+                
+                if (updatedItems.length === 0) {
+                    showDbError('Cannot delete the last item. A certificate must have at least one item.');
+                    hideElement('dbLoading');
+                    return;
+                }
+                
+                const payload = {
+                    header: {
+                        certificate_number: currentCert.certificate_number,
+                        company_name: currentCert.company_name,
+                        model_number: currentCert.model_number,
+                        exemption_start_date: currentCert.exemption_start_date,
+                        exemption_end_date: currentCert.exemption_end_date,
+                        source_filename: currentCert.source_filename
+                    },
+                    items: updatedItems
+                };
+                
+                const response = await fetch(`${API_BASE}/api/mida/certificates/${cert.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+                }
+                
+                const result = await response.json();
+                dbState.selectedCertificate = result;
+                
+                showCrudSuccess('Item Deleted', 'The item has been deleted from the certificate.');
+                loadCertificateItems(cert.id, dbState.itemsPage);
+                
+            } catch (error) {
+                console.error('Error deleting item:', error);
+                showDbError('Error deleting item: ' + error.message);
+            } finally {
+                hideElement('dbLoading');
+            }
+        }
+        
+        // --- Success Modal ---
+        function showCrudSuccess(title, message) {
+            document.getElementById('crudSuccessTitle').textContent = '✅ ' + title;
+            document.getElementById('crudSuccessMessage').textContent = message;
+            document.getElementById('crudSuccessModal').classList.add('active');
+        }
+        
+        function hideCrudSuccessModal() {
+            document.getElementById('crudSuccessModal').classList.remove('active');
+        }
     </script>
     
     <!-- Confirmation Modal -->
@@ -5610,6 +7419,291 @@
             <p>Another active certificate already uses this certificate number. You must delete or rename the active certificate before restoring this one.</p>
             <div class="modal-buttons">
                 <button class="btn-secondary" onclick="hideRestoreConflictModal()">OK</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Certificate Modal -->
+    <div id="addCertificateModal" class="modal-overlay">
+        <div class="modal-content large">
+            <h3>➕ Add New Certificate</h3>
+            
+            <!-- Header Section -->
+            <div class="form-section">
+                <div class="form-section-title">Certificate Header</div>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>Certificate Number <span style="color: #e74c3c;">*</span></label>
+                        <input type="text" id="addCertNumber" placeholder="e.g., MIDA/2024/12345">
+                    </div>
+                    <div class="form-field">
+                        <label>Company Name <span style="color: #e74c3c;">*</span></label>
+                        <input type="text" id="addCertCompany" placeholder="Company name">
+                    </div>
+                    <div class="form-field">
+                        <label>Model Number <span style="color: #e74c3c;">*</span></label>
+                        <input type="text" id="addCertModelNumber" placeholder="e.g., MODEL-001">
+                    </div>
+                </div>
+                <div class="form-grid" style="margin-top: 0.5rem;">
+                    <div class="form-field">
+                        <label>Start Date</label>
+                        <input type="date" id="addCertStartDate">
+                    </div>
+                    <div class="form-field">
+                        <label>End Date</label>
+                        <input type="date" id="addCertEndDate">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Items Section -->
+            <div class="form-section">
+                <div class="form-section-title">Certificate Items</div>
+                <div class="items-form-container">
+                    <table class="items-form-table">
+                        <thead>
+                            <tr>
+                                <th class="line-no-cell">Line</th>
+                                <th>HS Code *</th>
+                                <th>Item Name *</th>
+                                <th>UOM *</th>
+                                <th class="qty-cell">Total Qty</th>
+                                <th class="qty-cell">Port Klang</th>
+                                <th class="qty-cell">KLIA</th>
+                                <th class="qty-cell">BKH</th>
+                                <th class="action-cell"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="addCertItemsBody">
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn-add-row" onclick="addNewItemRowToAdd()">➕ Add Item Row</button>
+                </div>
+            </div>
+            
+            <div id="addCertError" class="error-message hidden" style="margin-top: 1rem;">
+                <p id="addCertErrorText"></p>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideAddCertificateModal()">Cancel</button>
+                <button class="btn-add" onclick="submitAddCertificate()">💾 Save Certificate</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Certificate Modal -->
+    <div id="editCertificateModal" class="modal-overlay">
+        <div class="modal-content large">
+            <h3>✏️ Edit Certificate</h3>
+            <input type="hidden" id="editCertId">
+            
+            <!-- Header Section -->
+            <div class="form-section">
+                <div class="form-section-title">Certificate Header</div>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>Certificate Number <span style="color: #e74c3c;">*</span></label>
+                        <input type="text" id="editCertNumber" placeholder="e.g., MIDA/2024/12345">
+                    </div>
+                    <div class="form-field">
+                        <label>Company Name <span style="color: #e74c3c;">*</span></label>
+                        <input type="text" id="editCertCompany" placeholder="Company name">
+                    </div>
+                    <div class="form-field">
+                        <label>Model Number <span style="color: #e74c3c;">*</span></label>
+                        <input type="text" id="editCertModelNumber" placeholder="e.g., MODEL-001">
+                    </div>
+                </div>
+                <div class="form-grid" style="margin-top: 0.5rem;">
+                    <div class="form-field">
+                        <label>Start Date</label>
+                        <input type="date" id="editCertStartDate">
+                    </div>
+                    <div class="form-field">
+                        <label>End Date</label>
+                        <input type="date" id="editCertEndDate">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Items Section -->
+            <div class="form-section">
+                <div class="form-section-title">Certificate Items</div>
+                <div class="items-form-container">
+                    <table class="items-form-table">
+                        <thead>
+                            <tr>
+                                <th class="line-no-cell">Line</th>
+                                <th>HS Code *</th>
+                                <th>Item Name *</th>
+                                <th>UOM *</th>
+                                <th class="qty-cell">Total Qty</th>
+                                <th class="qty-cell">Port Klang</th>
+                                <th class="qty-cell">KLIA</th>
+                                <th class="qty-cell">BKH</th>
+                                <th class="action-cell"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="editCertItemsBody">
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn-add-row" onclick="addNewItemRowToEdit()">➕ Add Item Row</button>
+                </div>
+            </div>
+            
+            <div id="editCertError" class="error-message hidden" style="margin-top: 1rem;">
+                <p id="editCertErrorText"></p>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideEditCertificateModal()">Cancel</button>
+                <button class="btn-action btn-action-edit" onclick="submitEditCertificate()">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Item Modal (Single Item) -->
+    <div id="addItemModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>➕ Add New Item</h3>
+            <p style="color: #7f8c8d; margin-bottom: 1rem;">Adding item to certificate: <strong id="addItemCertNumber"></strong></p>
+            
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>Line Number <span style="color: #e74c3c;">*</span></label>
+                    <input type="number" id="addItemLineNo" min="1" placeholder="1">
+                </div>
+                <div class="form-field">
+                    <label>HS Code <span style="color: #e74c3c;">*</span></label>
+                    <input type="text" id="addItemHsCode" placeholder="e.g., 8471.30.10">
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Item Name <span style="color: #e74c3c;">*</span></label>
+                <input type="text" id="addItemName" placeholder="Item description">
+            </div>
+            <div class="form-grid form-grid-4">
+                <div class="form-field">
+                    <label>UOM <span style="color: #e74c3c;">*</span></label>
+                    <input type="text" id="addItemUom" placeholder="e.g., UNIT">
+                </div>
+                <div class="form-field">
+                    <label>Total Quantity</label>
+                    <input type="number" id="addItemTotalQty" step="0.001" min="0" placeholder="0">
+                </div>
+            </div>
+            <div class="form-grid form-grid-3">
+                <div class="form-field">
+                    <label>Port Klang Qty</label>
+                    <input type="number" id="addItemPortKlang" step="0.001" min="0" placeholder="0">
+                </div>
+                <div class="form-field">
+                    <label>KLIA Qty</label>
+                    <input type="number" id="addItemKlia" step="0.001" min="0" placeholder="0">
+                </div>
+                <div class="form-field">
+                    <label>Bukit Kayu Hitam Qty</label>
+                    <input type="number" id="addItemBkh" step="0.001" min="0" placeholder="0">
+                </div>
+            </div>
+            
+            <div id="addItemError" class="error-message hidden" style="margin-top: 1rem;">
+                <p id="addItemErrorText"></p>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideAddItemModal()">Cancel</button>
+                <button class="btn-add" onclick="submitAddItem()">💾 Add Item</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Item Modal -->
+    <div id="editItemModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>✏️ Edit Item</h3>
+            <input type="hidden" id="editItemId">
+            <p style="color: #7f8c8d; margin-bottom: 1rem;">Editing item in certificate: <strong id="editItemCertNumber"></strong></p>
+            
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>Line Number <span style="color: #e74c3c;">*</span></label>
+                    <input type="number" id="editItemLineNo" min="1" placeholder="1">
+                </div>
+                <div class="form-field">
+                    <label>HS Code <span style="color: #e74c3c;">*</span></label>
+                    <input type="text" id="editItemHsCode" placeholder="e.g., 8471.30.10">
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Item Name <span style="color: #e74c3c;">*</span></label>
+                <input type="text" id="editItemName" placeholder="Item description">
+            </div>
+            <div class="form-grid form-grid-4">
+                <div class="form-field">
+                    <label>UOM <span style="color: #e74c3c;">*</span></label>
+                    <input type="text" id="editItemUom" placeholder="e.g., UNIT">
+                </div>
+                <div class="form-field">
+                    <label>Total Quantity</label>
+                    <input type="number" id="editItemTotalQty" step="0.001" min="0" placeholder="0">
+                </div>
+            </div>
+            <div class="form-grid form-grid-3">
+                <div class="form-field">
+                    <label>Port Klang Qty</label>
+                    <input type="number" id="editItemPortKlang" step="0.001" min="0" placeholder="0">
+                </div>
+                <div class="form-field">
+                    <label>KLIA Qty</label>
+                    <input type="number" id="editItemKlia" step="0.001" min="0" placeholder="0">
+                </div>
+                <div class="form-field">
+                    <label>Bukit Kayu Hitam Qty</label>
+                    <input type="number" id="editItemBkh" step="0.001" min="0" placeholder="0">
+                </div>
+            </div>
+            
+            <div id="editItemError" class="error-message hidden" style="margin-top: 1rem;">
+                <p id="editItemErrorText"></p>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideEditItemModal()">Cancel</button>
+                <button class="btn-action btn-action-edit" onclick="submitEditItem()">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Delete Item Confirmation Modal -->
+    <div id="deleteItemModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>🗑️ Delete Item</h3>
+            <p>Are you sure you want to delete this item?</p>
+            <div class="item-delete-info">
+                <p><strong>Line:</strong> <span id="deleteItemLineNo"></span></p>
+                <p><strong>HS Code:</strong> <span id="deleteItemHsCode"></span></p>
+                <p><strong>Item Name:</strong> <span id="deleteItemName"></span></p>
+            </div>
+            <p style="color: #e74c3c; font-weight: 600;">⚠️ This will also delete all import records for this item!</p>
+            <input type="hidden" id="deleteItemId">
+            
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="hideDeleteItemModal()">Cancel</button>
+                <button class="btn-action btn-action-delete" onclick="confirmDeleteItem()">🗑️ Delete Item</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Success Toast/Modal -->
+    <div id="crudSuccessModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="crudSuccessTitle">✅ Success</h3>
+            <p id="crudSuccessMessage"></p>
+            <div class="modal-buttons">
+                <button class="btn-add" onclick="hideCrudSuccessModal()">OK</button>
             </div>
         </div>
     </div>

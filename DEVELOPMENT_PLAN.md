@@ -1,21 +1,35 @@
 # MIDA Project – Development Plan (Azure OCR)
 
-## What we have so far (Phase 1–8 done, Phase 9 in progress)
+## What we have so far (Phase 1–10 done)
 - Repo scaffolded similar to Form-D-demo:
   - `server/` FastAPI backend
-  - `web/` simple HTML upload page with 3-tab classification UI
-- Endpoints:
-  - `POST /api/mida/certificate/certificate/parse` - Production parsing
-  - `POST /api/mida/certificate/certificate/parse-debug` - Debug parsing with stats
+  - `frontend/` React TypeScript frontend with Vite, React Query, Tailwind CSS
+  - `web/` legacy HTML upload page (deprecated)
+- Backend Endpoints:
+  - `POST /api/mida/certificate/parse` - Production parsing
+  - `POST /api/mida/certificate/parse-debug` - Debug parsing with stats
+  - `GET /api/mida/certificates/` - List certificates with pagination
+  - `GET /api/mida/certificates/{id}` - Get certificate with items
+  - `POST /api/mida/certificates/draft` - Create/update draft certificate
+  - `DELETE /api/mida/certificates/{id}` - Soft delete certificate
+  - `POST /api/mida/imports` - Record import
+  - `GET /api/mida/imports/{item_id}` - Get import history
   - `POST /api/convert` - Invoice conversion with MIDA matching
   - `POST /api/convert-multi` - Multi-certificate MIDA matching
   - `GET /api/companies` - Get all companies for classification
   - `POST /api/convert/classify` - 3-tab classification (Form-D, MIDA, Duties Payable)
   - `POST /api/convert/export-classified` - K1 XLS export for classified items
+- Frontend Pages:
+  - Database View - Certificate list with search, pagination, soft/hard delete
+  - Certificate Details - View/edit certificate items with port-wise balances
+  - Item Imports - View/add import records per item
+  - Invoice Converter - 3-tab classification with K1 export
+  - Certificate Parser - PDF upload with OCR parsing
 - Database:
   - Companies table (HICOM YAMAHA MOTOR SDN BHD, HONG LEONG YAMAHA MOTOR SDN BHD)
   - HSCODE UOM mappings table for balance deduction
-  - 8 Alembic migrations (certificates, import tracking, status, declaration form, model number, soft delete, hscode uom, companies)
+  - HSCODE Master table with 25,000+ entries
+  - 9 Alembic migrations (certificates, import tracking, status, declaration form, model number, soft delete, hscode uom, companies, hscode master)
 
 ## ✅ Phase 2 Completed: Certificate OCR
 
@@ -420,25 +434,128 @@ Integrated Form-D classification workflow with company-specific SST and routing 
 ---
 
 # Part B — Remaining Work (Future Phases)
-## Phase 10: UI Enhancements (TODO)
 
-### 10.1 Certificate List & Management UI
-- [ ] Add "View Saved Certificates" section in Certificate Parser tab
-- [ ] Fetch certificates via `GET /api/mida/certificates/?status=draft` and `status=confirmed`
-- [ ] Display as searchable/filterable table with columns: Cert No, Company, Status, Date
-- [ ] Click to load → populate edit form (if draft) or read-only view (if confirmed)
-- [ ] Add "Confirm Certificate" button to lock drafts
+## ✅ Phase 10 Completed: React TypeScript Frontend
 
-### 10.2 Certificate Dropdown Enhancement
-- [ ] Replace text input with searchable dropdown/autocomplete
-- [ ] Populate from `GET /api/mida/certificates/?status=confirmed`
-- [ ] Show cert number + company name + expiry date in dropdown
+### 10.1 ✅ Frontend Architecture
+- [x] Created `frontend/` directory with Vite + React + TypeScript
+- [x] Configured Vite proxy to forward `/api` requests to FastAPI backend
+- [x] Integrated React Query (@tanstack/react-query) for server state management
+- [x] Set up React Router v6 for navigation
+- [x] Tailwind CSS for styling with custom utility classes
+- [x] react-hot-toast for notifications
 
-### 10.3 Balance Sheet Views
-- [ ] Per-certificate summary: All items with approved/remaining for each port
-- [ ] Per-item detail: Full import history with running balance
-- [ ] Export to Excel/PDF for reporting
-- [ ] Filter by date range, port, item
+### 10.2 ✅ TypeScript Type Definitions (`frontend/src/types/index.ts`)
+- [x] `Certificate` - Full certificate with items and balances
+- [x] `CertificateItem` - Certificate line item
+- [x] `CertificateItemBalance` - Item with remaining quantities per port
+- [x] `ImportRecord` - Import transaction record
+- [x] `BulkImportRequest` - Bulk import request body
+- [x] `ClassifiedItem`, `ClassifyResponse` - 3-tab classification types
+- [x] `Company` - Company configuration
+
+### 10.3 ✅ API Service Layer (`frontend/src/services/`)
+- [x] `api.ts` - Axios instance with base URL configuration
+- [x] `certificateService.ts` - Certificate CRUD operations
+  - `getCertificates()` - List with pagination, status filter, search
+  - `getCertificate()` - Get single certificate with items
+  - `getCertificateItems()` - Get items with balances for a certificate
+  - `saveCertificate()` - Create or update certificate
+  - `confirmCertificate()` - Lock certificate
+  - `deleteCertificate()` - Soft delete
+  - `hardDeleteCertificate()` - Permanent delete
+  - `restoreCertificate()` - Restore soft-deleted
+- [x] `importService.ts` - Import tracking operations
+  - `getImports()` - Get import history for an item
+  - `createBulkImport()` - Record new imports
+  - `getById()` - Get single import record
+  - `update()` - Update import record
+  - `delete()` - Delete import record
+- [x] `classificationService.ts` - Invoice classification
+  - `classifyInvoice()` - 3-tab classification
+  - `exportToK1()` - K1 XLS export
+- [x] `companyService.ts` - Company operations
+  - `getCompanies()` - Get all companies for dropdown
+
+### 10.4 ✅ Database View Page (`frontend/src/pages/DatabaseView.tsx`)
+- [x] Active/Deleted tabs for filtering certificates
+- [x] Search by certificate number or company name
+- [x] Pagination with offset-based navigation
+- [x] Status badges (Active, Expired, Draft)
+- [x] Certificate table with sortable columns
+- [x] Actions: View, Delete, Restore, Permanently Delete
+- [x] Confirmation modals for delete/restore actions
+
+### 10.5 ✅ Certificate Details Page (`frontend/src/pages/CertificateDetails.tsx`)
+- [x] Certificate header with status, dates, company name
+- [x] Edit mode for draft certificates
+- [x] Items table with remaining quantities per port
+- [x] Quantity status indicators (In Stock, Low Stock, Out of Stock)
+- [x] Navigation to item imports
+- [x] Save changes functionality
+- [x] **Inline item editing**: Add/edit/delete certificate items directly in table
+- [x] **Add new item**: Button to append new item rows
+- [x] **Delete item**: Remove item with confirmation modal
+- [x] **Editable fields**: Line no, HS code, description, quantities per port
+
+### 10.6 ✅ Item Imports Page (`frontend/src/pages/ItemImports.tsx`)
+- [x] Import history table with date, invoice, quantity, port, balance
+- [x] Add new import form with validation
+- [x] Balance before/after display
+- [x] Remarks field support
+- [x] **Edit import record**: Edit button opens modal with editable fields
+- [x] **Delete import record**: Delete button with confirmation modal
+- [x] **React Query mutations**: Update and delete mutations for import records
+
+### 10.7 ✅ Invoice Converter Page (`frontend/src/pages/InvoiceConverter.tsx`)
+- [x] Company dropdown populated from API
+- [x] File upload for invoice Excel
+- [x] 3-tab UI: Form-D, MIDA, Duties Payable
+- [x] Per-item SST toggle
+- [x] Export to K1 XLS per tab
+- [x] **Date entry field**: Import date input with today's date as default
+- [x] **Grid layout**: Company, country, port, and date in organized 3-column grid
+
+### 10.8 ✅ Certificate Parser Page (`frontend/src/pages/CertificateParser.tsx`)
+- [x] PDF file upload with drag-and-drop
+- [x] OCR parsing via Azure Document Intelligence
+- [x] Editable parsed results
+- [x] Save to database functionality
+- [x] **Table/Card view toggle**: Switch between editable table and card views
+- [x] **Scrollable preview**: Items table in preview modal with scroll support
+- [x] **Editable table view**: Inline editing of items with add/delete rows
+
+### Frontend Project Structure
+```
+frontend/
+├── src/
+│   ├── App.tsx                     # Main app with routes
+│   ├── main.tsx                    # Entry point
+│   ├── index.css                   # Tailwind styles
+│   ├── components/
+│   │   ├── Layout.tsx              # App layout with sidebar
+│   │   └── ui/                     # Shadcn/ui components
+│   ├── pages/
+│   │   ├── DatabaseView.tsx        # Certificate list
+│   │   ├── CertificateDetails.tsx  # Certificate detail
+│   │   ├── ItemImports.tsx         # Import history
+│   │   ├── InvoiceConverter.tsx    # 3-tab classification
+│   │   └── CertificateParser.tsx   # PDF parsing
+│   ├── services/
+│   │   ├── api.ts
+│   │   ├── certificateService.ts
+│   │   ├── importService.ts
+│   │   ├── classificationService.ts
+│   │   └── companyService.ts
+│   ├── types/
+│   │   └── index.ts
+│   └── utils/
+│       └── index.ts
+├── package.json
+├── vite.config.ts
+├── tailwind.config.js
+└── tsconfig.json
+```
 
 ---
 
@@ -459,18 +576,46 @@ Integrated Form-D classification workflow with company-specific SST and routing 
 
 | Phase | Description | Priority | Effort | Status |
 |-------|-------------|----------|--------|--------|
-| 10.1 | Certificate list & management UI | 🟡 Medium | Medium | TODO |
-| 10.2 | Certificate dropdown in converter | 🟡 Medium | Small | TODO |
-| 10.3 | Balance sheet views (UI) | 🟡 Medium | Large | TODO |
+| 10 | React TypeScript Frontend | 🔴 High | Large | ✅ DONE |
 | 11.1 | ALDEC post-approval workflow | 🟢 Low | Medium | TODO |
 | 11.2 | Declaration reference tracking | 🟢 Low | Small | TODO |
+| 12 | Balance sheet export (Excel/PDF) | 🟡 Medium | Medium | TODO |
 
 ---
 
 ## Current Codebase Structure
 
 ```
-server/
+MIDA/
+├── frontend/                            # React TypeScript frontend
+│   ├── src/
+│   │   ├── App.tsx                     # Main app with React Router
+│   │   ├── main.tsx                    # Entry point
+│   │   ├── index.css                   # Tailwind CSS styles
+│   │   ├── components/
+│   │   │   ├── Layout.tsx              # App layout with navigation
+│   │   │   └── ui/                     # Reusable UI components
+│   │   ├── pages/
+│   │   │   ├── DatabaseView.tsx        # Certificate list & management
+│   │   │   ├── CertificateDetails.tsx  # Certificate detail view/edit
+│   │   │   ├── ItemImports.tsx         # Import history per item
+│   │   │   ├── InvoiceConverter.tsx    # 3-tab invoice classification
+│   │   │   └── CertificateParser.tsx   # PDF upload & OCR parsing
+│   │   ├── services/
+│   │   │   ├── api.ts                  # Axios instance with base URL
+│   │   │   ├── certificateService.ts   # Certificate API calls
+│   │   │   ├── importService.ts        # Import tracking API calls
+│   │   │   ├── classificationService.ts
+│   │   │   └── companyService.ts
+│   │   ├── types/
+│   │   │   └── index.ts                # TypeScript interfaces
+│   │   └── utils/
+│   │       └── index.ts
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tailwind.config.js
+│   └── tsconfig.json
+├── server/                              # FastAPI backend
 ├── app/
 │   ├── main.py                          # FastAPI app entry point
 │   ├── config.py                        # 12-factor settings
@@ -556,7 +701,10 @@ web/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/mida/imports` | Record import |
-| GET | `/api/mida/imports/{item_id}` | Get import history |
+| GET | `/api/mida/imports/item/{item_id}` | Get import history for item |
+| GET | `/api/mida/imports/{record_id}` | Get single import record |
+| PUT | `/api/mida/imports/{record_id}` | Update import record |
+| DELETE | `/api/mida/imports/{record_id}` | Delete import record |
 
 ### Certificate Parsing (`/api/mida/certificate/...`)
 | Method | Endpoint | Description |

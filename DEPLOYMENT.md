@@ -1,12 +1,13 @@
 # MIDA OCR API Deployment Guide
 
-This guide covers deploying the MIDA OCR API with 3-Tab Classification System following 12-factor app principles.
+This guide covers deploying the MIDA OCR API with 3-Tab Classification System and React TypeScript frontend following 12-factor app principles.
 
 ## Table of Contents
 
 - [Environment Variables](#environment-variables)
 - [Ports](#ports)
 - [Run Commands](#run-commands)
+- [Frontend Deployment](#frontend-deployment)
 - [Database Migrations](#database-migrations)
 - [Docker Deployment](#docker-deployment)
 - [Docker Compose](#docker-compose)
@@ -47,6 +48,12 @@ This guide covers deploying the MIDA OCR API with 3-Tab Classification System fo
 | `MIDA_API_TIMEOUT_SECONDS` | `10` | Request timeout |
 | `MIDA_API_CACHE_TTL_SECONDS` | `60` | Cache TTL for API responses |
 
+### Frontend Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE_URL` | `/api` | API base URL for frontend (in production) |
+
 ### Security Notes
 
 - **Never commit secrets** to version control
@@ -58,9 +65,10 @@ This guide covers deploying the MIDA OCR API with 3-Tab Classification System fo
 
 ## Ports
 
-| Port | Protocol | Description |
-|------|----------|-------------|
-| 8000 | HTTP | Main API server (configurable via `PORT` env var) |
+| Port | Protocol | Service | Description |
+|------|----------|---------|-------------|
+| 8000 | HTTP | Backend | FastAPI server (configurable via `PORT` env var) |
+| 3000 | HTTP | Frontend | Vite dev server (development only) |
 
 ---
 
@@ -69,44 +77,106 @@ This guide covers deploying the MIDA OCR API with 3-Tab Classification System fo
 ### Local Development
 
 ```bash
-# Navigate to server directory
+# Terminal 1: Run Backend
 cd server
-
-# Create virtual environment
 python -m venv venv
-
-# Activate virtual environment
-# Windows:
-.\venv\Scripts\activate
-# Linux/macOS:
-source venv/bin/activate
-
-# Install dependencies
+.\venv\Scripts\activate        # Windows
+# source venv/bin/activate     # Linux/macOS
 pip install -r requirements.txt
-
-# Copy environment file and configure
 cp ../.env.example .env
 # Edit .env with your values
-
-# Run development server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2: Run Frontend
+cd frontend
+npm install
+npm run dev
 ```
+
+The frontend runs on `http://localhost:3000` and proxies `/api` requests to `http://localhost:8000`.
 
 ### Production (without Docker)
 
 ```bash
+# Backend
 cd server
 pip install -r requirements.txt
-
-# Set environment variables (use your preferred method)
 export AZURE_DI_ENDPOINT="https://..."
 export AZURE_DI_KEY="..."
 export LOG_FORMAT=json
 export ENVIRONMENT=production
-
-# Run with production settings
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+
+# Frontend (build static files)
+cd frontend
+npm install
+npm run build
+# Serve dist/ folder with nginx or similar
 ```
+
+---
+
+## Frontend Deployment
+
+### Development
+
+The Vite dev server includes a proxy configuration that forwards all `/api` requests to the FastAPI backend:
+
+```typescript
+// vite.config.ts
+export default defineConfig({
+  server: {
+    port: 3000,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      }
+    }
+  }
+})
+```
+
+### Production Build
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+This creates a `dist/` folder with static assets.
+
+### Serving Frontend in Production
+
+**Option 1: Nginx (Recommended)**
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # Serve static frontend files
+    location / {
+        root /var/www/mida/frontend/dist;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API requests to backend
+    location /api {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**Option 2: Docker Multi-stage Build**
+
+See Docker Compose section below.
 
 ---
 
@@ -116,16 +186,17 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ### Migration Files
 
-The project has 8 Alembic migrations:
+The project has 9 Alembic migrations:
 
-1. `001_add_mida_certificates.py` - Certificate and item tables
-2. `002_add_import_tracking.py` - Import ledger
-3. `003_add_certificate_status.py` - Status column
-4. `004_add_declaration_form_number.py` - Declaration form field
+1. `001_mida_certificates.py` - Certificate and item tables
+2. `002_mida_import_tracking.py` - Import ledger
+3. `003_update_certificate_status.py` - Status column
+4. `004_add_declaration_form_reg_no.py` - Declaration form field
 5. `005_add_model_number.py` - Model number field
 6. `006_add_soft_delete.py` - Soft delete flag
-7. `007_add_hscode_uom_mappings.py` - HSCODE to UOM mapping table
+7. `007_hscode_uom_mappings.py` - HSCODE to UOM mapping table
 8. `008_companies.py` - Companies table (HICOM, Hong Leong)
+9. `009_hscode_master.py` - HSCODE master table with 25,000+ entries
 
 ### Before First Deployment
 
@@ -230,13 +301,14 @@ Create `docker-compose.yml` in project root:
 version: '3.8'
 
 services:
+  # FastAPI Backend
   mida-api:
     build:
       context: ./server
       dockerfile: Dockerfile
     container_name: mida-ocr-api
     ports:
-      - "${PORT:-8000}:8000"
+      - "${API_PORT:-8000}:8000"
     environment:
       - AZURE_DI_ENDPOINT=${AZURE_DI_ENDPOINT}
       - AZURE_DI_KEY=${AZURE_DI_KEY}
@@ -252,38 +324,109 @@ services:
       retries: 3
       start_period: 5s
     restart: unless-stopped
-    # Optional: uncomment for volume persistence
-    # volumes:
-    #   - ./data:/app/data
+    networks:
+      - mida-network
 
-  # Optional: Add database if needed
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: mida-postgres
-  #   environment:
-  #     POSTGRES_USER: mida
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  #     POSTGRES_DB: mida
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U mida"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # React Frontend (Production)
+  mida-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mida-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - mida-api
+    restart: unless-stopped
+    networks:
+      - mida-network
 
-# volumes:
-#   postgres_data:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mida-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mida}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mida}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mida"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mida-network
+
+networks:
+  mida-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+```
+
+### Frontend Dockerfile
+
+Create `frontend/Dockerfile`:
+
+```dockerfile
+# Build stage
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Frontend Nginx Config
+
+Create `frontend/nginx.conf`:
+
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Serve static files
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API requests to backend
+    location /api {
+        proxy_pass http://mida-api:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ### Docker Compose Commands
 
 ```bash
-# Start services
+# Start all services (backend, frontend, database)
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f mida-frontend
 
 # Stop services
 docker-compose down
@@ -291,7 +434,10 @@ docker-compose down
 # Rebuild and restart
 docker-compose up -d --build
 
-# Scale (if using multiple workers)
+# Run database migrations
+docker-compose exec mida-api alembic upgrade head
+
+# Scale API workers
 docker-compose up -d --scale mida-api=3
 ```
 

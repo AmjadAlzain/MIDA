@@ -24,6 +24,7 @@ from app.models.mida_certificate import (
 from app.repositories import mida_import_repo
 from app.schemas.mida_import import (
     ImportRecordCreate,
+    ImportRecordUpdate,
     ImportPreview,
     ImportPreviewResponse,
     ItemBalanceRead,
@@ -375,6 +376,74 @@ def record_bulk_imports(
             raise
     
     return results
+
+
+def update_import(
+    db: Session,
+    record_id: UUID,
+    update_data: ImportRecordUpdate,
+) -> Optional[MidaImportRecord]:
+    """
+    Update an existing import record.
+    
+    Args:
+        db: Database session
+        record_id: UUID of the import record to update
+        update_data: Fields to update
+    
+    Returns:
+        Updated import record, or None if not found
+    """
+    record = mida_import_repo.update_import_record(
+        db=db,
+        record_id=record_id,
+        import_date=update_data.import_date,
+        declaration_form_reg_no=update_data.declaration_form_reg_no,
+        invoice_number=update_data.invoice_number,
+        invoice_line=update_data.invoice_line,
+        quantity_imported=update_data.quantity_imported,
+        port=update_data.port.value if update_data.port else None,
+        remarks=update_data.remarks,
+    )
+    
+    if record:
+        db.commit()
+    
+    return record
+
+
+def delete_import(
+    db: Session,
+    record_id: UUID,
+) -> bool:
+    """
+    Delete an import record.
+    
+    Args:
+        db: Database session
+        record_id: UUID of the import record to delete
+    
+    Returns:
+        True if deleted, False if not found
+    """
+    # Get the record first to know the item
+    record = mida_import_repo.get_import_record_by_id(db, record_id)
+    if not record:
+        return False
+    
+    success = mida_import_repo.delete_import_record(db, record_id)
+    if success:
+        db.commit()
+    
+    return success
+
+
+def get_import_by_id(
+    db: Session,
+    record_id: UUID,
+) -> Optional[MidaImportRecord]:
+    """Get an import record by ID."""
+    return mida_import_repo.get_import_record_by_id(db, record_id)
 
 
 # =============================================================================

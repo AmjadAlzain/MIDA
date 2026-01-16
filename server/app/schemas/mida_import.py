@@ -74,6 +74,34 @@ class ImportRecordBulkCreate(BaseModel):
     )
 
 
+class ImportRecordUpdate(BaseModel):
+    """Request schema for updating an import record."""
+
+    import_date: Optional[date] = Field(
+        default=None, description="Date of the import"
+    )
+    declaration_form_reg_no: Optional[str] = Field(
+        default=None, max_length=100, description="Declaration Form Registration Number"
+    )
+    invoice_number: Optional[str] = Field(
+        default=None, min_length=1, max_length=100, description="Invoice number"
+    )
+    invoice_line: Optional[int] = Field(
+        default=None, ge=1, description="Line number within the invoice"
+    )
+    quantity_imported: Optional[Decimal] = Field(
+        default=None, gt=0, description="Quantity imported (must be positive)"
+    )
+    port: Optional[ImportPort] = Field(
+        default=None, description="Port where the import occurred"
+    )
+    remarks: Optional[str] = Field(
+        default=None, max_length=1000, description="Optional remarks/notes"
+    )
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 class ImportRecordRead(BaseModel):
     """Response schema for an import record."""
 
