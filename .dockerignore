@@ -1,0 +1,64 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Docs
+*.md
+!README.md
+
+# Logs
+*.log
+server_stdout.log
+server_stderr.log
+
+# Database
+*.db
+*.sqlite3
+
+# Templates (large binary files not needed for build)
+*.xls
+*.xlsx
+
+# Local config
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

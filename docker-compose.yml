@@ -1,0 +1,96 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mida-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mida}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mida_password}
+      POSTGRES_DB: ${POSTGRES_DB:-mida}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mida} -d ${POSTGRES_DB:-mida}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mida-network
+
+  # Database migrations (one-time job)
+  migrations:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: mida-migrations
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mida}:${POSTGRES_PASSWORD:-mida_password}@postgres:5432/${POSTGRES_DB:-mida}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mida-network
+    restart: "no"
+
+  # FastAPI Backend
+  mida-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: mida-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - AZURE_DI_ENDPOINT=${AZURE_DI_ENDPOINT}
+      - AZURE_DI_KEY=${AZURE_DI_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mida}:${POSTGRES_PASSWORD:-mida_password}@postgres:5432/${POSTGRES_DB:-mida}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - mida-network
+
+  # React Frontend
+  mida-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mida-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      mida-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - mida-network
+
+volumes:
+  postgres_data:
+
+networks:
+  mida-network:
+    driver: bridge

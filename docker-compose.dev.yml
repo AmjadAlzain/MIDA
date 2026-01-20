@@ -1,0 +1,31 @@
+# Development override - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  mida-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./server/app:/app/app:ro
+      - ./server/templates:/app/templates:ro
+    environment:
+      - ENVIRONMENT=development
+      - LOG_FORMAT=text
+      - LOG_LEVEL=DEBUG
+    ports:
+      - "8000:8000"
+
+  mida-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend/src:/app/src:ro
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
