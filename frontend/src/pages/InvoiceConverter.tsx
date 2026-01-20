@@ -10,8 +10,8 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { Button, Card, CardHeader, CardTitle, FileUpload, Badge, Select, Input } from '@/components/ui';
-import { classificationService, companyService } from '@/services';
-import { ClassificationResponse, ClassificationItem, Company, K1ExportItem } from '@/types';
+import { classificationService, companyService, certificateService } from '@/services';
+import { ClassificationResponse, ClassificationItem, Company, K1ExportItem, Certificate, COUNTRIES } from '@/types';
 import { cn, formatNumber, getTodayISO } from '@/utils';
 
 // Tab types for the Invoice Converter
@@ -33,6 +33,7 @@ export function InvoiceConverter() {
     duties: new Set(),
   });
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedCertificateIds, setSelectedCertificateIds] = useState<string[]>([]);
 
   // Fetch companies
   const { data: companies = [] } = useQuery<Company[]>({
@@ -40,17 +41,25 @@ export function InvoiceConverter() {
     queryFn: companyService.getAll,
   });
 
-  // Country options
-  const countryOptions = [
-    { value: 'JP', label: 'Japan' },
-    { value: 'CN', label: 'China' },
-    { value: 'US', label: 'United States' },
-    { value: 'DE', label: 'Germany' },
-    { value: 'KR', label: 'Korea' },
-    { value: 'TW', label: 'Taiwan' },
-    { value: 'TH', label: 'Thailand' },
-    { value: 'SG', label: 'Singapore' },
-  ];
+  // Get selected company name for certificate fetch
+  const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
+
+  // Fetch certificates for selected company
+  const { data: companyCertificates = [], isLoading: isLoadingCertificates } = useQuery<Certificate[]>({
+    queryKey: ['certificates', 'company', selectedCompany?.name],
+    queryFn: async () => {
+      if (!selectedCompany?.name) return [];
+      const result = await certificateService.getByCompany(selectedCompany.name, 'active');
+      return result.certificates;
+    },
+    enabled: !!selectedCompany?.name,
+  });
+
+  // Country options - all countries with code in brackets
+  const countryOptions = COUNTRIES.map((c) => ({
+    value: c.code,
+    label: `${c.name} (${c.code})`,
+  }));
 
   // Port options
   const portOptions = [
@@ -96,6 +105,7 @@ export function InvoiceConverter() {
         country: selectedCountry,
         port: selectedPort,
         importDate: importDate,
+        certificateIds: selectedCertificateIds.length > 0 ? selectedCertificateIds : undefined,
       });
       setClassificationResult(result);
       toast.success('Invoice classified successfully!');
@@ -216,11 +226,78 @@ export function InvoiceConverter() {
             <Select
               label="Company"
               value={selectedCompanyId}
-              onChange={(e) => setSelectedCompanyId(e.target.value)}
+              onChange={(e) => {
+                setSelectedCompanyId(e.target.value);
+                setSelectedCertificateIds([]); // Reset certificate selection when company changes
+              }}
               options={companies.map((c) => ({ value: c.id, label: c.name }))}
               placeholder="Select Company"
               required
             />
+            
+            {/* MIDA Certificate Selection */}
+            {selectedCompanyId && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  MIDA Certificates <span className="text-gray-400">(for MIDA matching)</span>
+                </label>
+                {isLoadingCertificates ? (
+                  <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 text-center text-sm text-gray-500">
+                    Loading certificates...
+                  </div>
+                ) : companyCertificates.length === 0 ? (
+                  <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 text-center text-sm text-gray-500">
+                    No active MIDA certificates found for this company
+                  </div>
+                ) : (
+                  <>
+                    <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-2 bg-white space-y-1">
+                      {companyCertificates.map((cert) => (
+                        <label
+                          key={cert.id}
+                          className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedCertificateIds.includes(cert.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCertificateIds((prev) => [...prev, cert.id]);
+                              } else {
+                                setSelectedCertificateIds((prev) => prev.filter((id) => id !== cert.id));
+                              }
+                            }}
+                            className="rounded border-gray-300 text-blue-600"
+                          />
+                          <span className="text-sm font-medium text-purple-600">{cert.certificate_number}</span>
+                          <span className="text-xs text-gray-500">
+                            ({cert.exemption_start_date} - {cert.exemption_end_date})
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span>{selectedCertificateIds.length} of {companyCertificates.length} selected</span>
+                      {companyCertificates.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedCertificateIds.length === companyCertificates.length) {
+                              setSelectedCertificateIds([]);
+                            } else {
+                              setSelectedCertificateIds(companyCertificates.map((c) => c.id));
+                            }
+                          }}
+                          className="text-blue-600 hover:text-blue-800 underline"
+                        >
+                          {selectedCertificateIds.length === companyCertificates.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             
             <div className="grid grid-cols-3 gap-4">
               <Input
