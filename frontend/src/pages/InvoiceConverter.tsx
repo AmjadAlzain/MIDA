@@ -11,9 +11,9 @@ import {
   ArrowRightLeft,
   RotateCcw,
 } from 'lucide-react';
-import { Button, Card, CardHeader, CardTitle, FileUpload, Badge, Select, Input } from '@/components/ui';
-import { classificationService, companyService, certificateService } from '@/services';
-import { ClassificationResponse, ClassificationItem, Company, K1ExportItem, Certificate, COUNTRIES } from '@/types';
+import { Button, Card, CardHeader, CardTitle, FileUpload, Badge, Select, Input, Modal } from '@/components/ui';
+import { classificationService, companyService, certificateService, importService } from '@/services';
+import { ClassificationResponse, ClassificationItem, Company, K1ExportItem, Certificate, COUNTRIES, ImportPreviewResponse } from '@/types';
 import { cn, formatNumber, getTodayISO } from '@/utils';
 
 // Tab types for the Invoice Converter
@@ -37,6 +37,12 @@ export function InvoiceConverter() {
   });
   const [isExporting, setIsExporting] = useState(false);
   const [selectedCertificateIds, setSelectedCertificateIds] = useState<string[]>([]);
+  
+  // MIDA Balance Update State
+  const [declarationRefNo, setDeclarationRefNo] = useState('');
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewData, setPreviewData] = useState<ImportPreviewResponse | null>(null);
+  const [isUpdatingBalance, setIsUpdatingBalance] = useState(false);
 
   // Fetch companies
   const { data: companies = [] } = useQuery<Company[]>({
@@ -276,6 +282,94 @@ export function InvoiceConverter() {
     toast.success(`All items set to SST ${setExempted ? 'Exempt' : 'Taxable'}`);
   };
 
+  // Handle Update Balance (Step 1: Preview)
+  const handleUpdateBalance = async () => {
+    if (!declarationRefNo.trim()) {
+      toast.error('Please enter Declaration Ref/Reg No.');
+      return;
+    }
+
+    const midaItems = classificationResult?.mida_items || [];
+    if (midaItems.length === 0) {
+      toast.error('No MIDA items to update.');
+      return;
+    }
+
+    // Filter items that have a deduction quantity and certificate item ID
+    const validItems = midaItems.filter(
+      item => item.mida_item_id && (item.deduction_quantity || item.quantity) > 0
+    );
+
+    if (validItems.length === 0) {
+      toast.error('No valid MIDA items with deduction quantity found.');
+      return;
+    }
+
+    setIsUpdatingBalance(true);
+    try {
+      const preview = await importService.previewBulk({
+        records: validItems.map(item => ({
+          certificate_item_id: item.mida_item_id!,
+          import_date: importDate,
+          declaration_form_reg_no: declarationRefNo,
+          invoice_number: file?.name || 'Unknown Invoice', // Using filename as invoice number for now
+          invoice_line: item.line_no,
+          quantity_imported: item.deduction_quantity || item.quantity,
+          port: selectedPort,
+          remarks: `Batch update from invoice classification`,
+        }))
+      });
+
+      setPreviewData(preview);
+      setShowPreviewModal(true);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to preview balance update';
+      toast.error(message);
+    } finally {
+      setIsUpdatingBalance(false);
+    }
+  };
+
+  // Handle Confirm Update (Step 2: Commit)
+  const handleConfirmUpdate = async () => {
+    if (!previewData) return;
+
+    setIsUpdatingBalance(true);
+    try {
+      const midaItems = classificationResult?.mida_items || [];
+      const validItems = midaItems.filter(
+        item => item.mida_item_id && (item.deduction_quantity || item.quantity) > 0
+      );
+
+      await importService.createBulk({
+        records: validItems.map(item => ({
+          certificate_item_id: item.mida_item_id!,
+          import_date: importDate,
+          declaration_form_reg_no: declarationRefNo,
+          invoice_number: file?.name || 'Unknown Invoice',
+          invoice_line: item.line_no,
+          quantity_imported: item.deduction_quantity || item.quantity,
+          port: selectedPort,
+          remarks: `Batch update from invoice classification`,
+        }))
+      });
+
+      toast.success('Balances updated successfully!');
+      setShowPreviewModal(false);
+      setPreviewData(null);
+      setDeclarationRefNo(''); // Clear input
+      
+      // Ideally here we would refresh the certificate balances, 
+      // but that requires re-fetching or updating local state
+      
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update balances';
+      toast.error(message);
+    } finally {
+      setIsUpdatingBalance(false);
+    }
+  };
+
   // Handle Undo
   const handleUndoChanges = () => {
     if (originalResult) {
@@ -305,7 +399,9 @@ export function InvoiceConverter() {
       
       const k1Items: K1ExportItem[] = items.map((item) => ({
         hs_code: item.hs_code,
-        description: item.description,
+        description: (tabKey === 'mida' && item.mida_item_name && item.mida_line_no)
+          ? `${item.mida_item_name} (${item.mida_line_no})` 
+          : item.description,
         quantity: item.quantity,
         uom: item.uom,
         amount: item.amount,
@@ -319,7 +415,7 @@ export function InvoiceConverter() {
         country: selectedCountry,
       });
       
-      classificationService.downloadBlob(blob, `K1_Export_${exportType}.xlsx`);
+      classificationService.downloadBlob(blob, `K1_Export_${exportType}.xls`);
       toast.success('K1 export downloaded successfully!');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to export K1';
@@ -555,6 +651,26 @@ export function InvoiceConverter() {
               </div>
               
               <div className="flex items-center gap-2">
+                {activeTab === 'mida' && (
+                  <div className="flex items-center gap-2 mr-2 border-r border-gray-300 pr-4">
+                    <Input
+                      placeholder="Declaration Ref/Reg No."
+                      value={declarationRefNo}
+                      onChange={(e) => setDeclarationRefNo(e.target.value)}
+                      className="w-48 py-1 h-9"
+                    />
+                    <Button
+                      onClick={handleUpdateBalance}
+                      isLoading={isUpdatingBalance}
+                      disabled={!classificationResult.mida_items.length}
+                      size="sm"
+                      variant="primary"
+                    >
+                      Update Balance
+                    </Button>
+                  </div>
+                )}
+                
                 {hasChanges && (
                   <Button
                     onClick={handleUndoChanges}
@@ -595,6 +711,7 @@ export function InvoiceConverter() {
                       <th className={cn("text-left font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>HS Code</th>
                       <th className={cn("text-left font-semibold", activeTab === 'mida' ? "px-2 py-2 max-w-[150px]" : "px-4 py-3")}>Description</th>
                       <th className={cn("text-right font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>Quantity</th>
+                      <th className={cn("text-right font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>Net Wt (kg)</th>
                       <th className={cn("text-left font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>UOM</th>
                       <th className={cn("text-right font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>Amount</th>
                       <th className={cn("text-center font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>SST</th>
@@ -637,9 +754,12 @@ export function InvoiceConverter() {
                           {activeTab === 'mida' && item.mida_hs_code ? item.mida_hs_code : item.hs_code}
                         </td>
                         <td className={cn(activeTab === 'mida' ? "px-2 py-2 max-w-[150px] truncate" : "px-4 py-3 max-w-xs truncate")} title={item.description}>
-                          {item.description}
+                          {activeTab === 'mida' && item.mida_item_name && item.mida_line_no 
+                            ? `${item.mida_item_name} (${item.mida_line_no})`
+                            : item.description}
                         </td>
                         <td className={cn("text-right", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>{formatNumber(item.quantity)}</td>
+                        <td className={cn("text-right", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>{item.net_weight_kg ? formatNumber(item.net_weight_kg) : '-'}</td>
                         <td className={cn(activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>{item.uom}</td>
                         <td className={cn("text-right", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>
                           {item.amount ? formatNumber(item.amount) : '-'}
@@ -719,6 +839,103 @@ export function InvoiceConverter() {
           </div>
         </Card>
       )}
+      {/* Import Preview Modal */}
+      <Modal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        title="Balance Update Preview"
+        size="xl"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowPreviewModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleConfirmUpdate}
+              isLoading={isUpdatingBalance}
+              disabled={!previewData || previewData.has_overdrawns}
+            >
+              Confirm Update
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800">
+            <p><strong>Declaration Ref:</strong> {declarationRefNo}</p>
+            <p className="mt-1">
+              This will update balances for {previewData?.total_items} items.
+              Please review the changes below before confirming.
+            </p>
+          </div>
+
+          {previewData?.has_depletions && (
+            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-sm text-yellow-800 flex flex-col gap-1">
+              <strong>Wait! Some items will be fully depleted.</strong>
+            </div>
+          )}
+
+          {previewData?.has_overdrawns && (
+            <div className="bg-red-50 border border-red-200 p-3 rounded-lg text-sm text-red-800 flex flex-col gap-1">
+              <strong>Error: Some items would be overdrawn!</strong>
+              <span>You cannot proceed with negative balances. Please adjust quantities.</span>
+            </div>
+          )}
+
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-700 font-semibold border-b">
+                <tr>
+                  <th className="px-4 py-3">Item / Certificate</th>
+                  <th className="px-4 py-3 text-right">Current Balance</th>
+                  <th className="px-4 py-3 text-right">Deduction</th>
+                  <th className="px-4 py-3 text-right">New Balance</th>
+                  <th className="px-4 py-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {previewData?.previews.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-4 py-2">
+                      <div className="font-medium">{item.item_name}</div>
+                      <div className="text-xs text-gray-500">{item.certificate_number}</div>
+                    </td>
+                    <td className="px-4 py-2 text-right text-gray-600">
+                      {formatNumber(item.current_balance)}
+                    </td>
+                    <td className="px-4 py-2 text-right font-medium text-red-600">
+                      -{formatNumber(item.quantity_to_import)}
+                    </td>
+                    <td className={cn(
+                      "px-4 py-2 text-right font-bold",
+                      item.will_overdraw ? "text-red-600" : 
+                      item.will_deplete ? "text-orange-500" : 
+                      item.will_trigger_warning ? "text-yellow-600" : "text-green-600"
+                    )}>
+                      {formatNumber(item.balance_after_import)}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {item.will_overdraw ? (
+                        <Badge variant="danger">Overdrawn</Badge>
+                      ) : item.will_deplete ? (
+                        <Badge variant="warning">Depleted</Badge>
+                      ) : item.will_trigger_warning ? (
+                        <Badge variant="warning">Low</Badge>
+                      ) : (
+                        <Badge variant="success">OK</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

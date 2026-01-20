@@ -1,5 +1,5 @@
 import api from './api';
-import { ImportRecordsResponse, BulkImportRequest, ImportRecord } from '@/types';
+import { ImportRecordsResponse, BulkImportRequest, ImportRecord, ImportPreviewResponse } from '@/types';
 
 export interface UpdateImportRequest {
   import_date?: string;
@@ -38,6 +38,14 @@ export const importService = {
    */
   async createBulk(data: BulkImportRequest): Promise<ImportRecord[]> {
     const response = await api.post<ImportRecord[]>('/mida/imports/bulk', data);
+    return response.data;
+  },
+
+  /**
+   * Preview bulk import records
+   */
+  async previewBulk(data: BulkImportRequest): Promise<ImportPreviewResponse> {
+    const response = await api.post<ImportPreviewResponse>('/mida/imports/preview', data);
     return response.data;
   },
 

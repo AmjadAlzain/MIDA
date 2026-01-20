@@ -95,6 +95,30 @@ export interface BulkImportRequest {
   }[];
 }
 
+export interface ImportPreview {
+  certificate_item_id: string;
+  certificate_number: string;
+  item_name: string;
+  hs_code: string;
+  port: string;
+  quantity_to_import: number;
+  current_balance: number;
+  balance_after_import: number;
+  new_status: string;
+  will_trigger_warning: boolean;
+  will_deplete: boolean;
+  will_overdraw: boolean;
+  warning_message?: string;
+}
+
+export interface ImportPreviewResponse {
+  previews: ImportPreview[];
+  has_warnings: boolean;
+  has_depletions: boolean;
+  has_overdrawns: boolean;
+  total_items: number;
+}
+
 // ==========================================
 // Classification Types
 // ==========================================
