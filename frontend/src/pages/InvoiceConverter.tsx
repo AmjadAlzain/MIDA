@@ -8,6 +8,8 @@ import {
   Package,
   DollarSign,
   CheckCircle,
+  ArrowRightLeft,
+  RotateCcw,
 } from 'lucide-react';
 import { Button, Card, CardHeader, CardTitle, FileUpload, Badge, Select, Input } from '@/components/ui';
 import { classificationService, companyService, certificateService } from '@/services';
@@ -26,6 +28,7 @@ export function InvoiceConverter() {
   const [importDate, setImportDate] = useState<string>(getTodayISO());
   const [isProcessing, setIsProcessing] = useState(false);
   const [classificationResult, setClassificationResult] = useState<ClassificationResponse | null>(null);
+  const [originalResult, setOriginalResult] = useState<ClassificationResponse | null>(null);
   const [activeTab, setActiveTab] = useState<ConverterTab>('formd');
   const [selectedItems, setSelectedItems] = useState<Record<string, Set<number>>>({
     formd: new Set(),
@@ -68,6 +71,17 @@ export function InvoiceConverter() {
     { value: 'bukit_kayu_hitam', label: 'Bukit Kayu Hitam' },
   ];
 
+  // Check for manual changes
+  const hasChanges = useMemo(() => {
+    if (!classificationResult) return false;
+    const allItems = [
+      ...classificationResult.form_d_items,
+      ...classificationResult.mida_items,
+      ...classificationResult.duties_payable_items
+    ];
+    return allItems.some(i => i.manually_moved || i.sst_manually_changed);
+  }, [classificationResult]);
+
   // Computed data
   const tabData = useMemo((): Record<ConverterTab, ClassificationItem[]> => {
     if (!classificationResult) return { formd: [], mida: [], duties: [] };
@@ -107,7 +121,21 @@ export function InvoiceConverter() {
         importDate: importDate,
         certificateIds: selectedCertificateIds.length > 0 ? selectedCertificateIds : undefined,
       });
+
+      // Assign unique IDs to items if missing (backend response doesn't always include them)
+      const assignIds = (items: ClassificationItem[]) => {
+        items.forEach((item) => {
+          if (!item.id) {
+            item.id = `item-${item.line_no}-${Math.random().toString(36).substring(2, 9)}`;
+          }
+        });
+      };
+      assignIds(result.form_d_items);
+      assignIds(result.mida_items);
+      assignIds(result.duties_payable_items);
+
       setClassificationResult(result);
+      setOriginalResult(JSON.parse(JSON.stringify(result)));
       toast.success('Invoice classified successfully!');
       
       // Reset selections
@@ -146,6 +174,119 @@ export function InvoiceConverter() {
         return { ...prev, [activeTab]: new Set(currentItems.map((_, i) => i)) };
       }
     });
+  };
+
+  // Handle moving items between tables
+  const handleMoveItem = (item: ClassificationItem, targetTable: ConverterTab) => {
+    if (!classificationResult) return;
+
+    const newResult = JSON.parse(JSON.stringify(classificationResult)) as ClassificationResponse;
+    
+    // Get source list
+    let sourceList: ClassificationItem[];
+    if (activeTab === 'formd') sourceList = newResult.form_d_items;
+    else if (activeTab === 'mida') sourceList = newResult.mida_items;
+    else sourceList = newResult.duties_payable_items;
+    
+    // Get target list
+    let targetList: ClassificationItem[];
+    if (targetTable === 'formd') targetList = newResult.form_d_items;
+    else if (targetTable === 'mida') targetList = newResult.mida_items;
+    else targetList = newResult.duties_payable_items;
+
+    // Find index in the source list
+    const itemIndex = sourceList.findIndex((i) => i.id === item.id);
+    if (itemIndex === -1) return;
+    
+    const [movedItem] = sourceList.splice(itemIndex, 1);
+    
+    // Update properties
+    const newTable = targetTable === 'formd' ? 'form_d' : targetTable === 'mida' ? 'mida' : 'duties_payable';
+    movedItem.current_table = newTable;
+    movedItem.manually_moved = newTable !== movedItem.original_table;
+
+    // Use mida_hs_code if available and moving from MIDA
+    if (activeTab === 'mida' && movedItem.mida_hs_code) {
+      // Remove all dots from the HSCODE for non-MIDA tables
+      movedItem.hs_code = movedItem.mida_hs_code.replace(/\./g, '');
+    }
+    
+    // Update SST rules
+    const isHicom = newResult.company.sst_default_behavior === 'all_on';
+    if (isHicom) {
+      movedItem.sst_exempted = true;
+    } else {
+      if (targetTable === 'mida') {
+        movedItem.sst_exempted = true;
+      } else {
+        movedItem.sst_exempted = false;
+      }
+    }
+    movedItem.sst_manually_changed = false; // Reset manual flag
+    
+    // Add to target (top of list)
+    targetList.unshift(movedItem);
+    
+    setClassificationResult(newResult);
+    
+    // Clear selection
+    setSelectedItems({
+      formd: new Set(),
+      mida: new Set(),
+      duties: new Set(),
+    });
+    
+    toast.success(`Moved to ${targetTable === 'formd' ? 'Form-D' : targetTable === 'mida' ? 'MIDA' : 'Duties Payable'}`);
+  };
+
+  // Handle SST toggle
+  const handleToggleSST = (itemId: string) => {
+    if (!classificationResult) return;
+    
+    setClassificationResult((prev) => {
+      if (!prev) return prev;
+      const newResult = JSON.parse(JSON.stringify(prev)) as ClassificationResponse;
+      const list = activeTab === 'formd' ? newResult.form_d_items : activeTab === 'mida' ? newResult.mida_items : newResult.duties_payable_items;
+      
+      const targetItem = list.find((i) => i.id === itemId);
+      if (targetItem) {
+        targetItem.sst_exempted = !targetItem.sst_exempted;
+        targetItem.sst_manually_changed = true;
+      }
+      return newResult;
+    });
+  };
+
+  // Handle SST toggle for ALL items in current tab
+  const handleToggleAllSST = (setExempted: boolean) => {
+    if (!classificationResult) return;
+    
+    setClassificationResult((prev) => {
+      if (!prev) return prev;
+      const newResult = JSON.parse(JSON.stringify(prev)) as ClassificationResponse;
+      const list = activeTab === 'formd' ? newResult.form_d_items : activeTab === 'mida' ? newResult.mida_items : newResult.duties_payable_items;
+      
+      list.forEach((item) => {
+        item.sst_exempted = setExempted;
+        item.sst_manually_changed = true;
+      });
+      return newResult;
+    });
+    
+    toast.success(`All items set to SST ${setExempted ? 'Exempt' : 'Taxable'}`);
+  };
+
+  // Handle Undo
+  const handleUndoChanges = () => {
+    if (originalResult) {
+      setClassificationResult(JSON.parse(JSON.stringify(originalResult)));
+      setSelectedItems({
+        formd: new Set(),
+        mida: new Set(),
+        duties: new Set(),
+      });
+      toast.success('All changes reset');
+    }
   };
 
   // Handle K1 export
@@ -394,18 +535,48 @@ export function InvoiceConverter() {
                 <span className="text-sm text-gray-500">
                   {currentSelection.size} of {currentItems.length} selected
                 </span>
+
+                {/* SST Toggle All Buttons */}
+                <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-300">
+                  <span className="text-sm text-gray-500">SST:</span>
+                  <button
+                    onClick={() => handleToggleAllSST(true)}
+                    className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                  >
+                    All Exempt
+                  </button>
+                  <button
+                    onClick={() => handleToggleAllSST(false)}
+                    className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 transition-colors"
+                  >
+                    All Taxable
+                  </button>
+                </div>
               </div>
               
-              {currentSelection.size > 0 && (
-                <Button
-                  onClick={handleK1Export}
-                  isLoading={isExporting}
-                  leftIcon={<Download className="w-4 h-4" />}
-                  variant="success"
-                >
-                  Export K1 ({currentSelection.size})
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {hasChanges && (
+                  <Button
+                    onClick={handleUndoChanges}
+                    variant="outline"
+                    leftIcon={<RotateCcw className="w-4 h-4" />}
+                    size="sm"
+                  >
+                    Reset Changes
+                  </Button>
+                )}
+
+                {currentSelection.size > 0 && (
+                  <Button
+                    onClick={handleK1Export}
+                    isLoading={isExporting}
+                    leftIcon={<Download className="w-4 h-4" />}
+                    variant="success"
+                  >
+                    Export K1 ({currentSelection.size})
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Items Table */}
@@ -416,23 +587,24 @@ export function InvoiceConverter() {
               </div>
             ) : (
               <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                <table className="w-full text-sm">
+                <table className={cn("w-full", activeTab === 'mida' ? "text-xs" : "text-sm")}>
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="w-10 px-4 py-3"></th>
-                      <th className="px-4 py-3 text-left font-semibold">Line</th>
-                      <th className="px-4 py-3 text-left font-semibold">HS Code</th>
-                      <th className="px-4 py-3 text-left font-semibold">Description</th>
-                      <th className="px-4 py-3 text-right font-semibold">Quantity</th>
-                      <th className="px-4 py-3 text-left font-semibold">UOM</th>
-                      <th className="px-4 py-3 text-right font-semibold">Amount</th>
-                      <th className="px-4 py-3 text-center font-semibold">SST</th>
+                      <th className={cn(activeTab === 'mida' ? "w-8 px-2 py-2" : "w-10 px-4 py-3")}></th>
+                      <th className={cn("text-left font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>Line</th>
+                      <th className={cn("text-left font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>HS Code</th>
+                      <th className={cn("text-left font-semibold", activeTab === 'mida' ? "px-2 py-2 max-w-[150px]" : "px-4 py-3")}>Description</th>
+                      <th className={cn("text-right font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>Quantity</th>
+                      <th className={cn("text-left font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>UOM</th>
+                      <th className={cn("text-right font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>Amount</th>
+                      <th className={cn("text-center font-semibold", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>SST</th>
                       {activeTab === 'mida' && (
                         <>
-                          <th className="px-4 py-3 text-left font-semibold">Certificate</th>
-                          <th className="px-4 py-3 text-right font-semibold">Balance</th>
+                          <th className="px-2 py-2 text-left font-semibold">Certificate</th>
+                          <th className="px-2 py-2 text-right font-semibold">Balance</th>
                         </>
                       )}
+                      <th className={cn("text-center font-semibold", activeTab === 'mida' ? "px-2 py-2 w-24" : "px-4 py-3")}>Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -441,46 +613,103 @@ export function InvoiceConverter() {
                         key={item.id || index}
                         className={cn(
                           'hover:bg-gray-50 transition-colors',
+                          item.manually_moved ? 'bg-orange-50/50' : '',
                           currentSelection.has(index) && 'bg-blue-50'
                         )}
                       >
-                        <td className="px-4 py-3 text-center">
+                        <td className={cn("text-center", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>
                           <input
                             type="checkbox"
                             checked={currentSelection.has(index)}
                             onChange={() => toggleItemSelection(index)}
-                            className="rounded border-gray-300"
+                            className={cn("rounded border-gray-300", activeTab === 'mida' ? "w-3 h-3" : "")}
                           />
                         </td>
-                        <td className="px-4 py-3">{item.line_no}</td>
-                        <td className="px-4 py-3 font-mono text-blue-600">{item.hs_code}</td>
-                        <td className="px-4 py-3 max-w-xs truncate" title={item.description}>
+                        <td className={cn(activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>
+                          <div className="flex items-center gap-1">
+                            {item.line_no}
+                            {item.manually_moved && (
+                              <ArrowRightLeft className="w-3 h-3 text-orange-500" title="Manually moved to this table" />
+                            )}
+                          </div>
+                        </td>
+                        <td className={cn("font-mono text-blue-600", activeTab === 'mida' ? "px-2 py-2 whitespace-nowrap" : "px-4 py-3")}>
+                          {activeTab === 'mida' && item.mida_hs_code ? item.mida_hs_code : item.hs_code}
+                        </td>
+                        <td className={cn(activeTab === 'mida' ? "px-2 py-2 max-w-[150px] truncate" : "px-4 py-3 max-w-xs truncate")} title={item.description}>
                           {item.description}
                         </td>
-                        <td className="px-4 py-3 text-right">{formatNumber(item.quantity)}</td>
-                        <td className="px-4 py-3">{item.uom}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className={cn("text-right", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>{formatNumber(item.quantity)}</td>
+                        <td className={cn(activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>{item.uom}</td>
+                        <td className={cn("text-right", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>
                           {item.amount ? formatNumber(item.amount) : '-'}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          {item.sst_exempted ? (
-                            <Badge variant="success">Exempt</Badge>
-                          ) : (
-                            <Badge variant="default">Taxable</Badge>
-                          )}
+                        <td className={cn("text-center", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>
+                          <button
+                            onClick={() => handleToggleSST(item.id)}
+                            className={cn(
+                              "font-semibold rounded-full transition-colors cursor-pointer border",
+                              item.sst_exempted
+                                ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
+                                : "bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200",
+                              activeTab === 'mida' ? "px-2 py-0.5 text-[10px]" : "px-2 py-1 text-xs"
+                            )}
+                          >
+                            {item.sst_exempted ? 'Exempt' : 'Taxable'}
+                          </button>
                         </td>
                         {activeTab === 'mida' && (
                           <>
-                            <td className="px-4 py-3">
-                              <span className="text-purple-600 font-medium">
+                            <td className="px-2 py-2">
+                              <span className="text-purple-600 font-medium whitespace-nowrap">
                                 {item.mida_certificate_number || '-'}
                               </span>
                             </td>
-                            <td className={cn('px-4 py-3 text-right font-semibold', getQtyStatusClass(item))}>
+                            <td className={cn('px-2 py-2 text-right font-semibold', getQtyStatusClass(item))}>
                               {item.remaining_qty !== undefined ? formatNumber(item.remaining_qty) : '-'}
                             </td>
                           </>
                         )}
+                        <td className={cn("text-center", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>
+                          <div className={cn("flex justify-center gap-1", activeTab === 'mida' ? "whitespace-nowrap" : "")}>
+                            {activeTab !== 'formd' && (
+                              <button
+                                onClick={() => handleMoveItem(item, 'formd')}
+                                className={cn(
+                                  "font-medium bg-green-50 text-green-700 hover:bg-green-100 rounded border border-green-200 text-center",
+                                  activeTab === 'mida' ? "w-12 px-1 py-1 text-[10px]" : "px-2 py-1 text-[10px]"
+                                )}
+                                title="Move to Form-D"
+                              >
+                                Form-D
+                              </button>
+                            )}
+                            {activeTab !== 'mida' && (
+                              <button
+                                onClick={() => handleMoveItem(item, 'mida')}
+                                className={cn(
+                                  "font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 text-center",
+                                  activeTab === 'mida' ? "w-12 px-1 py-1 text-[10px]" : "px-2 py-1 text-[10px]"
+                                )}
+                                title="Move to MIDA"
+                              >
+                                MIDA
+                              </button>
+                            )}
+                            {activeTab !== 'duties' && (
+                              <button
+                                onClick={() => handleMoveItem(item, 'duties')}
+                                className={cn(
+                                  "font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 rounded border border-orange-200 text-center",
+                                  activeTab === 'mida' ? "w-12 px-1 py-1 text-[10px]" : "px-2 py-1 text-[10px]"
+                                )}
+                                title="Move to Duties Payable"
+                              >
+                                Duties
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
