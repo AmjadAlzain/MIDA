@@ -160,6 +160,11 @@ class MidaItem:
     certificate_model_number: Optional[str] = None  # Model number from the certificate
     certificate_end_date: Optional[date] = None  # Expiration date for tie-breaking
     remaining_balance: Optional[Decimal] = None  # Remaining balance for tie-breaking
+    
+    # Port specific remaining balances (for display)
+    remaining_port_klang: Optional[Decimal] = None
+    remaining_klia: Optional[Decimal] = None
+    remaining_bukit_kayu_hitam: Optional[Decimal] = None
 
     @property
     def remaining_quantity(self) -> Decimal:

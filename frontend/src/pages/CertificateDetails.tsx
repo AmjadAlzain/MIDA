@@ -62,6 +62,8 @@ export function CertificateDetails() {
     queryKey: ['certificate-balances', id],
     queryFn: () => certificateService.getItemBalances(id!),
     enabled: !!id,
+    staleTime: 0, // Always refetch balance data to ensure up-to-date values
+    refetchOnMount: 'always', // Always refetch when component mounts
   });
 
   const itemBalances = balancesResponse?.items ?? [];

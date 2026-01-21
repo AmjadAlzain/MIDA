@@ -144,7 +144,13 @@ export interface ClassificationItem {
   mida_certificate_id?: string;
   mida_certificate_number?: string;
   mida_line_no?: number;
+  // MIDA-specific fields
+  mida_item_name?: string;
   remaining_qty?: number;
+  remaining_port_klang?: number;
+  remaining_klia?: number;
+  remaining_bukit_kayu_hitam?: number;
+  port_specific_remaining?: number;
   deduction_quantity?: number;
   match_score?: number;
   hscode_uom?: string;

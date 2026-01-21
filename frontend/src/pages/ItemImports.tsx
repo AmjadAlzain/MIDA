@@ -74,10 +74,12 @@ export function ItemImports() {
   });
 
   // Fetch item balances to get current item details
-  const { data: balancesResponse } = useQuery<CertificateItemsResponse>({
+  const { data: balancesResponse, isLoading: isLoadingBalances } = useQuery<CertificateItemsResponse>({
     queryKey: ['certificate-balances', certId],
     queryFn: () => certificateService.getItemBalances(certId!),
     enabled: !!certId,
+    staleTime: 0, // Always refetch balance data to ensure up-to-date values
+    refetchOnMount: 'always', // Always refetch when component mounts
   });
 
   // Find current item from balances (includes remaining quantities)
@@ -237,10 +239,25 @@ export function ItemImports() {
     label: p.label,
   }));
 
-  if (!certificate || !currentItem) {
+  // Show loading spinner while data is being fetched
+  if (isLoadingBalances || !certificate) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // Show error message if item not found after data has loaded
+  if (!currentItem) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <Package className="h-12 w-12 text-gray-400" />
+        <p className="text-gray-600">Item not found</p>
+        <Button variant="outline" onClick={() => navigate(`/database/certificates/${certId}`)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Certificate
+        </Button>
       </div>
     );
   }

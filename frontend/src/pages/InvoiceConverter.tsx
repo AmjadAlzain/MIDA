@@ -295,13 +295,23 @@ export function InvoiceConverter() {
       return;
     }
 
-    // Filter items that have a deduction quantity and certificate item ID
+    // Check if any MIDA items are selected
+    const selectedMidaIndices = selectedItems.mida;
+    if (selectedMidaIndices.size === 0) {
+      toast.error('Please select at least one item to update balance.');
+      return;
+    }
+
+    // Filter items that have a deduction quantity and certificate item ID AND are selected
     const validItems = midaItems.filter(
-      item => item.mida_item_id && (item.deduction_quantity || item.quantity) > 0
+      (item, index) => 
+        selectedMidaIndices.has(index) && 
+        item.mida_item_id && 
+        (item.deduction_quantity || item.quantity) > 0
     );
 
     if (validItems.length === 0) {
-      toast.error('No valid MIDA items with deduction quantity found.');
+      toast.error('No valid selected MIDA items with deduction quantity found.');
       return;
     }
 
@@ -337,8 +347,13 @@ export function InvoiceConverter() {
     setIsUpdatingBalance(true);
     try {
       const midaItems = classificationResult?.mida_items || [];
+      const selectedMidaIndices = selectedItems.mida;
+      
       const validItems = midaItems.filter(
-        item => item.mida_item_id && (item.deduction_quantity || item.quantity) > 0
+        (item, index) => 
+          selectedMidaIndices.has(index) &&
+          item.mida_item_id && 
+          (item.deduction_quantity || item.quantity) > 0
       );
 
       await importService.createBulk({
@@ -786,7 +801,11 @@ export function InvoiceConverter() {
                               </span>
                             </td>
                             <td className={cn('px-2 py-2 text-right font-semibold', getQtyStatusClass(item))}>
-                              {item.remaining_qty !== undefined ? formatNumber(item.remaining_qty) : '-'}
+                              <div
+                                title={`Port Klang: ${formatNumber(item.remaining_port_klang || 0)}\nKLIA: ${formatNumber(item.remaining_klia || 0)}\nBKH: ${formatNumber(item.remaining_bukit_kayu_hitam || 0)}\nTotal: ${formatNumber(item.remaining_qty || 0)}`}
+                              >
+                                {item.port_specific_remaining !== undefined ? formatNumber(item.port_specific_remaining) : '-'}
+                              </div>
                             </td>
                           </>
                         )}

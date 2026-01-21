@@ -167,6 +167,9 @@ def _convert_to_matcher_mida_items_with_cert_info(
             certificate_model_number=certificate.model_number,
             certificate_end_date=certificate.exemption_end_date,
             remaining_balance=item.remaining_quantity,
+            remaining_port_klang=item.remaining_port_klang,
+            remaining_klia=item.remaining_klia,
+            remaining_bukit_kayu_hitam=item.remaining_bukit_kayu_hitam,
         )
         for item in db_items
     ]
@@ -1361,6 +1364,15 @@ async def classify_invoice(
                                     "severity": "error",
                                 })
 
+                        # Determine port specific remaining balance
+                        port_specific_remaining = match.remaining_qty # Default to total
+                        if port == "port_klang":
+                            port_specific_remaining = match.mida_item.remaining_port_klang
+                        elif port == "klia":
+                            port_specific_remaining = match.mida_item.remaining_klia
+                        elif port == "bukit_kayu_hitam":
+                            port_specific_remaining = match.mida_item.remaining_bukit_kayu_hitam
+
                         mida_matches[line_no] = {
                             "mida_item_id": match.mida_item.item_id,
                             "mida_certificate_id": match.certificate_id,
@@ -1370,6 +1382,13 @@ async def classify_invoice(
                             "mida_item_name": match.mida_item.item_name,
                             "remaining_qty": match.remaining_qty,
                             "remaining_uom": match.mida_item.uom,
+                            
+                            # Port specific balances
+                            "remaining_port_klang": match.mida_item.remaining_port_klang,
+                            "remaining_klia": match.mida_item.remaining_klia,
+                            "remaining_bukit_kayu_hitam": match.mida_item.remaining_bukit_kayu_hitam,
+                            "port_specific_remaining": port_specific_remaining,
+
                             "match_score": round(match.match_score, 4),
                             "approved_qty": match.mida_item.approved_quantity,
                             "hscode_uom": hscode_uom,

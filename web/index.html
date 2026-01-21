@@ -1883,7 +1883,7 @@
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 150px;">
                         <label for="portSelect" style="font-weight: 600; color: #555;">Import Port</label>
-                        <select id="portSelect" style="width: 100%; padding: 0.5rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;">
+                        <select id="portSelect" style="width: 100%; padding: 0.5rem; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 0.9rem;" onchange="renderClassificationTable('mida')">
                             <option value="port_klang" selected>Port Klang</option>
                             <option value="klia">KLIA</option>
                             <option value="bukit_kayu_hitam">Bukit Kayu Hitam</option>
@@ -1922,6 +1922,7 @@
                             <table id="formDTable">
                                 <thead>
                                     <tr>
+                                        <th style="width: 40px;"><input type="checkbox" onchange="toggleSelectAllItems('form_d', this.checked)"></th>
                                         <th>Line</th>
                                         <th>Parts Name</th>
                                         <th>HS Code</th>
@@ -1944,6 +1945,7 @@
                             <table id="midaTable">
                                 <thead>
                                     <tr>
+                                        <th style="width: 40px;"><input type="checkbox" onchange="toggleSelectAllItems('mida', this.checked)"></th>
                                         <th>Line</th>
                                         <th>Parts Name</th>
                                         <th>MIDA HS Code</th>
@@ -1983,6 +1985,7 @@
                             <table id="dutiesTable">
                                 <thead>
                                     <tr>
+                                        <th style="width: 40px;"><input type="checkbox" onchange="toggleSelectAllItems('duties_payable', this.checked)"></th>
                                         <th>Line</th>
                                         <th>Parts Name</th>
                                         <th>HS Code</th>
@@ -3378,6 +3381,7 @@
             form_d_items: [],
             mida_items: [],
             duties_payable_items: [],
+            selectedMidaItemIds: new Set(),
             company: null,
             country: '',
             port: '',
@@ -3437,6 +3441,39 @@
                     item.sst_manually_changed = true;
                 }
             });
+            
+            renderClassificationTable(tableName);
+        }
+
+        // Toggle item selection
+        function toggleItemSelection(itemId, tableName, isChecked) {
+            let set;
+            if (tableName === 'mida') set = classificationData.selectedMidaItemIds;
+            else if (tableName === 'form_d') set = classificationData.selectedFormDItemIds;
+            else set = classificationData.selectedDutiesItemIds;
+
+            if (isChecked) {
+                set.add(itemId);
+            } else {
+                set.delete(itemId);
+            }
+        }
+
+        // Toggle select all items in a table
+        function toggleSelectAllItems(tableName, isChecked) {
+            const tableKey = tableName + '_items';
+            const items = classificationData[tableKey];
+            
+            let set;
+            if (tableName === 'mida') set = classificationData.selectedMidaItemIds;
+            else if (tableName === 'form_d') set = classificationData.selectedFormDItemIds;
+            else set = classificationData.selectedDutiesItemIds;
+
+            if (isChecked) {
+                items.forEach(item => set.add(item.id));
+            } else {
+                set.clear();
+            }
             
             renderClassificationTable(tableName);
         }
@@ -3525,19 +3562,53 @@
                 if (item.manually_moved || item.sst_manually_changed) {
                     tr.classList.add('modified-row');
                 }
+
+                // Determine selection state
+                let isSelected = false;
+                if (tableName === 'mida') isSelected = classificationData.selectedMidaItemIds?.has(item.id);
+                else if (tableName === 'form_d') isSelected = classificationData.selectedFormDItemIds?.has(item.id);
+                else isSelected = classificationData.selectedDutiesItemIds?.has(item.id);
                 
                 if (tableName === 'mida') {
-                    // MIDA table has different columns
-                    // Format parts name with MIDA line number: "Water Pump (25)"
+                    // MIDA table: Calculate dynamic balance based on selected port
+                    const currentPort = document.getElementById('portSelect')?.value || 'port_klang';
+                    let displayRemaining = item.remaining_qty;
+                    
+                    // Build tooltip
+                    let balanceTooltip = `Total: ${item.remaining_qty != null ? parseFloat(item.remaining_qty).toLocaleString() : '-'}`;
+                    if (item.remaining_port_klang != null) {
+                         balanceTooltip += `\nPort Klang: ${parseFloat(item.remaining_port_klang).toLocaleString()}`;
+                         balanceTooltip += `\nKLIA: ${parseFloat(item.remaining_klia).toLocaleString()}`;
+                         balanceTooltip += `\nBKH: ${parseFloat(item.remaining_bukit_kayu_hitam).toLocaleString()}`;
+                    }
+
+                    // Select specific port balance
+                    if (currentPort === 'port_klang' && item.remaining_port_klang != null) {
+                        displayRemaining = item.remaining_port_klang;
+                    } else if (currentPort === 'klia' && item.remaining_klia != null) {
+                        displayRemaining = item.remaining_klia;
+                    } else if (currentPort === 'bukit_kayu_hitam' && item.remaining_bukit_kayu_hitam != null) {
+                        displayRemaining = item.remaining_bukit_kayu_hitam;
+                    } else if (item.port_specific_remaining != null) {
+                        displayRemaining = item.port_specific_remaining;
+                    }
+
+                    // Format parts name with MIDA line number
                     const partsName = item.description || item.parts_name || '';
                     const midaLineDisplay = item.mida_line_no ? `${partsName} (${item.mida_line_no})` : partsName;
+                    
                     tr.innerHTML = `
+                        <td style="text-align: center;">
+                            <input type="checkbox" onchange="toggleItemSelection('${item.id}', '${tableName}', this.checked)" ${isSelected ? 'checked' : ''}>
+                        </td>
                         <td>${item.line_no || index + 1}</td>
                         <td>${escapeHtml(midaLineDisplay)}</td>
                         <td>${escapeHtml(item.mida_hs_code || item.hs_code || '')}</td>
                         <td>${escapeHtml(item.uom || '')}</td>
                         <td>${escapeHtml(item.mida_certificate_number || '-')}</td>
-                        <td>${item.remaining_qty != null ? parseFloat(item.remaining_qty).toLocaleString() : '-'}</td>
+                        <td title="${escapeHtml(balanceTooltip)}" style="cursor: help; border-bottom: 1px dotted #ccc;">
+                            ${displayRemaining != null ? parseFloat(displayRemaining).toLocaleString() : '-'}
+                        </td>
                         <td>${item.deduction_quantity != null ? parseFloat(item.deduction_quantity).toLocaleString() : '-'}</td>
                         <td>${item.match_score != null ? (item.match_score * 100).toFixed(0) + '%' : '-'}</td>
                         <td>
@@ -3560,9 +3631,11 @@
                     `;
                 } else {
                     // Form-D and Duties Payable tables
-                    // For HS code: use hs_code, or fallback to mida_hs_code (remove dots for consistency)
                     const displayHsCode = item.hs_code || (item.mida_hs_code ? item.mida_hs_code.replace(/\./g, '') : '');
                     tr.innerHTML = `
+                        <td style="text-align: center;">
+                            <input type="checkbox" onchange="toggleItemSelection('${item.id}', '${tableName}', this.checked)" ${isSelected ? 'checked' : ''}>
+                        </td>
                         <td>${item.line_no || index + 1}</td>
                         <td>${escapeHtml(item.description || item.parts_name || '')}</td>
                         <td>${escapeHtml(displayHsCode)}</td>
@@ -3628,6 +3701,11 @@
                 port: document.getElementById('portSelect')?.value || '',
                 import_date: document.getElementById('importDate')?.value || ''
             };
+            
+            // Initialize selected items (empty by default)
+            classificationData.selectedMidaItemIds = new Set();
+            classificationData.selectedFormDItemIds = new Set();
+            classificationData.selectedDutiesItemIds = new Set();
             
             // Render all tables
             renderClassificationTable('form_d');
@@ -3871,8 +3949,15 @@
                 return;
             }
             
-            // Filter MIDA items: only non-manually-moved with certificate matches
+            // Check for selected items
+            if (classificationData.selectedMidaItemIds.size === 0) {
+                showError('Please select at least one MIDA item to update balances.');
+                return;
+            }
+
+            // Filter MIDA items: only SELECTED, non-manually-moved with certificate matches
             const eligibleItems = classificationData.mida_items.filter(item => 
+                classificationData.selectedMidaItemIds.has(item.id) &&
                 !item.manually_moved && 
                 item.mida_certificate_number && 
                 item.original_table === 'mida' &&
@@ -3880,12 +3965,13 @@
             );
             
             if (eligibleItems.length === 0) {
-                showError('No eligible items to update. Only non-manually-moved MIDA items with certificate matches and valid deduction quantities can update balances.');
+                showError('No eligible selected items to update. Ensure selected items have certificate matches and valid deduction quantities.');
                 return;
             }
             
-            // Check for items with missing deduction quantity
+            // Check for items with missing deduction quantity (among selected)
             const itemsWithErrors = classificationData.mida_items.filter(item => 
+                classificationData.selectedMidaItemIds.has(item.id) &&
                 !item.manually_moved && 
                 item.mida_certificate_number && 
                 item.original_table === 'mida' &&

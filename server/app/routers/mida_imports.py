@@ -186,95 +186,6 @@ async def create_bulk_imports(
 
 
 # =============================================================================
-# Import Record CRUD Endpoints
-# =============================================================================
-
-@router.get(
-    "/{record_id}",
-    response_model=ImportRecordRead,
-    status_code=status.HTTP_200_OK,
-    responses={
-        200: {"description": "Import record retrieved"},
-        404: {"description": "Import record not found"},
-    },
-    summary="Get a single import record",
-    description="Get details of a specific import record by its ID.",
-)
-async def get_import_record(
-    record_id: UUID,
-    db: Session = Depends(get_db),
-):
-    """Get an import record by ID."""
-    record = get_import_by_id(db, record_id)
-    if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Import record with id '{record_id}' not found",
-        )
-    return record
-
-
-@router.put(
-    "/{record_id}",
-    response_model=ImportRecordRead,
-    status_code=status.HTTP_200_OK,
-    responses={
-        200: {"description": "Import record updated"},
-        404: {"description": "Import record not found"},
-    },
-    summary="Update an import record",
-    description="""
-    Update an existing import record.
-    
-    Only provided fields will be updated. Note that changing the quantity
-    will affect the balance_after field.
-    """,
-)
-async def update_import_record(
-    record_id: UUID,
-    payload: ImportRecordUpdate,
-    db: Session = Depends(get_db),
-):
-    """Update an import record."""
-    record = update_import(db, record_id, payload)
-    if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Import record with id '{record_id}' not found",
-        )
-    return record
-
-
-@router.delete(
-    "/{record_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    responses={
-        204: {"description": "Import record deleted"},
-        404: {"description": "Import record not found"},
-    },
-    summary="Delete an import record",
-    description="""
-    Delete an import record permanently.
-    
-    Note: This will NOT automatically recalculate balances for subsequent imports.
-    Use with caution.
-    """,
-)
-async def delete_import_record(
-    record_id: UUID,
-    db: Session = Depends(get_db),
-):
-    """Delete an import record."""
-    success = delete_import(db, record_id)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Import record with id '{record_id}' not found",
-        )
-    return None
-
-
-# =============================================================================
 # Import History Endpoints
 # =============================================================================
 
@@ -583,3 +494,94 @@ async def update_threshold_setting(
             detail="Failed to update threshold setting",
         )
     return {"default_threshold": payload.default_threshold}
+
+
+# =============================================================================
+# Import Record CRUD Endpoints (by ID)
+# NOTE: These routes with path parameters must be defined AFTER static routes
+# to prevent FastAPI from matching /balances, /history, etc. as {record_id}
+# =============================================================================
+
+@router.get(
+    "/{record_id}",
+    response_model=ImportRecordRead,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Import record retrieved"},
+        404: {"description": "Import record not found"},
+    },
+    summary="Get a single import record",
+    description="Get details of a specific import record by its ID.",
+)
+async def get_import_record(
+    record_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Get an import record by ID."""
+    record = get_import_by_id(db, record_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Import record with id '{record_id}' not found",
+        )
+    return record
+
+
+@router.put(
+    "/{record_id}",
+    response_model=ImportRecordRead,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Import record updated"},
+        404: {"description": "Import record not found"},
+    },
+    summary="Update an import record",
+    description="""
+    Update an existing import record.
+    
+    Only provided fields will be updated. Note that changing the quantity
+    will affect the balance_after field.
+    """,
+)
+async def update_import_record(
+    record_id: UUID,
+    payload: ImportRecordUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update an import record."""
+    record = update_import(db, record_id, payload)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Import record with id '{record_id}' not found",
+        )
+    return record
+
+
+@router.delete(
+    "/{record_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "Import record deleted"},
+        404: {"description": "Import record not found"},
+    },
+    summary="Delete an import record",
+    description="""
+    Delete an import record permanently.
+    
+    Note: This will NOT automatically recalculate balances for subsequent imports.
+    Use with caution.
+    """,
+)
+async def delete_import_record(
+    record_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete an import record."""
+    success = delete_import(db, record_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Import record with id '{record_id}' not found",
+        )
+    return None

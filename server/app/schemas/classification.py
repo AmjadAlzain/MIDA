@@ -70,8 +70,15 @@ class ClassifiedItem(BaseModel):
     mida_line_no: Optional[int] = Field(default=None, description="MIDA certificate line number")
     mida_hs_code: Optional[str] = Field(default=None, description="HS code from MIDA certificate")
     mida_item_name: Optional[str] = Field(default=None, description="Item name from MIDA certificate")
-    remaining_qty: Optional[Decimal] = Field(default=None, description="Remaining quantity on MIDA certificate")
+    remaining_qty: Optional[Decimal] = Field(default=None, description="Remaining quantity on MIDA certificate (Total)")
     remaining_uom: Optional[str] = Field(default=None, description="UOM for remaining quantity")
+    
+    # Port-specific remaining balances
+    remaining_port_klang: Optional[Decimal] = Field(default=None, description="Remaining quantity for Port Klang")
+    remaining_klia: Optional[Decimal] = Field(default=None, description="Remaining quantity for KLIA")
+    remaining_bukit_kayu_hitam: Optional[Decimal] = Field(default=None, description="Remaining quantity for Bukit Kayu Hitam")
+    port_specific_remaining: Optional[Decimal] = Field(default=None, description="Remaining quantity for the selected port")
+
     match_score: Optional[float] = Field(default=None, description="Match confidence score (0-1)")
     approved_qty: Optional[Decimal] = Field(default=None, description="Original approved quantity")
     hscode_uom: Optional[str] = Field(default=None, description="UOM from HSCODE mapping (UNIT or KGM)")

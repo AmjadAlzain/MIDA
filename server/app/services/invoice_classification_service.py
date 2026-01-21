@@ -324,6 +324,13 @@ def classify_items(
             mida_item_name=mida_match.get("mida_item_name") if mida_match else None,
             remaining_qty=mida_match.get("remaining_qty") if mida_match else None,
             remaining_uom=mida_match.get("remaining_uom") if mida_match else None,
+            
+            # Port balances
+            remaining_port_klang=mida_match.get("remaining_port_klang") if mida_match else None,
+            remaining_klia=mida_match.get("remaining_klia") if mida_match else None,
+            remaining_bukit_kayu_hitam=mida_match.get("remaining_bukit_kayu_hitam") if mida_match else None,
+            port_specific_remaining=mida_match.get("port_specific_remaining") if mida_match else None,
+
             match_score=mida_match.get("match_score") if mida_match else None,
             approved_qty=mida_match.get("approved_qty") if mida_match else None,
             hscode_uom=mida_match.get("hscode_uom") if mida_match else None,
