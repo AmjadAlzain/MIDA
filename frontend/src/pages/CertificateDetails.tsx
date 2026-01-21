@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -13,6 +13,8 @@ import {
   BarChart3,
   Plus,
   Trash2,
+  Download,
+  ChevronDown,
 } from 'lucide-react';
 import {
   Button,
@@ -33,6 +35,7 @@ import {
   CertificateItemBalance,
   CertificateItemsResponse,
   SaveCertificateRequest,
+  PORTS,
 } from '@/types';
 import { cn, formatNumber, formatDate, getQuantityStatusClass } from '@/utils';
 
@@ -45,6 +48,20 @@ export function CertificateDetails() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedCertificate, setEditedCertificate] = useState<Certificate | null>(null);
   const [deleteItemIndex, setDeleteItemIndex] = useState<number | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setShowExportDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch certificate
   const {
@@ -179,6 +196,35 @@ export function CertificateDetails() {
     return itemBalances.find((b) => b.item_id === itemId);
   };
 
+  // Export certificate to XLSX
+  const handleExportCertificate = async () => {
+    if (!certificate) return;
+    setIsExporting(true);
+    try {
+      await certificateService.exportCertificate(certificate.id, certificate.certificate_number);
+      toast.success('Certificate exported successfully');
+    } catch (error) {
+      toast.error('Failed to export certificate');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Export all balance sheets for a specific port
+  const handleExportAllBalanceSheets = async (port: string) => {
+    if (!certificate) return;
+    setIsExporting(true);
+    setShowExportDropdown(false);
+    try {
+      await certificateService.exportAllBalanceSheets(certificate.id, certificate.certificate_number, port);
+      toast.success('Balance sheets exported successfully');
+    } catch (error) {
+      toast.error('Failed to export balance sheets');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -249,10 +295,45 @@ export function CertificateDetails() {
                   Back
                 </Button>
                 {certificate.status !== 'deleted' && (
-                  <Button variant="primary" onClick={handleStartEdit}>
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
+                  <>
+                    <Button variant="primary" onClick={handleStartEdit}>
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleExportCertificate}
+                      isLoading={isExporting}
+                      disabled={isExporting}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Export Certificate
+                    </Button>
+                    <div className="relative" ref={exportDropdownRef}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setShowExportDropdown(!showExportDropdown)}
+                        disabled={isExporting}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export All Balances
+                        <ChevronDown className="w-4 h-4 ml-2" />
+                      </Button>
+                      {showExportDropdown && (
+                        <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                          {PORTS.map((port) => (
+                            <button
+                              key={port.value}
+                              onClick={() => handleExportAllBalanceSheets(port.value)}
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              {port.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </>
             )}

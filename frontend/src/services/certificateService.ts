@@ -6,6 +6,20 @@ import {
   SaveCertificateRequest,
 } from '@/types';
 
+/**
+ * Trigger file download from a blob response
+ */
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
 export const certificateService = {
   /**
    * Get paginated list of certificates
@@ -115,5 +129,68 @@ export const certificateService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
+  },
+
+  // =========================================================================
+  // Export Functions
+  // =========================================================================
+
+  /**
+   * Export a certificate to XLSX format
+   */
+  async exportCertificate(certificateId: string, certificateNumber: string): Promise<void> {
+    const response = await api.get(`/mida/certificates/${certificateId}/export`, {
+      responseType: 'blob',
+    });
+    
+    const safeCertNum = certificateNumber.replace(/[/\\]/g, '_');
+    const filename = `${safeCertNum}_certificate.xlsx`;
+    downloadBlob(response.data, filename);
+  },
+
+  /**
+   * Export an item's balance sheet to XLSX format
+   * @param port - 'port_klang', 'klia', 'bukit_kayu_hitam', or undefined for all ports
+   */
+  async exportItemBalanceSheet(
+    certificateId: string,
+    itemId: string,
+    certificateNumber: string,
+    lineNo: number,
+    port?: string
+  ): Promise<void> {
+    const params = port && port !== 'all' ? { port } : {};
+    const response = await api.get(
+      `/mida/certificates/${certificateId}/items/${itemId}/balance-sheet/export`,
+      { params, responseType: 'blob' }
+    );
+    
+    const safeCertNum = certificateNumber.replace(/[/\\]/g, '_');
+    const portSuffix = port && port !== 'all' ? `_${port}` : '_all_ports';
+    const filename = `${safeCertNum}_item${lineNo}_balance${portSuffix}.xlsx`;
+    downloadBlob(response.data, filename);
+  },
+
+  /**
+   * Export all items' balance sheets for a specific port
+   */
+  async exportAllBalanceSheets(
+    certificateId: string,
+    certificateNumber: string,
+    port: string
+  ): Promise<void> {
+    const response = await api.get(
+      `/mida/certificates/${certificateId}/balance-sheets/export`,
+      { params: { port }, responseType: 'blob' }
+    );
+    
+    const safeCertNum = certificateNumber.replace(/[/\\]/g, '_');
+    const portDisplay: Record<string, string> = {
+      port_klang: 'PortKlang',
+      klia: 'KLIA',
+      bukit_kayu_hitam: 'BKH',
+    };
+    const filename = `${safeCertNum}_all_balances_${portDisplay[port] || port}.xlsx`;
+    downloadBlob(response.data, filename);
   },
 };

@@ -10,13 +10,16 @@ Expired certificates cannot be modified (returns 409 Conflict).
 New certificates are saved with 'active' status.
 """
 
+from io import BytesIO
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_db
+from app.models.mida_certificate import MidaCertificate, MidaCertificateItem, MidaImportRecord
 from app.schemas.mida_certificate import (
     CertificateDraftCreateRequest,
     CertificateDraftUpdateRequest,
@@ -39,6 +42,11 @@ from app.services.mida_certificate_service import (
     restore_certificate,
     soft_delete_certificate,
     update_draft_by_id,
+)
+from app.services.xlsx_export_service import (
+    generate_certificate_xlsx,
+    generate_item_balance_sheet_xlsx,
+    generate_all_items_balance_sheets_xlsx,
 )
 
 router = APIRouter()
@@ -254,6 +262,228 @@ async def get_deleted_certificates(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+# =============================================================================
+# Export Endpoints
+# =============================================================================
+
+@router.get(
+    "/{certificate_id}/export",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "XLSX file generated"},
+        404: {"description": "Certificate not found"},
+    },
+    summary="Export certificate to XLSX",
+    description="""
+    Export a MIDA certificate to XLSX format with:
+    - Certificate header information (company, dates, status)
+    - Table of all items with approved and remaining quantities per port
+    """,
+)
+async def export_certificate(
+    certificate_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Export a certificate to XLSX format."""
+    # Load certificate with items
+    certificate = db.query(MidaCertificate).options(
+        selectinload(MidaCertificate.items)
+    ).filter(
+        MidaCertificate.id == certificate_id,
+        MidaCertificate.deleted_at.is_(None),
+    ).first()
+    
+    if not certificate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Certificate with id '{certificate_id}' not found",
+        )
+    
+    # Generate XLSX
+    xlsx_bytes = generate_certificate_xlsx(certificate)
+    
+    # Create safe filename
+    safe_cert_num = certificate.certificate_number.replace("/", "_").replace("\\", "_")
+    filename = f"{safe_cert_num}_certificate.xlsx"
+    
+    return StreamingResponse(
+        BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.get(
+    "/{certificate_id}/items/{item_id}/balance-sheet/export",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "XLSX file generated"},
+        404: {"description": "Certificate or item not found"},
+    },
+    summary="Export item balance sheet to XLSX",
+    description="""
+    Export an item's balance sheet (import history) to XLSX format.
+    
+    If port is specified, exports only that port's history in a single sheet.
+    If port is not specified (or 'all'), exports all 3 ports as separate sheets
+    in the same workbook.
+    
+    Format:
+    - Item and certificate info header at top
+    - Import history table below
+    """,
+)
+async def export_item_balance_sheet(
+    certificate_id: UUID,
+    item_id: UUID,
+    port: Optional[str] = Query(
+        None, 
+        description="Port filter: port_klang, klia, bukit_kayu_hitam, or omit for all"
+    ),
+    db: Session = Depends(get_db),
+):
+    """Export an item's balance sheet to XLSX format."""
+    # Load certificate
+    certificate = db.query(MidaCertificate).filter(
+        MidaCertificate.id == certificate_id,
+        MidaCertificate.deleted_at.is_(None),
+    ).first()
+    
+    if not certificate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Certificate with id '{certificate_id}' not found",
+        )
+    
+    # Load item
+    item = db.query(MidaCertificateItem).filter(
+        MidaCertificateItem.id == item_id,
+        MidaCertificateItem.certificate_id == certificate_id,
+    ).first()
+    
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item with id '{item_id}' not found in certificate",
+        )
+    
+    # Validate port if specified
+    valid_ports = ["port_klang", "klia", "bukit_kayu_hitam"]
+    if port and port != "all" and port not in valid_ports:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid port. Must be one of: {valid_ports}",
+        )
+    
+    # Load import records separately to avoid SQLAlchemy issues
+    import_records = db.query(MidaImportRecord).filter(
+        MidaImportRecord.certificate_item_id == item_id
+    ).order_by(MidaImportRecord.created_at).all()
+    
+    # Generate XLSX
+    port_param = port if port and port != "all" else None
+    xlsx_bytes = generate_item_balance_sheet_xlsx(item, certificate, port_param, import_records)
+    
+    # Create safe filename
+    safe_cert_num = certificate.certificate_number.replace("/", "_").replace("\\", "_")
+    port_suffix = f"_{port}" if port and port != "all" else "_all_ports"
+    filename = f"{safe_cert_num}_item{item.line_no}_balance{port_suffix}.xlsx"
+    
+    return StreamingResponse(
+        BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.get(
+    "/{certificate_id}/balance-sheets/export",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "XLSX file generated"},
+        404: {"description": "Certificate not found"},
+        400: {"description": "Invalid port specified"},
+    },
+    summary="Export all items' balance sheets to XLSX",
+    description="""
+    Export balance sheets for ALL items in a certificate to a single XLSX workbook.
+    Each item gets its own sheet with its import history for the specified port.
+    
+    This is useful for getting a complete overview of all balance sheets 
+    for a certificate at a specific port.
+    """,
+)
+async def export_all_balance_sheets(
+    certificate_id: UUID,
+    port: str = Query(
+        ...,
+        description="Port to export: port_klang, klia, or bukit_kayu_hitam"
+    ),
+    db: Session = Depends(get_db),
+):
+    """Export all items' balance sheets for a specific port."""
+    # Validate port
+    valid_ports = ["port_klang", "klia", "bukit_kayu_hitam"]
+    if port not in valid_ports:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid port. Must be one of: {valid_ports}",
+        )
+    
+    # Load certificate with items
+    certificate = db.query(MidaCertificate).options(
+        selectinload(MidaCertificate.items)
+    ).filter(
+        MidaCertificate.id == certificate_id,
+        MidaCertificate.deleted_at.is_(None),
+    ).first()
+    
+    if not certificate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Certificate with id '{certificate_id}' not found",
+        )
+    
+    if not certificate.items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Certificate has no items to export",
+        )
+    
+    # Load all import records for items in this certificate
+    item_ids = [item.id for item in certificate.items]
+    all_import_records = db.query(MidaImportRecord).filter(
+        MidaImportRecord.certificate_item_id.in_(item_ids)
+    ).order_by(MidaImportRecord.created_at).all()
+    
+    # Group import records by item_id
+    import_records_by_item: dict = {}
+    for record in all_import_records:
+        if record.certificate_item_id not in import_records_by_item:
+            import_records_by_item[record.certificate_item_id] = []
+        import_records_by_item[record.certificate_item_id].append(record)
+    
+    # Generate XLSX
+    xlsx_bytes = generate_all_items_balance_sheets_xlsx(certificate, port, import_records_by_item)
+    
+    # Create safe filename
+    safe_cert_num = certificate.certificate_number.replace("/", "_").replace("\\", "_")
+    port_display = {"port_klang": "PortKlang", "klia": "KLIA", "bukit_kayu_hitam": "BKH"}
+    filename = f"{safe_cert_num}_all_balances_{port_display.get(port, port)}.xlsx"
+    
+    return StreamingResponse(
+        BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
     )
 
 

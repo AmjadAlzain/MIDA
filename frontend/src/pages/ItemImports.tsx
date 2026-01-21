@@ -10,6 +10,7 @@ import {
   Edit2,
   Trash2,
   Save,
+  Download,
 } from 'lucide-react';
 import {
   Button,
@@ -48,6 +49,7 @@ export function ItemImports() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingImport, setEditingImport] = useState<ImportRecord | null>(null);
   const [deleteImportId, setDeleteImportId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [newImport, setNewImport] = useState({
     import_date: getTodayISO(),
     invoice_number: '',
@@ -236,6 +238,29 @@ export function ItemImports() {
     }
   };
 
+  // Handle export balance sheet
+  const handleExportBalanceSheet = async () => {
+    if (!certificate || !currentItem || !itemId) return;
+    setIsExporting(true);
+    try {
+      // If "all" is selected, export all ports as separate sheets
+      // Otherwise export only the selected port
+      const portParam = selectedPort === 'all' ? undefined : selectedPort;
+      await certificateService.exportItemBalanceSheet(
+        certificate.id,
+        itemId,
+        certificate.certificate_number,
+        currentItem.line_no,
+        portParam
+      );
+      toast.success('Balance sheet exported successfully');
+    } catch (error) {
+      toast.error('Failed to export balance sheet');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Port options for select
   const portOptions = PORTS.map((p) => ({
     value: p.value,
@@ -353,6 +378,15 @@ export function ItemImports() {
             <Button variant="primary" onClick={() => setShowAddModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add Import
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleExportBalanceSheet}
+              isLoading={isExporting}
+              disabled={isExporting}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Balance Sheet
             </Button>
           </div>
         </div>
