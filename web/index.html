@@ -2452,6 +2452,10 @@
                             <span class="info-card-label">UOM</span>
                             <span class="info-card-value" id="infoItemUom">-</span>
                         </div>
+                        <div class="info-card-item">
+                            <span class="info-card-label">Remaining Qty</span>
+                            <span class="info-card-value" id="infoItemRemaining">-</span>
+                        </div>
                     </div>
                 </div>
                 
@@ -2476,7 +2480,6 @@
                                 <th class="number-cell">Qty Imported</th>
                                 <th class="number-cell">Before Balance</th>
                                 <th class="number-cell">After Balance</th>
-                                <th>Remarks</th>
                             </tr>
                         </thead>
                         <tbody id="importsTableBody">
@@ -6136,6 +6139,7 @@
             document.getElementById('infoItemHsCode').textContent = item.hs_code || item.item_hs_code || '-';
             document.getElementById('infoItemName').textContent = item.item_name || '-';
             document.getElementById('infoItemUom').textContent = item.uom || item.item_uom || '-';
+            document.getElementById('infoItemRemaining').textContent = formatNumber(item.remaining_quantity);
             
             // Update breadcrumb
             updateBreadcrumb('imports', {
@@ -6243,6 +6247,18 @@
             
             // Reload with filter
             loadImportRecords(dbState.selectedItem.item_id, port, 1);
+            
+            // Update balance display
+            const item = dbState.selectedItem;
+            if (item) {
+                let bal = item.remaining_quantity;
+                if (port === 'port_klang') bal = item.remaining_port_klang;
+                else if (port === 'klia') bal = item.remaining_klia;
+                else if (port === 'bukit_kayu_hitam') bal = item.remaining_bukit_kayu_hitam;
+                
+                const el = document.getElementById('infoItemRemaining');
+                if (el) el.textContent = formatNumber(bal);
+            }
         }
         
         function renderImportsTable() {
@@ -6274,7 +6290,6 @@
                     <td class="number-cell">${formatNumber(record.quantity_imported)}</td>
                     <td class="number-cell">${formatNumber(record.balance_before)}</td>
                     <td class="number-cell">${formatNumber(record.balance_after)}</td>
-                    <td>${escapeHtml(record.remarks || '-')}</td>
                 `;
                 tbody.appendChild(row);
             });

@@ -44,6 +44,7 @@ export function ItemImports() {
   const queryClient = useQueryClient();
 
   // State
+  const [selectedPort, setSelectedPort] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingImport, setEditingImport] = useState<ImportRecord | null>(null);
   const [deleteImportId, setDeleteImportId] = useState<string | null>(null);
@@ -92,8 +93,10 @@ export function ItemImports() {
     data: importsResponse,
     isLoading,
   } = useQuery<ImportRecordsResponse>({
-    queryKey: ['imports', itemId],
-    queryFn: () => importService.getByItemId(itemId!),
+    queryKey: ['imports', itemId, selectedPort],
+    queryFn: () => importService.getByItemId(itemId!, {
+      port: selectedPort === 'all' ? undefined : selectedPort,
+    }),
     enabled: !!itemId,
   });
 
@@ -262,7 +265,11 @@ export function ItemImports() {
     );
   }
 
-  const remainingBalance = currentItem.remaining_quantity;
+  const remainingBalance = 
+    selectedPort === 'port_klang' ? (currentItem.remaining_port_klang ?? 0) :
+    selectedPort === 'klia' ? (currentItem.remaining_klia ?? 0) :
+    selectedPort === 'bukit_kayu_hitam' ? (currentItem.remaining_bukit_kayu_hitam ?? 0) :
+    currentItem.remaining_quantity;
 
   return (
     <div className="space-y-6">
@@ -362,6 +369,28 @@ export function ItemImports() {
           </CardTitle>
         </CardHeader>
 
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
+          <div className="flex gap-2">
+            <Button
+              variant={selectedPort === 'all' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedPort('all')}
+            >
+              All Ports
+            </Button>
+            {PORTS.map((port) => (
+              <Button
+                key={port.value}
+                variant={selectedPort === port.value ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedPort(port.value)}
+              >
+                {port.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full" />
@@ -378,7 +407,6 @@ export function ItemImports() {
                   <th className="px-4 py-3 text-left font-semibold">Port</th>
                   <th className="px-4 py-3 text-right font-semibold">Quantity</th>
                   <th className="px-4 py-3 text-right font-semibold">Balance After</th>
-                  <th className="px-4 py-3 text-left font-semibold">Remarks</th>
                   <th className="px-4 py-3 text-center font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -393,9 +421,6 @@ export function ItemImports() {
                     <td className="px-4 py-3 text-right">{formatNumber(imp.quantity_imported)}</td>
                     <td className="px-4 py-3 text-right font-semibold">
                       {formatNumber(imp.balance_after)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 max-w-xs truncate" title={imp.remarks || ''}>
-                      {imp.remarks || '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
