@@ -14,7 +14,7 @@ import {
 import { Button, Card, CardHeader, CardTitle, FileUpload, Badge, Select, Input, Modal } from '@/components/ui';
 import { classificationService, companyService, certificateService, importService } from '@/services';
 import { ClassificationResponse, ClassificationItem, Company, K1ExportItem, Certificate, COUNTRIES, ImportPreviewResponse } from '@/types';
-import { cn, formatNumber, getTodayISO } from '@/utils';
+import { cn, formatNumber } from '@/utils';
 
 // Tab types for the Invoice Converter
 type ConverterTab = 'formd' | 'mida' | 'duties';
@@ -802,13 +802,19 @@ export function InvoiceConverter() {
                           <div className="flex items-center gap-1">
                             {item.line_no}
                             {item.manually_moved && (
-                              <ArrowRightLeft className="w-3 h-3 text-orange-500" title="Manually moved to this table" />
+                              <span title="Manually moved to this table">
+                                <ArrowRightLeft className="w-3 h-3 text-orange-500" />
+                              </span>
                             )}
                             {item.sst_manually_changed && (
-                              <ArrowRightLeft className="w-3 h-3 text-blue-500" title="SST status manually changed" />
+                              <span title="SST status manually changed">
+                                <ArrowRightLeft className="w-3 h-3 text-blue-500" />
+                              </span>
                             )}
                             {isItemUpdated && (
-                              <CheckCircle className="w-3 h-3 text-green-500" title="Balance already updated - can still be exported but cannot update balance again" />
+                              <span title="Balance already updated - can still be exported but cannot update balance again">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                              </span>
                             )}
                           </div>
                         </td>
@@ -873,10 +879,7 @@ export function InvoiceConverter() {
                             {activeTab !== 'mida' && (
                               <button
                                 onClick={() => handleMoveItem(item, 'mida')}
-                                className={cn(
-                                  "font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 text-center",
-                                  activeTab === 'mida' ? "w-12 px-1 py-1 text-[10px]" : "px-2 py-1 text-[10px]"
-                                )}
+                                className="font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 text-center px-2 py-1 text-[10px]"
                                 title="Move to MIDA"
                               >
                                 MIDA

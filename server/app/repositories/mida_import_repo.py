@@ -270,9 +270,30 @@ def get_current_balance_for_port(
     db: Session,
     item_id: UUID,
     port: str,
+    for_update: bool = False,
 ) -> Optional[Decimal]:
-    """Get the current remaining balance for an item at a specific port."""
-    item = db.get(MidaCertificateItem, item_id)
+    """
+    Get the current remaining balance for an item at a specific port.
+    
+    Args:
+        db: Database session
+        item_id: The certificate item ID
+        port: The import port
+        for_update: If True, acquires a row-level lock (SELECT FOR UPDATE)
+                   to prevent concurrent modifications. Use this when
+                   you intend to update the balance after reading it.
+    """
+    if for_update:
+        # Use SELECT FOR UPDATE to lock the row and prevent race conditions
+        stmt = (
+            select(MidaCertificateItem)
+            .where(MidaCertificateItem.id == item_id)
+            .with_for_update()
+        )
+        item = db.scalars(stmt).first()
+    else:
+        item = db.get(MidaCertificateItem, item_id)
+    
     if not item:
         return None
     

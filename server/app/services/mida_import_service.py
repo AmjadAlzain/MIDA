@@ -252,10 +252,11 @@ def record_import(
     #         f"Certificate '{item.certificate.certificate_number}' is not confirmed"
     #     )
     
-    # Get current balance for the port
+    # Get current balance for the port with row-level lock to prevent race conditions
+    # The for_update=True ensures concurrent imports don't read stale balance data
     port = import_data.port.value
     current_balance = mida_import_repo.get_current_balance_for_port(
-        db, import_data.certificate_item_id, port
+        db, import_data.certificate_item_id, port, for_update=True
     )
     
     if current_balance is None:

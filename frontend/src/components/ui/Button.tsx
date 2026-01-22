@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '@/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
@@ -16,6 +16,7 @@ const variantStyles = {
   danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
   warning: 'bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-500',
   ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+  outline: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 border border-gray-300',
 };
 
 const sizeStyles = {

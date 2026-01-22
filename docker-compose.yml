@@ -1,0 +1,218 @@
+# =============================================================================
+# MIDA OCR Application - Docker Compose Production Configuration
+# =============================================================================
+# This file orchestrates all services: API, Frontend, Database, and Backups
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # FastAPI Backend
+  # ===========================================================================
+  mida-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: mida-ocr-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      # Azure Document Intelligence (OCR)
+      - AZURE_DI_ENDPOINT=${AZURE_DI_ENDPOINT}
+      - AZURE_DI_KEY=${AZURE_DI_KEY}
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mida}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mida}
+      # Application settings
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:3000}
+      # Worker configuration (adjust based on server resources)
+      - WORKERS=${WORKERS:-4}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - mida-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    # Resource limits (adjust based on server)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ===========================================================================
+  # React Frontend (served via Nginx)
+  # ===========================================================================
+  mida-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mida-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - mida-api
+    networks:
+      - mida-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+  # ===========================================================================
+  # PostgreSQL Database
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: mida-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mida}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mida}
+      # Performance tuning
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Mount backup directory
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mida} -d ${POSTGRES_DB:-mida}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - mida-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  # ===========================================================================
+  # Database Backup Service (runs daily at 2 AM)
+  # ===========================================================================
+  db-backup:
+    image: postgres:15-alpine
+    container_name: mida-db-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-mida}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-mida}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Install crond in Alpine
+        apk add --no-cache dcron
+        
+        # Create backup script
+        cat > /run-backup.sh << 'EOF'
+        #!/bin/sh
+        TIMESTAMP=$$(date +%Y%m%d_%H%M%S)
+        BACKUP_FILE="/backups/mida_backup_$${TIMESTAMP}.sql.gz"
+        
+        echo "[$$TIMESTAMP] Starting database backup..."
+        pg_dump -h postgres -U $${PGUSER} -d $${PGDATABASE} | gzip > "$${BACKUP_FILE}"
+        
+        if [ $$? -eq 0 ]; then
+            echo "[$$TIMESTAMP] Backup completed: $${BACKUP_FILE}"
+            # Clean up old backups (keep last N days)
+            find /backups -name "mida_backup_*.sql.gz" -mtime +$${BACKUP_RETENTION_DAYS:-7} -delete
+            echo "[$$TIMESTAMP] Old backups cleaned up (keeping $${BACKUP_RETENTION_DAYS:-7} days)"
+        else
+            echo "[$$TIMESTAMP] Backup FAILED!"
+            exit 1
+        fi
+        EOF
+        chmod +x /run-backup.sh
+        
+        # Create cron job (2 AM daily)
+        echo "0 2 * * * /run-backup.sh >> /var/log/backup.log 2>&1" > /etc/crontabs/root
+        
+        # Run initial backup on startup
+        /run-backup.sh
+        
+        # Start cron daemon in foreground
+        crond -f -l 2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mida-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ===========================================================================
+  # Database Migration Runner (one-time)
+  # ===========================================================================
+  db-migrate:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: mida-db-migrate
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mida}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mida}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mida-network
+    restart: "no"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  mida-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local

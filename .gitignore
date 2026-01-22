@@ -18,3 +18,16 @@ Templates/
 
 # Allow server templates (K1 export template)
 !server/templates/
+
+# Development database setup scripts (contain credentials)
+server/tools/db_setup/Kagayaku_db.py
+server/tools/db_setup/Kagayaku.session.sql
+server/tools/db_setup/Kagayaku_db.ipynb
+
+# Docker environment files (production secrets)
+.env.production
+docker-compose.override.yml
+
+# Logs
+logs/
+*.log
