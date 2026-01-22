@@ -23,9 +23,9 @@ export function InvoiceConverter() {
   // State
   const [file, setFile] = useState<File | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
-  const [selectedCountry, setSelectedCountry] = useState<string>('JP');
-  const [selectedPort, setSelectedPort] = useState<string>('port_klang');
-  const [importDate, setImportDate] = useState<string>(getTodayISO());
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [selectedPort, setSelectedPort] = useState<string>('');
+  const [importDate, setImportDate] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [classificationResult, setClassificationResult] = useState<ClassificationResponse | null>(null);
   const [originalResult, setOriginalResult] = useState<ClassificationResponse | null>(null);
@@ -43,6 +43,7 @@ export function InvoiceConverter() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewData, setPreviewData] = useState<ImportPreviewResponse | null>(null);
   const [isUpdatingBalance, setIsUpdatingBalance] = useState(false);
+  const [updatedItemIds, setUpdatedItemIds] = useState<Set<string>>(new Set()); // Track items with balance already updated
 
   // Fetch companies
   const { data: companies = [] } = useQuery<Company[]>({
@@ -116,6 +117,14 @@ export function InvoiceConverter() {
       toast.error('Please select an import date');
       return;
     }
+    if (!selectedCountry) {
+      toast.error('Please select a country');
+      return;
+    }
+    if (!selectedPort) {
+      toast.error('Please select a port');
+      return;
+    }
 
     setIsProcessing(true);
     try {
@@ -144,12 +153,13 @@ export function InvoiceConverter() {
       setOriginalResult(JSON.parse(JSON.stringify(result)));
       toast.success('Invoice classified successfully!');
       
-      // Reset selections
+      // Reset selections and tracking
       setSelectedItems({
         formd: new Set(),
         mida: new Set(),
         duties: new Set(),
       });
+      setUpdatedItemIds(new Set()); // Reset tracking for new classification
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to classify invoice';
       toast.error(message);
@@ -302,6 +312,17 @@ export function InvoiceConverter() {
       return;
     }
 
+    // Check if any selected items have already been updated
+    const alreadyUpdatedItems = midaItems.filter(
+      (item, index) => selectedMidaIndices.has(index) && item.id && updatedItemIds.has(item.id)
+    );
+    if (alreadyUpdatedItems.length > 0) {
+      toast.error(
+        `${alreadyUpdatedItems.length} selected item(s) have already been updated. Please deselect items with green checkmarks before updating balance.`
+      );
+      return;
+    }
+
     // Filter items that have a deduction quantity and certificate item ID AND are selected
     const validItems = midaItems.filter(
       (item, index) => 
@@ -374,8 +395,18 @@ export function InvoiceConverter() {
       setPreviewData(null);
       setDeclarationRefNo(''); // Clear input
       
-      // Ideally here we would refresh the certificate balances, 
-      // but that requires re-fetching or updating local state
+      // Mark items as updated to prevent duplicate balance updates
+      const newUpdatedIds = new Set(updatedItemIds);
+      validItems.forEach(item => {
+        if (item.id) newUpdatedIds.add(item.id);
+      });
+      setUpdatedItemIds(newUpdatedIds);
+      
+      // Clear selection for updated items
+      setSelectedItems(prev => ({
+        ...prev,
+        mida: new Set()
+      }));
       
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to update balances';
@@ -507,7 +538,12 @@ export function InvoiceConverter() {
                       {companyCertificates.map((cert) => (
                         <label
                           key={cert.id}
-                          className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded cursor-pointer transition-colors",
+                            selectedCertificateIds.includes(cert.id)
+                              ? "bg-purple-100 hover:bg-purple-200"
+                              : "hover:bg-gray-50"
+                          )}
                         >
                           <input
                             type="checkbox"
@@ -523,7 +559,7 @@ export function InvoiceConverter() {
                           />
                           <span className="text-sm font-medium text-purple-600">{cert.certificate_number}</span>
                           <span className="text-xs text-gray-500">
-                            ({cert.exemption_start_date} - {cert.exemption_end_date})
+                            {cert.model_number || 'N/A'} | {cert.item_count ?? cert.items?.length ?? 0} items | {cert.exemption_end_date}
                           </span>
                         </label>
                       ))}
@@ -563,13 +599,15 @@ export function InvoiceConverter() {
                 label="Country"
                 value={selectedCountry}
                 onChange={(e) => setSelectedCountry(e.target.value)}
-                options={countryOptions}
+                options={[{ value: '', label: 'Select Country...' }, ...countryOptions]}
+                required
               />
               <Select
                 label="Port"
                 value={selectedPort}
                 onChange={(e) => setSelectedPort(e.target.value)}
-                options={portOptions}
+                options={[{ value: '', label: 'Select Port...' }, ...portOptions]}
+                required
               />
             </div>
           </div>
@@ -578,7 +616,7 @@ export function InvoiceConverter() {
         <Button
           onClick={handleClassify}
           isLoading={isProcessing}
-          disabled={!file || !selectedCompanyId}
+          disabled={!file || !selectedCompanyId || !importDate || !selectedCountry || !selectedPort}
           size="lg"
           leftIcon={<Upload className="w-4 h-4" />}
         >
@@ -740,13 +778,16 @@ export function InvoiceConverter() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {currentItems.map((item, index) => (
+                    {currentItems.map((item, index) => {
+                      const isItemUpdated = item.id && updatedItemIds.has(item.id);
+                      return (
                       <tr
                         key={item.id || index}
                         className={cn(
                           'hover:bg-gray-50 transition-colors',
                           item.manually_moved ? 'bg-orange-50/50' : '',
-                          currentSelection.has(index) && 'bg-blue-50'
+                          currentSelection.has(index) && 'bg-blue-50',
+                          isItemUpdated && 'bg-green-50/50'
                         )}
                       >
                         <td className={cn("text-center", activeTab === 'mida' ? "px-2 py-2" : "px-4 py-3")}>
@@ -762,6 +803,12 @@ export function InvoiceConverter() {
                             {item.line_no}
                             {item.manually_moved && (
                               <ArrowRightLeft className="w-3 h-3 text-orange-500" title="Manually moved to this table" />
+                            )}
+                            {item.sst_manually_changed && (
+                              <ArrowRightLeft className="w-3 h-3 text-blue-500" title="SST status manually changed" />
+                            )}
+                            {isItemUpdated && (
+                              <CheckCircle className="w-3 h-3 text-green-500" title="Balance already updated - can still be exported but cannot update balance again" />
                             )}
                           </div>
                         </td>
@@ -850,7 +897,7 @@ export function InvoiceConverter() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>

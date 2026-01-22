@@ -26,6 +26,7 @@ import {
   Alert,
   Input,
   Badge,
+  Select,
 } from '@/components/ui';
 import { certificateService } from '@/services';
 import { ParsedCertificate, ParsedCertificateItem, SaveCertificateRequest } from '@/types';
@@ -47,7 +48,7 @@ export function CertificateParser() {
   const [editedData, setEditedData] = useState<ParsedCertificate | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
 
   // Validation logic
   const validationWarnings = useMemo((): ValidationWarning[] => {
@@ -70,7 +71,7 @@ export function CertificateParser() {
       warnings.push({ type: 'error', field: 'company_name', message: 'Company Name is required' });
     }
     if (!editedData.model_number || editedData.model_number.trim() === '') {
-      warnings.push({ type: 'warning', field: 'model_number', message: 'Model Number is missing (usually required)' });
+      warnings.push({ type: 'error', field: 'model_number', message: 'Model Number is required' });
     }
     if (!editedData.exemption_start) {
       warnings.push({ type: 'warning', field: 'exemption_start', message: 'Exemption Start Date is missing' });
@@ -154,6 +155,38 @@ export function CertificateParser() {
     return validationWarnings.some(
       (w) => w.type === 'error' && w.field === field && w.itemIndex === itemIndex
     );
+  };
+
+  // Check if a specific field has a warning
+  const getFieldWarning = (field: string, itemIndex?: number): boolean => {
+    return validationWarnings.some(
+      (w) => w.type === 'warning' && w.field === field && w.itemIndex === itemIndex
+    );
+  };
+
+  // Check if an item has any error (for row highlighting)
+  const getItemHasError = (itemIndex: number): boolean => {
+    return validationWarnings.some(
+      (w) => w.type === 'error' && w.itemIndex === itemIndex
+    );
+  };
+
+  // Check if an item has any warning (for row highlighting)
+  const getItemHasWarning = (itemIndex: number): boolean => {
+    return validationWarnings.some(
+      (w) => w.type === 'warning' && w.itemIndex === itemIndex
+    );
+  };
+
+  // Get cell class based on validation state
+  const getCellClass = (field: string, itemIndex: number): string => {
+    if (getFieldError(field, itemIndex)) {
+      return 'border-red-500 bg-red-50';
+    }
+    if (getFieldWarning(field, itemIndex)) {
+      return 'border-yellow-500 bg-yellow-50';
+    }
+    return 'border-gray-300';
   };
 
   // Handle file parse
@@ -257,6 +290,14 @@ export function CertificateParser() {
 
     setIsSaving(true);
     try {
+      // Check if MIDA number already exists
+      const existsCheck = await certificateService.checkExists(editedData.mida_no);
+      if (existsCheck.exists) {
+        toast.error(`Certificate number "${editedData.mida_no}" already exists in the database. Duplicate certificates are not allowed.`);
+        setIsSaving(false);
+        return;
+      }
+
       const request: SaveCertificateRequest = {
         header: {
           certificate_number: editedData.mida_no,
@@ -387,19 +428,25 @@ export function CertificateParser() {
               error={getFieldError('mida_no') ? 'Required' : undefined}
               className={getFieldError('mida_no') ? 'border-red-500' : ''}
             />
-            <Input
+            <Select
               label="Company Name"
               value={editedData.company_name}
               onChange={(e) => handleFieldChange('company_name', e.target.value)}
               required
               error={getFieldError('company_name') ? 'Required' : undefined}
               className={getFieldError('company_name') ? 'border-red-500' : ''}
+              options={[
+                { value: 'HONG LEONG YAMAHA MOTOR SDN BHD', label: 'HONG LEONG YAMAHA MOTOR SDN BHD' },
+                { value: 'HICOM YAMAHA MOTOR SDN BHD', label: 'HICOM YAMAHA MOTOR SDN BHD' },
+              ]}
             />
             <Input
               label="Model Number"
               value={editedData.model_number || ''}
               onChange={(e) => handleFieldChange('model_number', e.target.value)}
-              className={validationWarnings.some(w => w.field === 'model_number') ? 'border-yellow-500' : ''}
+              required
+              error={getFieldError('model_number') ? 'Required' : undefined}
+              className={getFieldError('model_number') ? 'border-red-500' : ''}
             />
           </div>
 
@@ -500,93 +547,115 @@ export function CertificateParser() {
                     <TableIcon className="w-4 h-4" />
                   </button>
                 </div>
-                <Button variant="secondary" onClick={handleAddItem} leftIcon={<Plus className="w-4 h-4" />}>
-                  Add Item
-                </Button>
               </div>
             </div>
 
             {/* Card View */}
             {viewMode === 'cards' && (
               <div className="space-y-4">
-                {editedData.items.map((item, index) => (
-                  <div
-                    key={index}
-                    className="bg-gray-50 rounded-lg p-4 border border-gray-200"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded font-semibold text-sm">
-                        Item #{item.line_no}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveItem(index)}
-                        className="text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+                {editedData.items.map((item, index) => {
+                  const hasError = getItemHasError(index);
+                  const hasWarning = getItemHasWarning(index);
+                  const cardClass = hasError ? 'bg-red-50 border-red-200' : hasWarning ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50 border-gray-200';
+                  
+                  return (
+                    <div
+                      key={index}
+                      className={`rounded-lg p-4 border ${cardClass}`}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded font-semibold text-sm">
+                          Item #{item.line_no}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(index)}
+                          className="text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
 
-                    <div className="grid md:grid-cols-4 gap-4 mb-4">
-                      <Input
-                        label="HS Code"
-                        value={item.hs_code}
-                        onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
-                        required
-                      />
-                      <Input
-                        label="Item Name"
-                        value={item.item_name}
-                        onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
-                        required
-                      />
-                      <Input
-                        label="Approved Quantity"
-                        type="number"
-                        value={item.approved_quantity}
-                        onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
-                        required
-                      />
-                      <Input
-                        label="UOM"
-                        value={item.uom}
-                        onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                        required
-                      />
-                    </div>
-                    {/* Port Allocation */}
-                    <div className="bg-white rounded border border-gray-200 p-3">
-                      <p className="text-xs font-semibold text-gray-600 mb-2">Port Allocation</p>
-                      <div className="grid md:grid-cols-3 gap-4">
+                      <div className="grid md:grid-cols-4 gap-4 mb-4">
                         <Input
-                          label="Port Klang"
-                          type="number"
-                          value={item.station_split?.PORT_KLANG || 0}
-                          onChange={(e) => handleStationSplitChange(index, 'PORT_KLANG', parseFloat(e.target.value) || 0)}
+                          label="HS Code"
+                          value={item.hs_code}
+                          onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
+                          required
+                          error={getFieldError('hs_code', index) ? 'Required' : undefined}
+                          className={getCellClass('hs_code', index)}
                         />
                         <Input
-                          label="KLIA"
-                          type="number"
-                          value={item.station_split?.KLIA || 0}
-                          onChange={(e) => handleStationSplitChange(index, 'KLIA', parseFloat(e.target.value) || 0)}
+                          label="Item Name"
+                          value={item.item_name}
+                          onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
+                          required
+                          error={getFieldError('item_name', index) ? 'Required' : undefined}
+                          className={getCellClass('item_name', index)}
                         />
                         <Input
-                          label="Bukit Kayu Hitam"
+                          label="Approved Quantity"
                           type="number"
-                          value={item.station_split?.BUKIT_KAYU_HITAM || 0}
-                          onChange={(e) => handleStationSplitChange(index, 'BUKIT_KAYU_HITAM', parseFloat(e.target.value) || 0)}
+                          value={item.approved_quantity}
+                          onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
+                          required
+                          error={getFieldError('approved_quantity', index) ? 'Must be > 0' : undefined}
+                          className={getCellClass('approved_quantity', index)}
                         />
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">UOM</label>
+                          <select
+                            value={item.uom}
+                            onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${getCellClass('uom', index)}`}
+                          >
+                            <option value="">Select...</option>
+                            <option value="KGM">KGM</option>
+                            <option value="UNT">UNT</option>
+                          </select>
+                        </div>
+                      </div>
+                      {/* Port Allocation */}
+                      <div className="bg-white rounded border border-gray-200 p-3">
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Port Allocation</p>
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <Input
+                            label="Port Klang"
+                            type="number"
+                            value={item.station_split?.PORT_KLANG || 0}
+                            onChange={(e) => handleStationSplitChange(index, 'PORT_KLANG', parseFloat(e.target.value) || 0)}
+                          />
+                          <Input
+                            label="KLIA"
+                            type="number"
+                            value={item.station_split?.KLIA || 0}
+                            onChange={(e) => handleStationSplitChange(index, 'KLIA', parseFloat(e.target.value) || 0)}
+                          />
+                          <Input
+                            label="Bukit Kayu Hitam"
+                            type="number"
+                            value={item.station_split?.BUKIT_KAYU_HITAM || 0}
+                            onChange={(e) => handleStationSplitChange(index, 'BUKIT_KAYU_HITAM', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {editedData.items.length === 0 && (
                   <Alert variant="warning">
                     <p>No items added yet. Click "Add Item" to add certificate items.</p>
                   </Alert>
                 )}
+                
+                {/* Add Item button at bottom */}
+                <div className="mt-4">
+                  <Button variant="secondary" onClick={handleAddItem} leftIcon={<Plus className="w-4 h-4" />}>
+                    Add Item
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -599,93 +668,102 @@ export function CertificateParser() {
                       <th className="px-3 py-3 text-left font-semibold w-16">#</th>
                       <th className="px-3 py-3 text-left font-semibold">HS Code</th>
                       <th className="px-3 py-3 text-left font-semibold">Item Name</th>
-                      <th className="px-3 py-3 text-right font-semibold w-28">Quantity</th>
-                      <th className="px-3 py-3 text-left font-semibold w-20">UOM</th>
-                      <th className="px-3 py-3 text-right font-semibold w-24">Port Klang</th>
+                      <th className="px-3 py-3 text-right font-semibold" style={{ minWidth: '120px' }}>Quantity</th>
+                      <th className="px-3 py-3 text-left font-semibold w-28">UOM</th>
+                      <th className="px-3 py-3 text-right font-semibold" style={{ minWidth: '120px' }}>Port Klang</th>
                       <th className="px-3 py-3 text-right font-semibold w-24">KLIA</th>
-                      <th className="px-3 py-3 text-right font-semibold w-24">BKH</th>
+                      <th className="px-3 py-3 text-right font-semibold" style={{ minWidth: '120px' }}>BKH</th>
                       <th className="px-3 py-3 text-center font-semibold w-16">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {editedData.items.map((item, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-3 py-2">
-                          <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-semibold">
-                            {item.line_no}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={item.hs_code}
-                            onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={item.item_name}
-                            onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            value={item.approved_quantity}
-                            onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={item.uom}
-                            onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            value={item.station_split?.PORT_KLANG || 0}
-                            onChange={(e) => handleStationSplitChange(index, 'PORT_KLANG', parseFloat(e.target.value) || 0)}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
-                            title="Port Klang Quantity"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            value={item.station_split?.KLIA || 0}
-                            onChange={(e) => handleStationSplitChange(index, 'KLIA', parseFloat(e.target.value) || 0)}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
-                            title="KLIA Quantity"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            value={item.station_split?.BUKIT_KAYU_HITAM || 0}
-                            onChange={(e) => handleStationSplitChange(index, 'BUKIT_KAYU_HITAM', parseFloat(e.target.value) || 0)}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
-                            title="Bukit Kayu Hitam Quantity"
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveItem(index)}
-                            className="text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {editedData.items.map((item, index) => {
+                      const hasError = getItemHasError(index);
+                      const hasWarning = getItemHasWarning(index);
+                      const rowClass = hasError ? 'bg-red-50' : hasWarning ? 'bg-yellow-50' : 'hover:bg-gray-50';
+                      
+                      return (
+                        <tr key={index} className={rowClass}>
+                          <td className="px-3 py-2">
+                            <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-semibold">
+                              {item.line_no}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={item.hs_code}
+                              onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm ${getCellClass('hs_code', index)}`}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={item.item_name}
+                              onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('item_name', index)}`}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              value={item.approved_quantity}
+                              onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('approved_quantity', index)}`}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={item.uom}
+                              onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('uom', index)}`}
+                            >
+                              <option value="">Select...</option>
+                              <option value="KGM">KGM</option>
+                              <option value="UNT">UNT</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              value={item.station_split?.PORT_KLANG || 0}
+                              onChange={(e) => handleStationSplitChange(index, 'PORT_KLANG', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                              title="Port Klang Quantity"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              value={item.station_split?.KLIA || 0}
+                              onChange={(e) => handleStationSplitChange(index, 'KLIA', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                              title="KLIA Quantity"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              value={item.station_split?.BUKIT_KAYU_HITAM || 0}
+                              onChange={(e) => handleStationSplitChange(index, 'BUKIT_KAYU_HITAM', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                              title="Bukit Kayu Hitam Quantity"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveItem(index)}
+                              className="text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {editedData.items.length === 0 && (
                       <tr>
                         <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
@@ -695,6 +773,12 @@ export function CertificateParser() {
                     )}
                   </tbody>
                 </table>
+                {/* Add Item button at bottom of table */}
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+                  <Button variant="secondary" onClick={handleAddItem} leftIcon={<Plus className="w-4 h-4" />}>
+                    Add Item
+                  </Button>
+                </div>
               </div>
             )}
           </div>

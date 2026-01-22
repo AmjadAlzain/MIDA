@@ -21,6 +21,7 @@ export interface Certificate {
   status: 'active' | 'expired' | 'deleted';
   source_filename?: string;
   items?: CertificateItem[];
+  item_count?: number;  // Used in list views where items aren't fully loaded
   created_at?: string;
   updated_at?: string;
   deleted_at?: string;

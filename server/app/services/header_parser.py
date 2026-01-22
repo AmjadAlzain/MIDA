@@ -5,11 +5,78 @@ from typing import Dict, Any, Optional
 MIDA_RE = re.compile(r"\bCDE\d?/\d{4}/\d+\b", re.IGNORECASE)
 PERIOD_RE = re.compile(r"(\d{2}/\d{2}/\d{4})\s*(?:hingga|to)\s*(\d{2}/\d{2}/\d{4})", re.IGNORECASE)
 
+# The two valid company names for MIDA certificates
+VALID_COMPANY_NAMES = [
+    "HONG LEONG YAMAHA MOTOR SDN BHD",
+    "HICOM YAMAHA MOTOR SDN BHD",
+]
+
 def _to_iso(ddmmyyyy: str) -> str:
     try:
         return datetime.strptime(ddmmyyyy, "%d/%m/%Y").date().isoformat()
     except ValueError:
         return ddmmyyyy
+
+
+def _levenshtein_distance(s1: str, s2: str) -> int:
+    """Calculate the Levenshtein distance between two strings."""
+    if len(s1) < len(s2):
+        return _levenshtein_distance(s2, s1)
+    
+    if len(s2) == 0:
+        return len(s1)
+    
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    
+    return previous_row[-1]
+
+
+def _fuzzy_match_company_name(ocr_name: Optional[str]) -> str:
+    """
+    Match OCR-extracted company name to one of the valid company names using fuzzy matching.
+    Returns the closest matching valid company name.
+    """
+    if not ocr_name:
+        # Default to Hong Leong if no name extracted
+        return VALID_COMPANY_NAMES[0]
+    
+    ocr_upper = ocr_name.upper().strip()
+    
+    # Quick exact match check
+    for valid_name in VALID_COMPANY_NAMES:
+        if valid_name == ocr_upper:
+            return valid_name
+    
+    # Check for substring match (company name might be part of a longer string)
+    for valid_name in VALID_COMPANY_NAMES:
+        if valid_name in ocr_upper or ocr_upper in valid_name:
+            return valid_name
+    
+    # Check for key distinguishing words
+    if "HONG LEONG" in ocr_upper or "HONGLEONG" in ocr_upper:
+        return "HONG LEONG YAMAHA MOTOR SDN BHD"
+    if "HICOM" in ocr_upper:
+        return "HICOM YAMAHA MOTOR SDN BHD"
+    
+    # Fall back to Levenshtein distance
+    min_distance = float('inf')
+    best_match = VALID_COMPANY_NAMES[0]
+    
+    for valid_name in VALID_COMPANY_NAMES:
+        distance = _levenshtein_distance(ocr_upper, valid_name)
+        if distance < min_distance:
+            min_distance = distance
+            best_match = valid_name
+    
+    return best_match
 
 def parse_header_fields(full_text: str) -> Dict[str, Optional[str]]:
     text = full_text or ""
@@ -100,9 +167,12 @@ def parse_header_fields(full_text: str) -> Dict[str, Optional[str]]:
                 company_name = line.strip()
                 break
 
+    # Apply fuzzy matching to normalize company name to one of the two valid options
+    matched_company_name = _fuzzy_match_company_name(company_name)
+
     return {
         "mida_no": mida_no,
-        "company_name": company_name,
+        "company_name": matched_company_name,
         "exemption_start": exemption_start,
         "exemption_end": exemption_end,
     }

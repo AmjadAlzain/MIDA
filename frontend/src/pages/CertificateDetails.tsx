@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -15,6 +15,10 @@ import {
   Trash2,
   Download,
   ChevronDown,
+  TableIcon,
+  LayoutList,
+  AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Button,
@@ -50,6 +54,7 @@ export function CertificateDetails() {
   const [deleteItemIndex, setDeleteItemIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const exportDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -101,6 +106,138 @@ export function CertificateDetails() {
     },
   });
 
+  // Validation types
+  interface ValidationWarning {
+    type: 'error' | 'warning' | 'info';
+    field?: string;
+    itemIndex?: number;
+    message: string;
+  }
+
+  // Validation logic
+  const validationWarnings = useMemo((): ValidationWarning[] => {
+    if (!isEditing || !editedCertificate) return [];
+    
+    const warnings: ValidationWarning[] = [];
+    
+    // Header field validation
+    if (!editedCertificate.certificate_number || editedCertificate.certificate_number.trim() === '') {
+      warnings.push({ type: 'error', field: 'certificate_number', message: 'Certificate Number is required' });
+    }
+    if (!editedCertificate.company_name || editedCertificate.company_name.trim() === '') {
+      warnings.push({ type: 'error', field: 'company_name', message: 'Company Name is required' });
+    }
+    if (!editedCertificate.model_number || editedCertificate.model_number.trim() === '') {
+      warnings.push({ type: 'error', field: 'model_number', message: 'Model Number is required' });
+    }
+    if (!editedCertificate.exemption_start_date) {
+      warnings.push({ type: 'warning', field: 'exemption_start_date', message: 'Exemption Start Date is missing' });
+    }
+    if (!editedCertificate.exemption_end_date) {
+      warnings.push({ type: 'warning', field: 'exemption_end_date', message: 'Exemption End Date is missing' });
+    }
+    
+    // Item validation
+    const items = editedCertificate.items || [];
+    if (items.length === 0) {
+      warnings.push({ type: 'error', message: 'At least one item is required' });
+    }
+    
+    items.forEach((item, index) => {
+      const lineLabel = `Item #${item.line_no || index + 1}`;
+      const isNewItem = item.id?.startsWith('temp-');
+      
+      if (!item.hs_code || item.hs_code.trim() === '') {
+        warnings.push({ type: 'error', itemIndex: index, field: 'hs_code', message: `${lineLabel}: HS Code is required` });
+      }
+      if (!item.item_name || item.item_name.trim() === '') {
+        warnings.push({ type: 'error', itemIndex: index, field: 'item_name', message: `${lineLabel}: Item Name is required` });
+      }
+      if (!item.uom || item.uom.trim() === '') {
+        warnings.push({ type: 'error', itemIndex: index, field: 'uom', message: `${lineLabel}: UOM is required` });
+      }
+      
+      // Only validate quantities for new items (existing items have read-only quantities)
+      if (isNewItem) {
+        if (!item.approved_quantity || item.approved_quantity <= 0) {
+          warnings.push({ type: 'error', itemIndex: index, field: 'approved_quantity', message: `${lineLabel}: Approved Quantity must be greater than 0` });
+        }
+        
+        // Quantity discrepancy check - always compare approved qty with station sum
+        const portKlang = item.port_klang_qty || 0;
+        const klia = item.klia_qty || 0;
+        const bukitKayuHitam = item.bukit_kayu_hitam_qty || 0;
+        const stationSum = portKlang + klia + bukitKayuHitam;
+        const approvedQty = item.approved_quantity || 0;
+        
+        // Show warning if approved qty doesn't match station sum
+        const difference = Math.abs(approvedQty - stationSum);
+        if (difference > 0.01) {
+          warnings.push({
+            type: 'warning',
+            itemIndex: index,
+            message: `${lineLabel}: Quantity mismatch - Approved (${formatNumber(approvedQty)}) ≠ Station Sum (${formatNumber(stationSum)})`,
+          });
+        }
+      }
+    });
+    
+    // Check for duplicate line numbers
+    const lineNumbers = items.map((i) => i.line_no);
+    const duplicates = lineNumbers.filter((v, i, a) => a.indexOf(v) !== i);
+    if (duplicates.length > 0) {
+      warnings.push({
+        type: 'error',
+        message: `Duplicate line numbers found: ${[...new Set(duplicates)].join(', ')}`,
+      });
+    }
+    
+    return warnings;
+  }, [isEditing, editedCertificate]);
+
+  const errorCount = validationWarnings.filter((w) => w.type === 'error').length;
+  const warningCount = validationWarnings.filter((w) => w.type === 'warning').length;
+  const hasBlockingErrors = errorCount > 0;
+
+  // Check if a specific field has an error
+  const getFieldError = (field: string, itemIndex?: number): boolean => {
+    return validationWarnings.some(
+      (w) => w.type === 'error' && w.field === field && w.itemIndex === itemIndex
+    );
+  };
+
+  // Check if a specific field has a warning
+  const getFieldWarning = (field: string, itemIndex?: number): boolean => {
+    return validationWarnings.some(
+      (w) => w.type === 'warning' && w.field === field && w.itemIndex === itemIndex
+    );
+  };
+
+  // Check if an item has any error
+  const getItemHasError = (itemIndex: number): boolean => {
+    return validationWarnings.some(
+      (w) => w.type === 'error' && w.itemIndex === itemIndex
+    );
+  };
+
+  // Check if an item has any warning
+  const getItemHasWarning = (itemIndex: number): boolean => {
+    return validationWarnings.some(
+      (w) => w.type === 'warning' && w.itemIndex === itemIndex
+    );
+  };
+
+  // Get cell class based on validation state
+  const getCellClass = (field: string, itemIndex: number): string => {
+    if (getFieldError(field, itemIndex)) {
+      return 'border-red-500 bg-red-50';
+    }
+    if (getFieldWarning(field, itemIndex)) {
+      return 'border-yellow-500 bg-yellow-50';
+    }
+    return 'border-gray-300';
+  };
+
   // Start editing
   const handleStartEdit = () => {
     setEditedCertificate(certificate ? { ...certificate, items: [...(certificate.items || [])] } : null);
@@ -116,6 +253,20 @@ export function CertificateDetails() {
   // Save changes
   const handleSave = () => {
     if (!editedCertificate) return;
+
+    // Block save if there are validation errors
+    if (hasBlockingErrors) {
+      toast.error(`Cannot save: ${errorCount} error(s) must be fixed first`);
+      return;
+    }
+
+    // Show warning about non-blocking issues
+    if (warningCount > 0) {
+      const proceed = window.confirm(
+        `There are ${warningCount} warning(s). Do you want to proceed anyway?`
+      );
+      if (!proceed) return;
+    }
 
     // Build the request matching SaveCertificateRequest
     const updateData: SaveCertificateRequest = {
@@ -162,9 +313,11 @@ export function CertificateDetails() {
     setEditedCertificate((prev) => {
       if (!prev) return prev;
       const items = prev.items || [];
+      // Use max line_no + 1 to ensure unique line number
+      const maxLineNo = items.length > 0 ? Math.max(...items.map(i => i.line_no)) : 0;
       const newItem: CertificateItem = {
         id: `temp-${Date.now()}`,
-        line_no: items.length + 1,
+        line_no: maxLineNo + 1,
         hs_code: '',
         item_name: '',
         uom: '',
@@ -181,12 +334,9 @@ export function CertificateDetails() {
   const handleRemoveItem = (index: number) => {
     setEditedCertificate((prev) => {
       if (!prev || !prev.items) return prev;
+      // Remove the item but DO NOT renumber - preserve line_no for backend matching
       const items = prev.items.filter((_, i) => i !== index);
-      // Re-number items
-      return {
-        ...prev,
-        items: items.map((item, i) => ({ ...item, line_no: i + 1 })),
-      };
+      return { ...prev, items };
     });
     setDeleteItemIndex(null);
   };
@@ -275,14 +425,27 @@ export function CertificateDetails() {
           <div className="flex items-center gap-2">
             {isEditing ? (
               <>
+                {hasBlockingErrors && (
+                  <span className="text-red-600 text-sm flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    Fix errors to save
+                  </span>
+                )}
+                {!hasBlockingErrors && warningCount > 0 && (
+                  <span className="text-yellow-600 text-sm flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4" />
+                    {warningCount} warning(s)
+                  </span>
+                )}
                 <Button variant="secondary" onClick={handleCancelEdit}>
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </Button>
                 <Button
-                  variant="success"
+                  variant={hasBlockingErrors ? 'secondary' : 'success'}
                   onClick={handleSave}
                   isLoading={updateMutation.isPending}
+                  disabled={hasBlockingErrors}
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Save
@@ -355,28 +518,45 @@ export function CertificateDetails() {
               label="Certificate Number"
               value={currentData.certificate_number}
               onChange={(e) => handleFieldChange('certificate_number', e.target.value)}
+              required
+              error={getFieldError('certificate_number') ? 'Required' : undefined}
+              className={getFieldError('certificate_number') ? 'border-red-500' : ''}
             />
-            <Input
-              label="Company Name"
-              value={currentData.company_name}
-              onChange={(e) => handleFieldChange('company_name', e.target.value)}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+              <select
+                value={currentData.company_name}
+                onChange={(e) => handleFieldChange('company_name', e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  getFieldError('company_name') ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                }`}
+              >
+                <option value="">Select Company...</option>
+                <option value="HONG LEONG YAMAHA MOTOR SDN BHD">HONG LEONG YAMAHA MOTOR SDN BHD</option>
+                <option value="HICOM YAMAHA MOTOR SDN BHD">HICOM YAMAHA MOTOR SDN BHD</option>
+              </select>
+            </div>
             <Input
               label="Model Number"
               value={currentData.model_number || ''}
               onChange={(e) => handleFieldChange('model_number', e.target.value)}
+              required
+              error={getFieldError('model_number') ? 'Required' : undefined}
+              className={getFieldError('model_number') ? 'border-red-500' : ''}
             />
             <Input
               label="Exemption Start"
               type="date"
               value={currentData.exemption_start_date?.split('T')[0] || ''}
               onChange={(e) => handleFieldChange('exemption_start_date', e.target.value)}
+              className={getFieldWarning('exemption_start_date') ? 'border-yellow-500' : ''}
             />
             <Input
               label="Exemption End"
               type="date"
               value={currentData.exemption_end_date?.split('T')[0] || ''}
               onChange={(e) => handleFieldChange('exemption_end_date', e.target.value)}
+              className={getFieldWarning('exemption_end_date') ? 'border-yellow-500' : ''}
             />
           </div>
         ) : (
@@ -417,16 +597,25 @@ export function CertificateDetails() {
       <Card>
         <CardHeader
           action={
-            isEditing && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleAddItem}
-                leftIcon={<Plus className="w-4 h-4" />}
-              >
-                Add Item
-              </Button>
-            )
+            <div className="flex items-center gap-2">
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="Table View"
+                >
+                  <TableIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`p-1.5 rounded ${viewMode === 'cards' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="Card View"
+                >
+                  <LayoutList className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           }
         >
           <CardTitle icon={<Package className="w-5 h-5 text-purple-600" />}>
@@ -444,82 +633,109 @@ export function CertificateDetails() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-3 py-3 text-left font-semibold w-16">Line #</th>
-                  <th className="px-3 py-3 text-left font-semibold">HS Code</th>
-                  <th className="px-3 py-3 text-left font-semibold">Item Name</th>
-                  <th className="px-3 py-3 text-right font-semibold w-28">Approved Qty</th>
-                  <th className="px-3 py-3 text-left font-semibold w-20">UOM</th>
-                  <th className="px-3 py-3 text-right font-semibold w-24">Port Klang</th>
-                  <th className="px-3 py-3 text-right font-semibold w-24">KLIA</th>
-                  <th className="px-3 py-3 text-right font-semibold w-24">BKH</th>
+                  <th className="px-3 py-3 text-left font-semibold" style={{ minWidth: '120px' }}>HS Code</th>
+                  <th className="px-3 py-3 text-left font-semibold" style={{ minWidth: '200px' }}>Item Name</th>
+                  <th className="px-3 py-3 text-right font-semibold" style={{ minWidth: '120px' }}>Approved Qty</th>
+                  <th className="px-3 py-3 text-left font-semibold w-24">UOM</th>
+                  <th className="px-3 py-3 text-right font-semibold" style={{ minWidth: '120px' }}>Port Klang</th>
+                  <th className="px-3 py-3 text-right font-semibold" style={{ minWidth: '120px' }}>KLIA</th>
+                  <th className="px-3 py-3 text-right font-semibold" style={{ minWidth: '120px' }}>BKH</th>
                   <th className="px-3 py-3 text-center font-semibold w-16">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {editedCertificate.items.map((item, index) => (
-                  <tr key={item.id || index} className="hover:bg-gray-50">
+                  <tr key={item.id || index} className={`hover:bg-gray-50 ${getItemHasError(index) ? 'bg-red-50' : getItemHasWarning(index) ? 'bg-yellow-50' : ''}`}>
                     <td className="px-3 py-2">
                       <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-semibold">
                         {item.line_no}
                       </span>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
                       <input
                         type="text"
                         value={item.hs_code}
                         onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                        className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm ${getCellClass('hs_code', index)}`}
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2" style={{ minWidth: '200px' }}>
                       <input
                         type="text"
                         value={item.item_name}
                         onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('item_name', index)}`}
                       />
                     </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={item.approved_quantity}
-                        onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
-                      />
+                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                      {item.id?.startsWith('temp-') ? (
+                        <input
+                          type="number"
+                          value={item.approved_quantity}
+                          onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
+                          className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('approved_quantity', index)}`}
+                        />
+                      ) : (
+                        <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
+                          {formatNumber(item.approved_quantity)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2">
-                      <input
-                        type="text"
+                      <select
                         value={item.uom}
                         onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      />
+                        className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('uom', index)}`}
+                      >
+                        <option value="">Select...</option>
+                        <option value="KGM">KGM</option>
+                        <option value="UNT">UNT</option>
+                      </select>
                     </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={item.port_klang_qty || 0}
-                        onChange={(e) => handleItemChange(index, 'port_klang_qty', parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
-                        title="Port Klang Quantity"
-                      />
+                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                      {item.id?.startsWith('temp-') ? (
+                        <input
+                          type="number"
+                          value={item.port_klang_qty || 0}
+                          onChange={(e) => handleItemChange(index, 'port_klang_qty', parseFloat(e.target.value) || 0)}
+                          className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('port_klang_qty', index)}`}
+                          title="Port Klang Quantity"
+                        />
+                      ) : (
+                        <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
+                          {formatNumber(item.port_klang_qty || 0)}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={item.klia_qty || 0}
-                        onChange={(e) => handleItemChange(index, 'klia_qty', parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
-                        title="KLIA Quantity"
-                      />
+                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                      {item.id?.startsWith('temp-') ? (
+                        <input
+                          type="number"
+                          value={item.klia_qty || 0}
+                          onChange={(e) => handleItemChange(index, 'klia_qty', parseFloat(e.target.value) || 0)}
+                          className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('klia_qty', index)}`}
+                          title="KLIA Quantity"
+                        />
+                      ) : (
+                        <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
+                          {formatNumber(item.klia_qty || 0)}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        value={item.bukit_kayu_hitam_qty || 0}
-                        onChange={(e) => handleItemChange(index, 'bukit_kayu_hitam_qty', parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
-                        title="Bukit Kayu Hitam Quantity"
-                      />
+                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                      {item.id?.startsWith('temp-') ? (
+                        <input
+                          type="number"
+                          value={item.bukit_kayu_hitam_qty || 0}
+                          onChange={(e) => handleItemChange(index, 'bukit_kayu_hitam_qty', parseFloat(e.target.value) || 0)}
+                          className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('bukit_kayu_hitam_qty', index)}`}
+                          title="Bukit Kayu Hitam Quantity"
+                        />
+                      ) : (
+                        <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
+                          {formatNumber(item.bukit_kayu_hitam_qty || 0)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <Button
@@ -535,6 +751,17 @@ export function CertificateDetails() {
                 ))}
               </tbody>
             </table>
+            {/* Add Item button at bottom */}
+            <div className="p-4 border-t border-gray-200">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleAddItem}
+                leftIcon={<Plus className="w-4 h-4" />}
+              >
+                Add Item
+              </Button>
+            </div>
           </div>
         )}
 

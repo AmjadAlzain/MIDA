@@ -135,6 +135,7 @@ def _write_item_header(
     certificate: MidaCertificate,
     start_row: int = 1,
     include_certificate: bool = True,
+    custom_title: str = None,
 ) -> int:
     """
     Write item information header with merged cells and styling.
@@ -144,7 +145,8 @@ def _write_item_header(
     
     # Title
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
-    title_cell = ws.cell(row=row, column=1, value=f"Balance Sheet - Item #{item.line_no}")
+    title_text = custom_title if custom_title else f"Balance Sheet - Item #{item.line_no}"
+    title_cell = ws.cell(row=row, column=1, value=title_text)
     title_cell.font = TITLE_FONT
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
     row += 2
@@ -158,6 +160,11 @@ def _write_item_header(
         
         row = _write_info_row(ws, row, "Certificate Number:", certificate.certificate_number)
         row = _write_info_row(ws, row, "Company Name:", certificate.company_name)
+        row = _write_info_row(ws, row, "Model Number:", certificate.model_number or "-")
+        row = _write_info_row(
+            ws, row, "Validity Period:",
+            f"{_format_date(certificate.exemption_start_date)} to {_format_date(certificate.exemption_end_date)}"
+        )
         row += 1
     
     # Item info
@@ -324,7 +331,7 @@ def generate_item_balance_sheet_xlsx(
         row += 1
         
         # Write import history title
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
         history_title = ws.cell(
             row=row, column=1,
             value=f"Import History - {sheet_name}"
@@ -335,7 +342,7 @@ def generate_item_balance_sheet_xlsx(
         # Write import table header
         headers = [
             "Date", "Invoice #", "Line", "Form Reg No",
-            "Quantity", "Balance Before", "Balance After", "Remarks"
+            "Quantity", "Balance Before", "Balance After"
         ]
         _write_header_row(ws, row, headers)
         row += 1
@@ -350,7 +357,6 @@ def generate_item_balance_sheet_xlsx(
                 ws.cell(row=row, column=5, value=float(record.quantity_imported)).border = THIN_BORDER
                 ws.cell(row=row, column=6, value=float(record.balance_before)).border = THIN_BORDER
                 ws.cell(row=row, column=7, value=float(record.balance_after)).border = THIN_BORDER
-                ws.cell(row=row, column=8, value=record.remarks or "-").border = THIN_BORDER
                 
                 # Number formatting
                 for col in [5, 6, 7]:
@@ -358,13 +364,13 @@ def generate_item_balance_sheet_xlsx(
                 
                 row += 1
         else:
-            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
             no_data_cell = ws.cell(row=row, column=1, value="No import records for this port")
             no_data_cell.font = Font(italic=True, color="999999")
             no_data_cell.alignment = Alignment(horizontal="center")
         
         # Set column widths
-        _set_column_widths(ws, [12, 18, 8, 18, 14, 14, 14, 30])
+        _set_column_widths(ws, [12, 18, 8, 18, 14, 14, 14])
     
     # Output
     output = BytesIO()
@@ -408,16 +414,28 @@ def generate_all_items_balance_sheets_xlsx(
         # Filter records for this port
         records = [r for r in item_records if r.port == port]
         
-        # Create sheet with safe name (max 31 chars for Excel)
-        sheet_name = f"Item {item.line_no} - {item.hs_code}"[:31]
+        # Create sheet with format "ItemName (line_no)" - truncate item name to fit Excel's 31 char limit
+        # Format: "ItemName (X)" where X is the MIDA line number
+        # Also sanitize for Excel: remove invalid characters /\*?:[]
+        line_suffix = f" ({item.line_no})"
+        max_name_length = 31 - len(line_suffix)
+        # Sanitize item name - remove characters not allowed in Excel sheet names
+        sanitized_name = item.item_name
+        for char in ['/', '\\', '*', '?', ':', '[', ']']:
+            sanitized_name = sanitized_name.replace(char, '-')
+        truncated_name = sanitized_name[:max_name_length] if len(sanitized_name) > max_name_length else sanitized_name
+        sheet_name = f"{truncated_name}{line_suffix}"
         ws = wb.create_sheet(title=sheet_name)
         
-        # Write item header
-        row = _write_item_header(ws, item, certificate, include_certificate=True)
+        # Create full title for the header (not truncated)
+        header_title = f"{item.item_name} ({item.line_no})"
+        
+        # Write item header with custom title
+        row = _write_item_header(ws, item, certificate, include_certificate=True, custom_title=header_title)
         row += 1
         
         # Write import history title
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
         history_title = ws.cell(
             row=row, column=1,
             value=f"Import History - {port_display}"
@@ -428,7 +446,7 @@ def generate_all_items_balance_sheets_xlsx(
         # Write import table header
         headers = [
             "Date", "Invoice #", "Line", "Form Reg No",
-            "Quantity", "Balance Before", "Balance After", "Remarks"
+            "Quantity", "Balance Before", "Balance After"
         ]
         _write_header_row(ws, row, headers)
         row += 1
@@ -443,7 +461,6 @@ def generate_all_items_balance_sheets_xlsx(
                 ws.cell(row=row, column=5, value=float(record.quantity_imported)).border = THIN_BORDER
                 ws.cell(row=row, column=6, value=float(record.balance_before)).border = THIN_BORDER
                 ws.cell(row=row, column=7, value=float(record.balance_after)).border = THIN_BORDER
-                ws.cell(row=row, column=8, value=record.remarks or "-").border = THIN_BORDER
                 
                 # Number formatting
                 for col in [5, 6, 7]:
@@ -451,13 +468,13 @@ def generate_all_items_balance_sheets_xlsx(
                 
                 row += 1
         else:
-            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
             no_data_cell = ws.cell(row=row, column=1, value="No import records for this port")
             no_data_cell.font = Font(italic=True, color="999999")
             no_data_cell.alignment = Alignment(horizontal="center")
         
         # Set column widths
-        _set_column_widths(ws, [12, 18, 8, 18, 14, 14, 14, 30])
+        _set_column_widths(ws, [12, 18, 8, 18, 14, 14, 14])
     
     # Output
     output = BytesIO()

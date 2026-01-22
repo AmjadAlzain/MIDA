@@ -183,6 +183,33 @@ export function ItemImports() {
       return;
     }
 
+    // Validate against remaining balance for the selected port
+    if (currentItem) {
+      let remainingForPort = 0;
+      let portLabel = '';
+      switch (newImport.port) {
+        case 'port_klang':
+          remainingForPort = currentItem.remaining_port_klang ?? 0;
+          portLabel = 'Port Klang';
+          break;
+        case 'klia':
+          remainingForPort = currentItem.remaining_klia ?? 0;
+          portLabel = 'KLIA';
+          break;
+        case 'bukit_kayu_hitam':
+          remainingForPort = currentItem.remaining_bukit_kayu_hitam ?? 0;
+          portLabel = 'Bukit Kayu Hitam';
+          break;
+      }
+
+      if (quantity > remainingForPort) {
+        toast.error(
+          `Cannot add import: quantity ${formatNumber(quantity)} exceeds remaining balance of ${formatNumber(remainingForPort)} for ${portLabel}`
+        );
+        return;
+      }
+    }
+
     addMutation.mutate(newImport);
   };
 
@@ -203,6 +230,50 @@ export function ItemImports() {
   // Handle save edit
   const handleSaveEdit = () => {
     if (!editingImport) return;
+
+    const newQuantity = parseFloat(editForm.quantity_imported);
+    const oldQuantity = editingImport.quantity_imported;
+    const quantityDiff = newQuantity - oldQuantity;
+    const newPort = editForm.port;
+    const oldPort = editingImport.port;
+
+    // Validate quantity changes against remaining balance
+    if (currentItem && (quantityDiff > 0 || newPort !== oldPort)) {
+      // Calculate effective change for the target port
+      let remainingForNewPort = 0;
+      let portLabel = '';
+      switch (newPort) {
+        case 'port_klang':
+          remainingForNewPort = currentItem.remaining_port_klang ?? 0;
+          portLabel = 'Port Klang';
+          break;
+        case 'klia':
+          remainingForNewPort = currentItem.remaining_klia ?? 0;
+          portLabel = 'KLIA';
+          break;
+        case 'bukit_kayu_hitam':
+          remainingForNewPort = currentItem.remaining_bukit_kayu_hitam ?? 0;
+          portLabel = 'Bukit Kayu Hitam';
+          break;
+      }
+
+      // If changing port, the new port needs to accommodate the full quantity
+      // If same port, it only needs to accommodate the increase
+      const requiredCapacity = newPort !== oldPort ? newQuantity : quantityDiff;
+      
+      if (requiredCapacity > remainingForNewPort) {
+        if (newPort !== oldPort) {
+          toast.error(
+            `Cannot change port: quantity ${formatNumber(newQuantity)} exceeds remaining balance of ${formatNumber(remainingForNewPort)} for ${portLabel}`
+          );
+        } else {
+          toast.error(
+            `Cannot increase quantity: increase of ${formatNumber(quantityDiff)} exceeds remaining balance of ${formatNumber(remainingForNewPort)} for ${portLabel}`
+          );
+        }
+        return;
+      }
+    }
 
     const data: UpdateImportRequest = {};
     

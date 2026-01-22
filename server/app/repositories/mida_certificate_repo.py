@@ -84,6 +84,9 @@ def replace_items(
 
     Deletes all existing items for the certificate, then inserts new items.
     Must be called within a transaction (caller handles commit/rollback).
+    
+    WARNING: This will cascade delete all import records! Use update_items_preserve_history
+    if you need to preserve import history.
 
     Args:
         db: Database session
@@ -102,6 +105,67 @@ def replace_items(
         item.certificate_id = certificate_id
         db.add(item)
 
+    db.flush()
+
+
+def update_items_preserve_history(
+    db: Session, 
+    certificate_id: UUID, 
+    new_items: list[MidaCertificateItem]
+) -> None:
+    """
+    Update items for a certificate while preserving import history.
+    
+    This function matches items by line_no and updates them in-place,
+    preserving their UUIDs and associated import records.
+    
+    Matching logic:
+    1. Items with the same line_no are updated in-place
+    2. Items that exist in DB but not in new_items are deleted
+    3. Items in new_items that don't match existing items are inserted
+    
+    Args:
+        db: Database session
+        certificate_id: UUID of the certificate
+        new_items: List of new items to insert/update
+    """
+    # Get existing items
+    stmt = select(MidaCertificateItem).where(
+        MidaCertificateItem.certificate_id == certificate_id
+    )
+    existing_items = list(db.execute(stmt).scalars().all())
+    
+    # Create lookup by line_no for existing items
+    existing_by_line = {item.line_no: item for item in existing_items}
+    
+    # Track which existing items were matched
+    matched_line_nos = set()
+    
+    for new_item in new_items:
+        line_no = new_item.line_no
+        
+        if line_no in existing_by_line:
+            # Update existing item in-place (preserves UUID and import records)
+            existing_item = existing_by_line[line_no]
+            existing_item.hs_code = new_item.hs_code
+            existing_item.item_name = new_item.item_name
+            existing_item.approved_quantity = new_item.approved_quantity
+            existing_item.uom = new_item.uom
+            existing_item.port_klang_qty = new_item.port_klang_qty
+            existing_item.klia_qty = new_item.klia_qty
+            existing_item.bukit_kayu_hitam_qty = new_item.bukit_kayu_hitam_qty
+            matched_line_nos.add(line_no)
+        else:
+            # Insert new item
+            new_item.certificate_id = certificate_id
+            db.add(new_item)
+    
+    # Delete items that are no longer present
+    for line_no, existing_item in existing_by_line.items():
+        if line_no not in matched_line_nos:
+            # This will cascade delete import records for removed items only
+            db.delete(existing_item)
+    
     db.flush()
 
 

@@ -226,7 +226,7 @@ export function DatabaseView() {
             </p>
           </div>
         </div>
-        <Link to="/certificate-parser">
+        <Link to="/parser">
           <Button>Upload New Certificate</Button>
         </Link>
       </div>

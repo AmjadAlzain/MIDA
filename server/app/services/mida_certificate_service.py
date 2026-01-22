@@ -140,7 +140,7 @@ def update_draft_by_id(
     Update an existing certificate by ID.
 
     Only active certificates can be updated. Expired certificates are read-only.
-    All items are replaced (delete existing, insert new) atomically.
+    Items are updated in-place to preserve import history when possible.
 
     Args:
         db: Database session
@@ -173,9 +173,10 @@ def update_draft_by_id(
     certificate.source_filename = payload.header.source_filename
     certificate.updated_at = datetime.now(timezone.utc)
 
-    # Replace items atomically
+    # Update items while preserving import history
+    # Items with matching line_no are updated in-place (keeps their UUID and import records)
     new_items = [_build_item_model(item, certificate.id) for item in payload.items]
-    repo.replace_items(db, certificate.id, new_items)
+    repo.update_items_preserve_history(db, certificate.id, new_items)
 
     db.commit()
     db.refresh(certificate)
