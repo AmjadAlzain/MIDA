@@ -12,6 +12,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from app.config import get_settings
 from app.logging_config import setup_logging, get_logger
 from app.routers import mida_certificate, mida_certificates, mida_imports, convert, hscode_uom, hscode_master
+from app.db.session import get_session_factory
+from app.repositories.hscode_master_repo import load_cache_from_db, get_cache_size
 
 # Load settings
 settings = get_settings()
@@ -32,6 +34,27 @@ async def lifespan(app: FastAPI):
             "environment": settings.environment,
         }
     )
+    
+    # Load HSCODE master cache on startup for this worker
+    # This ensures each Uvicorn worker has the cache loaded
+    try:
+        session_factory = get_session_factory()
+        if session_factory:
+            db = session_factory()
+            try:
+                load_cache_from_db(db)
+                cache_size = get_cache_size()
+                if cache_size > 0:
+                    logger.info(f"HSCODE Master cache loaded: {cache_size} entries")
+                else:
+                    logger.warning("HSCODE Master cache is empty - run /api/hscode-master/seed to populate")
+            finally:
+                db.close()
+        else:
+            logger.warning("Database not configured - HSCODE Master cache not loaded")
+    except Exception as e:
+        logger.warning(f"Failed to load HSCODE Master cache on startup: {e}")
+    
     yield
     logger.info("Shutting down application")
 
