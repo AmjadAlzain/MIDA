@@ -445,21 +445,15 @@ export function InvoiceConverter() {
       
       const k1Items: K1ExportItem[] = items.map((item) => {
         // For MIDA tab: use mida_hs_code (always present for matched items)
-        // For Duties Payable tab: only use hs_code if from hscode_master (never invoice)
-        // For Form-D tab: use invoice hs_code
+        // For Duties Payable tab: use hs_code as-is
+        // For Form-D tab: use invoice hs_code (backend will append "00")
         let hsCodeToUse = item.hs_code;
         if (tabKey === 'mida' && item.mida_hs_code) {
           // Strip dots from mida_hs_code for K1 export format
           hsCodeToUse = item.mida_hs_code.replace(/\./g, '');
         } else if (tabKey === 'duties') {
-          // Duties Payable: only use hs_code if it came from hscode_master lookup
-          // Never use invoice hs_code for duties payable items
-          if (item.hs_code_source === 'hscode_master') {
-            hsCodeToUse = item.hs_code ? item.hs_code.replace(/\./g, '') : '';
-          } else {
-            // Invoice hs_code or no hs_code - leave empty for duties
-            hsCodeToUse = '';
-          }
+          // Duties Payable: use hs_code as-is (strip dots if present)
+          hsCodeToUse = item.hs_code ? item.hs_code.replace(/\./g, '') : '';
         }
         
         return {
