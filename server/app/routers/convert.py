@@ -1448,6 +1448,7 @@ async def classify_invoice(
                 if lookup_result:
                     # Found a match - assign HSCODE and UOM directly
                     item["hs_code"] = lookup_result.hs_code
+                    item["hs_code_source"] = "hscode_master"
                     item["uom"] = lookup_result.uom
                     match_type = "exact" if lookup_result.is_exact_match else f"fuzzy ({lookup_result.match_score:.2f})"
                     warnings.append({

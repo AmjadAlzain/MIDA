@@ -129,6 +129,7 @@ export interface ClassificationItem {
   description: string;
   parts_name?: string;
   hs_code: string;
+  hs_code_source: 'invoice' | 'hscode_master' | 'none';
   mida_hs_code?: string;
   quantity: number;
   uom: string;

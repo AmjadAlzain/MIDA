@@ -40,6 +40,14 @@ class ItemTable(str, Enum):
     duties_payable = "duties_payable"
 
 
+class HsCodeSource(str, Enum):
+    """Source of the HS code for an item."""
+
+    invoice = "invoice"  # HS code came from the original invoice
+    hscode_master = "hscode_master"  # HS code was looked up from hscode_master table
+    none = "none"  # No HS code available
+
+
 class ClassifiedItem(BaseModel):
     """
     An invoice item that has been classified into one of the 3 tables.
@@ -49,7 +57,8 @@ class ClassifiedItem(BaseModel):
 
     # Original invoice fields
     line_no: int = Field(..., description="Line number in the invoice")
-    hs_code: str = Field(default="", description="HS tariff code from invoice")
+    hs_code: str = Field(default="", description="HS tariff code")
+    hs_code_source: HsCodeSource = Field(default=HsCodeSource.none, description="Source of the HS code: invoice, hscode_master, or none")
     description: str = Field(..., description="Item description (Parts Name)")
     quantity: Decimal = Field(..., ge=0, description="Invoice quantity")
     uom: str = Field(default="", description="Unit of measure from HSCODE_UOM lookup (may be empty if not found)")

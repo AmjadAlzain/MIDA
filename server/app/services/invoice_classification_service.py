@@ -35,7 +35,7 @@ import pandas as pd
 
 from app.models.company import Company
 from app.models.mida_certificate import MidaCertificate
-from app.schemas.classification import ClassifiedItem, ItemTable
+from app.schemas.classification import ClassifiedItem, HsCodeSource, ItemTable
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +228,7 @@ def parse_all_invoice_items(file_bytes: bytes) -> list[dict]:
         items.append({
             "line_no": line_no,
             "hs_code": hs_code,
+            "hs_code_source": "invoice" if hs_code else "none",
             "description": description,
             "quantity": quantity,
             "uom": uom,
@@ -305,6 +306,7 @@ def classify_items(
             # Original invoice fields
             line_no=item["line_no"],
             hs_code=item["hs_code"],
+            hs_code_source=HsCodeSource(item.get("hs_code_source", "none")),
             description=item["description"],
             quantity=item["quantity"],
             uom=item["uom"],

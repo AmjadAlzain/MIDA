@@ -443,17 +443,37 @@ export function InvoiceConverter() {
       const items = selectedIndices.map((i) => tabData[tabKey][i]);
       const exportType = tabKey === 'formd' ? 'form_d' : tabKey === 'mida' ? 'mida' : 'duties_payable';
       
-      const k1Items: K1ExportItem[] = items.map((item) => ({
-        hs_code: item.hs_code,
-        description: (tabKey === 'mida' && item.mida_item_name && item.mida_line_no)
-          ? `${item.mida_item_name} (${item.mida_line_no})` 
-          : item.description,
-        quantity: item.quantity,
-        uom: item.uom,
-        amount: item.amount,
-        net_weight_kg: item.net_weight_kg,
-        sst_exempted: item.sst_exempted,
-      }));
+      const k1Items: K1ExportItem[] = items.map((item) => {
+        // For MIDA tab: use mida_hs_code (always present for matched items)
+        // For Duties Payable tab: only use hs_code if from hscode_master (never invoice)
+        // For Form-D tab: use invoice hs_code
+        let hsCodeToUse = item.hs_code;
+        if (tabKey === 'mida' && item.mida_hs_code) {
+          // Strip dots from mida_hs_code for K1 export format
+          hsCodeToUse = item.mida_hs_code.replace(/\./g, '');
+        } else if (tabKey === 'duties') {
+          // Duties Payable: only use hs_code if it came from hscode_master lookup
+          // Never use invoice hs_code for duties payable items
+          if (item.hs_code_source === 'hscode_master') {
+            hsCodeToUse = item.hs_code ? item.hs_code.replace(/\./g, '') : '';
+          } else {
+            // Invoice hs_code or no hs_code - leave empty for duties
+            hsCodeToUse = '';
+          }
+        }
+        
+        return {
+          hs_code: hsCodeToUse,
+          description: (tabKey === 'mida' && item.mida_item_name && item.mida_line_no)
+            ? `${item.mida_item_name} (${item.mida_line_no})` 
+            : item.description,
+          quantity: item.quantity,
+          uom: item.uom,
+          amount: item.amount,
+          net_weight_kg: item.net_weight_kg,
+          sst_exempted: item.sst_exempted,
+        };
+      });
 
       const blob = await classificationService.exportK1({
         items: k1Items,
