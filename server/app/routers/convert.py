@@ -1427,26 +1427,27 @@ async def classify_invoice(
                         "severity": warning.severity.value,
                     })
 
-    # ===== HSCODE LOOKUP BY PART NAME (for items without HSCODE) =====
-    # Before UOM lookup, try to assign HSCODE to items that don't have one
-    # by matching their description/part name against the HSCODE master table
+    # ===== HSCODE LOOKUP BY PART NAME (for duties payable items) =====
+    # For items that will become duties payable (no Form-D flag AND no MIDA match),
+    # always try to find HSCODE from HSCODE_master table by part name matching.
+    # This ensures all duties payable items have proper HSCODE and UOM if they exist in master.
     for item in invoice_items:
         line_no = item.get("line_no")
         mida_match = mida_matches.get(line_no)
         
-        # Check if item already has an HSCODE (from MIDA match or invoice)
-        has_mida_hscode = mida_match and mida_match.get("mida_hs_code")
-        invoice_hscode = item.get("hs_code", "")
-        # Treat "None", empty strings, and whitespace-only as no HSCODE
-        has_invoice_hscode = bool(invoice_hscode and invoice_hscode.strip() and invoice_hscode.strip().lower() != "none")
+        # Check if this item will be duties payable (no Form-D flag AND no MIDA match)
+        is_form_d = item.get("form_flag", "").upper() == "FORM-D"
+        is_mida_matched = mida_match is not None
+        is_duties_payable = not is_form_d and not is_mida_matched
         
-        if not has_mida_hscode and not has_invoice_hscode:
-            # No HSCODE - try to find one by matching part name
+        if is_duties_payable:
+            # HSCODE_master lookup for duties payable items - NEVER use invoice HSCODE
             description = item.get("description", "")
+            
             if description:
                 lookup_result = lookup_by_part_name(description, fuzzy_threshold=0.85, db=db)
                 if lookup_result:
-                    # Found a match - assign HSCODE and UOM directly
+                    # Found a match - assign HSCODE and UOM from master
                     item["hs_code"] = lookup_result.hs_code
                     item["hs_code_source"] = "hscode_master"
                     item["uom"] = lookup_result.uom
@@ -1456,6 +1457,47 @@ async def classify_invoice(
                         "reason": f"HSCODE '{lookup_result.hs_code}' and UOM '{lookup_result.uom}' assigned from HSCODE Master by {match_type} match on part name '{lookup_result.part_name}'",
                         "severity": "info",
                     })
+                else:
+                    # No match in HSCODE_master - duties payable NEVER uses invoice HSCODE
+                    # Clear any invoice HSCODE and set source to none
+                    item["hs_code"] = ""
+                    item["hs_code_source"] = "none"
+                    item["uom"] = ""
+                    warnings.append({
+                        "invoice_item": f"Line {line_no}",
+                        "reason": f"No HSCODE found in HSCODE Master for part name '{description}' - item will have no HSCODE/UOM",
+                        "severity": "warning",
+                    })
+            else:
+                # No description to match
+                item["hs_code"] = ""
+                item["hs_code_source"] = "none"
+                item["uom"] = ""
+                warnings.append({
+                    "invoice_item": f"Line {line_no}",
+                    "reason": "No description available for HSCODE Master lookup - item will have no HSCODE/UOM",
+                    "severity": "warning",
+                })
+        else:
+            # For Form-D and MIDA items, only lookup if no existing HSCODE
+            has_mida_hscode = mida_match and mida_match.get("mida_hs_code")
+            invoice_hscode = item.get("hs_code", "")
+            has_invoice_hscode = bool(invoice_hscode and invoice_hscode.strip() and invoice_hscode.strip().lower() != "none")
+            
+            if not has_mida_hscode and not has_invoice_hscode:
+                description = item.get("description", "")
+                if description:
+                    lookup_result = lookup_by_part_name(description, fuzzy_threshold=0.85, db=db)
+                    if lookup_result:
+                        item["hs_code"] = lookup_result.hs_code
+                        item["hs_code_source"] = "hscode_master"
+                        item["uom"] = lookup_result.uom
+                        match_type = "exact" if lookup_result.is_exact_match else f"fuzzy ({lookup_result.match_score:.2f})"
+                        warnings.append({
+                            "invoice_item": f"Line {line_no}",
+                            "reason": f"HSCODE '{lookup_result.hs_code}' and UOM '{lookup_result.uom}' assigned from HSCODE Master by {match_type} match on part name '{lookup_result.part_name}'",
+                            "severity": "info",
+                        })
 
     # ===== UOM LOOKUP (after MIDA matching, before classification) =====
     # Now that all HSCODEs are finalized (including MIDA HS codes), look up UOM for each item
