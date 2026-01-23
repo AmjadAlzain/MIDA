@@ -17,8 +17,6 @@ import {
   FilePlus,
   ArrowDown,
   Ghost,
-  Ban,
-  MoreHorizontal, 
 } from 'lucide-react';
 import {
   Button,
@@ -789,7 +787,7 @@ export function CertificateParser() {
                 
                 {/* Add Item button at bottom */}
                 <div className="mt-4">
-                  <Button variant="secondary" onClick={handleAddItem} leftIcon={<Plus className="w-4 h-4" />}>
+                  <Button variant="secondary" onClick={() => handleAddItem()} leftIcon={<Plus className="w-4 h-4" />}>
                     Add Item
                   </Button>
                 </div>
@@ -958,7 +956,7 @@ export function CertificateParser() {
                 </table>
                 {/* Add Item button at bottom of table */}
                 <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-                  <Button variant="secondary" onClick={handleAddItem} leftIcon={<Plus className="w-4 h-4" />}>
+                  <Button variant="secondary" onClick={() => handleAddItem()} leftIcon={<Plus className="w-4 h-4" />}>
                     Add Item
                   </Button>
                 </div>
