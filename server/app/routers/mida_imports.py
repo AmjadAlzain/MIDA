@@ -539,8 +539,13 @@ async def get_import_record(
     description="""
     Update an existing import record.
     
-    Only provided fields will be updated. Note that changing the quantity
-    will affect the balance_after field.
+    Only provided fields will be updated. Changing quantity, import_date, or port
+    will automatically:
+    - Recalculate balance_before/balance_after for all records of the same item+port
+    - Update the item's remaining quantities
+    - Update the item's quantity_status
+    
+    If the port is changed, recalculation is done for both old and new ports.
     """,
 )
 async def update_import_record(
@@ -569,8 +574,10 @@ async def update_import_record(
     description="""
     Delete an import record permanently.
     
-    Note: This will NOT automatically recalculate balances for subsequent imports.
-    Use with caution.
+    After deletion, automatically:
+    - Recalculates balance_before/balance_after for remaining records of the same item+port
+    - Updates the item's remaining quantities (restoring the deleted amount)
+    - Updates the item's quantity_status
     """,
 )
 async def delete_import_record(

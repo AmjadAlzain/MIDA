@@ -24,6 +24,138 @@ from app.models.mida_certificate import (
 
 
 # =============================================================================
+# Balance Recalculation Helpers
+# =============================================================================
+
+def recalculate_item_port_balances(
+    db: Session,
+    certificate_item_id: UUID,
+    port: str,
+) -> None:
+    """
+    Recalculate balance_before and balance_after for all import records
+    of an item at a specific port.
+    
+    This should be called after editing or deleting an import record to ensure
+    the balance history flows correctly between consecutive entries.
+    
+    Records are ordered by import_date, then created_at (as tie-breaker).
+    
+    Args:
+        db: Database session
+        certificate_item_id: The certificate item ID
+        port: The import port
+    """
+    # Get the item to determine the approved quantity for this port
+    item = db.get(MidaCertificateItem, certificate_item_id)
+    if not item:
+        return
+    
+    # Get the approved quantity for this port
+    if port == ImportPort.PORT_KLANG.value:
+        approved_qty = item.port_klang_qty or Decimal("0")
+    elif port == ImportPort.KLIA.value:
+        approved_qty = item.klia_qty or Decimal("0")
+    elif port == ImportPort.BUKIT_KAYU_HITAM.value:
+        approved_qty = item.bukit_kayu_hitam_qty or Decimal("0")
+    else:
+        return
+    
+    # Get all import records for this item+port ordered by date then created_at
+    stmt = (
+        select(MidaImportRecord)
+        .where(MidaImportRecord.certificate_item_id == certificate_item_id)
+        .where(MidaImportRecord.port == port)
+        .order_by(MidaImportRecord.import_date, MidaImportRecord.created_at)
+    )
+    records = list(db.scalars(stmt))
+    
+    # Recalculate balances sequentially
+    current_balance = approved_qty
+    for record in records:
+        record.balance_before = current_balance
+        record.balance_after = current_balance - record.quantity_imported
+        current_balance = record.balance_after
+    
+    db.flush()
+
+
+def recalculate_item_remaining_quantities(
+    db: Session,
+    certificate_item_id: UUID,
+) -> None:
+    """
+    Recalculate the remaining quantities for a certificate item based on
+    all its import records.
+    
+    This updates:
+    - remaining_port_klang
+    - remaining_klia
+    - remaining_bukit_kayu_hitam
+    - remaining_quantity (total)
+    - quantity_status
+    
+    Args:
+        db: Database session
+        certificate_item_id: The certificate item ID
+    """
+    # Lock the item row to prevent concurrent modifications
+    stmt = (
+        select(MidaCertificateItem)
+        .where(MidaCertificateItem.id == certificate_item_id)
+        .with_for_update()
+    )
+    item = db.scalars(stmt).first()
+    if not item:
+        return
+    
+    # Get sum of quantities imported for each port
+    port_sums = db.execute(
+        text("""
+            SELECT port, COALESCE(SUM(quantity_imported), 0) as total_imported
+            FROM mida_import_records
+            WHERE certificate_item_id = :item_id
+            GROUP BY port
+        """),
+        {"item_id": str(certificate_item_id)}
+    ).fetchall()
+    
+    # Convert to dict for easy lookup
+    imported_by_port = {row[0]: Decimal(str(row[1])) for row in port_sums}
+    
+    # Calculate remaining for each port
+    port_klang_imported = imported_by_port.get(ImportPort.PORT_KLANG.value, Decimal("0"))
+    klia_imported = imported_by_port.get(ImportPort.KLIA.value, Decimal("0"))
+    bkh_imported = imported_by_port.get(ImportPort.BUKIT_KAYU_HITAM.value, Decimal("0"))
+    
+    item.remaining_port_klang = (item.port_klang_qty or Decimal("0")) - port_klang_imported
+    item.remaining_klia = (item.klia_qty or Decimal("0")) - klia_imported
+    item.remaining_bukit_kayu_hitam = (item.bukit_kayu_hitam_qty or Decimal("0")) - bkh_imported
+    
+    # Calculate total remaining
+    item.remaining_quantity = (
+        item.remaining_port_klang +
+        item.remaining_klia +
+        item.remaining_bukit_kayu_hitam
+    )
+    
+    # Update quantity status
+    default_threshold = get_default_warning_threshold(db)
+    threshold = item.warning_threshold if item.warning_threshold is not None else default_threshold
+    
+    if item.remaining_quantity < 0:
+        item.quantity_status = "overdrawn"
+    elif item.remaining_quantity == 0:
+        item.quantity_status = "depleted"
+    elif item.remaining_quantity <= threshold:
+        item.quantity_status = "warning"
+    else:
+        item.quantity_status = "normal"
+    
+    db.flush()
+
+
+# =============================================================================
 # Import Record Operations
 # =============================================================================
 
@@ -86,13 +218,28 @@ def update_import_record(
     """
     Update an existing import record.
     
-    Note: Changing quantity_imported will require recalculating balances
-    for all subsequent imports on this item/port.
+    After updating, this function automatically:
+    1. Recalculates balance_before/balance_after for all records of the same item+port
+    2. Updates the item's remaining quantities
+    3. Updates the item's quantity_status
+    
+    If the port is changed, recalculation is done for both old and new ports.
     """
     record = db.get(MidaImportRecord, record_id)
     if not record:
         return None
     
+    # Track original values for recalculation
+    original_port = record.port
+    original_item_id = record.certificate_item_id
+    port_changed = port is not None and port != original_port
+    needs_recalculation = (
+        quantity_imported is not None or 
+        import_date is not None or 
+        port_changed
+    )
+    
+    # Apply updates
     if import_date is not None:
         record.import_date = import_date
     if declaration_form_reg_no is not None:
@@ -104,15 +251,25 @@ def update_import_record(
     if remarks is not None:
         record.remarks = remarks
     if quantity_imported is not None:
-        # Recalculate balance
-        old_qty = record.quantity_imported
-        qty_diff = quantity_imported - old_qty
         record.quantity_imported = quantity_imported
-        record.balance_after = record.balance_after - qty_diff
     if port is not None:
         record.port = port
     
     db.flush()
+    
+    # Recalculate balances if needed
+    if needs_recalculation:
+        if port_changed:
+            # Recalculate for both old and new ports
+            recalculate_item_port_balances(db, original_item_id, original_port)
+            recalculate_item_port_balances(db, original_item_id, port)
+        else:
+            # Recalculate for the current port only
+            recalculate_item_port_balances(db, original_item_id, record.port)
+        
+        # Update item remaining quantities
+        recalculate_item_remaining_quantities(db, original_item_id)
+    
     db.refresh(record)
     return record
 
@@ -124,15 +281,29 @@ def delete_import_record(
     """
     Delete an import record.
     
-    Note: This will NOT automatically recalculate balances for the item.
-    The caller should handle balance recalculation if needed.
+    After deletion, this function automatically:
+    1. Recalculates balance_before/balance_after for all remaining records of the same item+port
+    2. Updates the item's remaining quantities (increasing by the deleted amount)
+    3. Updates the item's quantity_status
     """
     record = db.get(MidaImportRecord, record_id)
     if not record:
         return False
     
+    # Capture context before deletion for recalculation
+    certificate_item_id = record.certificate_item_id
+    port = record.port
+    
+    # Delete the record
     db.delete(record)
     db.flush()
+    
+    # Recalculate balances for remaining records in same item+port
+    recalculate_item_port_balances(db, certificate_item_id, port)
+    
+    # Update item remaining quantities
+    recalculate_item_remaining_quantities(db, certificate_item_id)
+    
     return True
 
 

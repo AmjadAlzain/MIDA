@@ -387,6 +387,13 @@ def update_import(
     """
     Update an existing import record.
     
+    After updating, automatically:
+    - Recalculates balance_before/balance_after for all records of the same item+port
+    - Updates the item's remaining quantities
+    - Updates the item's quantity_status
+    
+    If the port is changed, recalculation is done for both old and new ports.
+    
     Args:
         db: Database session
         record_id: UUID of the import record to update
@@ -419,6 +426,11 @@ def delete_import(
 ) -> bool:
     """
     Delete an import record.
+    
+    After deletion, automatically:
+    - Recalculates balance_before/balance_after for remaining records of the same item+port
+    - Updates the item's remaining quantities (restoring the deleted amount)
+    - Updates the item's quantity_status
     
     Args:
         db: Database session
