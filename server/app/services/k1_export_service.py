@@ -336,7 +336,8 @@ def generate_k1_xls_with_options(
     # Extract and transform item data
     hs_codes = [_format_hs_code(item.get("hs_code", ""), export_type) for item in items]
     descriptions = [str(item.get("description", "")) for item in items]
-    descriptions2 = [str(item.get("description2", item.get("quantity", ""))) for item in items]
+    # ItemDescription2 should always contain the invoice quantity for each item
+    descriptions2 = [str(item.get("quantity", "")) for item in items]
     uoms = [str(item.get("uom") or "").upper() for item in items]
     
     quantities = [_to_float(item.get("quantity", 0)) for item in items]
