@@ -61,12 +61,25 @@ def _digits_only(hs_code: str) -> str:
     return re.sub(r"[^\d]", "", hs_code or "")
 
 
-def _format_hs_code(hs_code: str) -> str:
-    """Format HS code for K1 Import: digits only + '00' suffix."""
+def _format_hs_code(hs_code: str, export_type: str = EXPORT_TYPE_FORM_D) -> str:
+    """
+    Format HS code for K1 Import: digits only.
+    
+    Add '00' suffix ONLY for:
+    - Form-D export
+    
+    Do NOT add suffix for:
+    - MIDA export
+    - Duties Payable export
+    """
     digits = _digits_only(hs_code)
-    if digits:
+    if not digits:
+        return ""
+        
+    if export_type == EXPORT_TYPE_FORM_D:
         return digits + "00"
-    return ""
+        
+    return digits
 
 
 def _to_float(value: Any) -> float:
@@ -321,7 +334,7 @@ def generate_k1_xls_with_options(
     output = pd.DataFrame(index=range(n_items))
 
     # Extract and transform item data
-    hs_codes = [_format_hs_code(item.get("hs_code", "")) for item in items]
+    hs_codes = [_format_hs_code(item.get("hs_code", ""), export_type) for item in items]
     descriptions = [str(item.get("description", "")) for item in items]
     descriptions2 = [str(item.get("description2", item.get("quantity", ""))) for item in items]
     uoms = [str(item.get("uom") or "").upper() for item in items]
