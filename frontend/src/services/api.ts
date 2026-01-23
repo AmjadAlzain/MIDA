@@ -32,6 +32,13 @@ api.interceptors.response.use(
       const detail = error.response.data.detail;
       if (typeof detail === 'string') {
         message = detail;
+      } else if (Array.isArray(detail)) {
+        // Pydantic validation errors come as an array
+        const messages = detail.map((err: { msg?: string; loc?: string[] }) => {
+          const field = err.loc?.slice(-1)[0] || 'field';
+          return `${field}: ${err.msg || 'validation error'}`;
+        });
+        message = messages.join('; ');
       } else if (detail && typeof detail === 'object' && 'detail' in detail) {
         message = detail.detail;
       }

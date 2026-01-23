@@ -179,7 +179,7 @@ export function DatabaseView() {
       header: 'Actions',
       headerClassName: 'text-right',
       cell: (cert: Certificate) => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="sm"

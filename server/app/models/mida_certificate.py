@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any, Optional, TYPE_CHECKING
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -110,6 +111,7 @@ class MidaCertificateItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Numeric(18, 3), nullable=True
     )
     uom: Mapped[str] = mapped_column(String(50), nullable=False)
+    is_dummy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Station split quantities (original approved amounts)
     port_klang_qty: Mapped[Optional[Decimal]] = mapped_column(

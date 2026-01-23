@@ -151,6 +151,7 @@ def update_items_preserve_history(
             existing_item.item_name = new_item.item_name
             existing_item.approved_quantity = new_item.approved_quantity
             existing_item.uom = new_item.uom
+            existing_item.is_dummy = new_item.is_dummy
             existing_item.port_klang_qty = new_item.port_klang_qty
             existing_item.klia_qty = new_item.klia_qty
             existing_item.bukit_kayu_hitam_qty = new_item.bukit_kayu_hitam_qty

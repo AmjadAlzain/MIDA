@@ -56,12 +56,13 @@ class CertificateItemIn(BaseModel):
     """Input schema for a certificate line item."""
 
     line_no: int = Field(..., gt=0, description="Line number (must be positive)")
-    hs_code: str = Field(..., min_length=1, description="HS tariff code")
-    item_name: str = Field(..., min_length=1, description="Item description")
+    hs_code: str = Field(default="", description="HS tariff code")
+    item_name: str = Field(default="", description="Item description")
     approved_quantity: Optional[Decimal] = Field(
         default=None, ge=0, description="Approved quantity (must be >= 0 if provided)"
     )
-    uom: str = Field(..., min_length=1, description="Unit of measure")
+    uom: str = Field(default="", description="Unit of measure")
+    is_dummy: bool = Field(default=False, description="Flag for dummy/spacer item")
 
     # Optional station split quantities
     port_klang_qty: Optional[Decimal] = Field(
@@ -75,6 +76,17 @@ class CertificateItemIn(BaseModel):
     )
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
+    @model_validator(mode='after')
+    def validate_dummy_fields(self) -> 'CertificateItemIn':
+        if not self.is_dummy:
+            if not self.hs_code:
+                raise ValueError("hs_code is required for non-dummy items")
+            if not self.item_name:
+                raise ValueError("item_name is required for non-dummy items")
+            if not self.uom:
+                raise ValueError("uom is required for non-dummy items")
+        return self
 
 
 class CertificateHeaderIn(BaseModel):
@@ -178,6 +190,7 @@ class CertificateItemRead(BaseModel):
     item_name: str
     approved_quantity: Optional[Decimal] = None
     uom: str
+    is_dummy: bool = False
     port_klang_qty: Optional[Decimal] = None
     klia_qty: Optional[Decimal] = None
     bukit_kayu_hitam_qty: Optional[Decimal] = None

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import toast from 'react-hot-toast';
 import {
   FileSearch,
@@ -14,6 +14,11 @@ import {
   AlertTriangle,
   AlertCircle,
   Info,
+  FilePlus,
+  ArrowDown,
+  Ghost,
+  Ban,
+  MoreHorizontal, 
 } from 'lucide-react';
 import {
   Button,
@@ -86,6 +91,9 @@ export function CertificateParser() {
     }
     
     editedData.items.forEach((item, index) => {
+      // Skip validation for dummy items
+      if (item.is_dummy) return;
+
       const lineLabel = `Item #${item.line_no || index + 1}`;
       
       // Required field checks
@@ -199,8 +207,16 @@ export function CertificateParser() {
     setIsParsing(true);
     try {
       const result = await certificateService.parsePdf(file);
-      setParsedData(result);
-      setEditedData(result);
+      // Normalize items to ensure is_dummy is set
+      const normalizedResult = {
+        ...result,
+        items: result.items.map((item: ParsedCertificateItem) => ({
+          ...item,
+          is_dummy: item.is_dummy ?? false,
+        })),
+      };
+      setParsedData(normalizedResult);
+      setEditedData(normalizedResult);
       toast.success('Certificate parsed successfully!');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to parse certificate';
@@ -208,6 +224,37 @@ export function CertificateParser() {
     } finally {
       setIsParsing(false);
     }
+  };
+
+  // Create a new empty certificate for manual entry
+  const handleNewCertificate = () => {
+    const emptyCertificate: ParsedCertificate = {
+      mida_no: '',
+      company_name: '',
+      model_number: '',
+      exemption_start: '',
+      exemption_end: '',
+      items: [
+        {
+          line_no: 1,
+          hs_code: '',
+          item_name: '',
+          approved_quantity: 0,
+          uom: '',
+          is_dummy: false,
+          station_split: {
+            PORT_KLANG: 0,
+            KLIA: 0,
+            BUKIT_KAYU_HITAM: 0,
+          },
+        },
+      ],
+      warnings: [],
+    };
+    setFile(null);
+    setParsedData(null);
+    setEditedData(emptyCertificate);
+    toast.success('New certificate created. Fill in the details manually.');
   };
 
   // Handle field changes
@@ -239,21 +286,55 @@ export function CertificateParser() {
     });
   };
 
-  // Add new item
-  const handleAddItem = () => {
+  // Add new item (optionally at specific index)
+  const handleAddItem = (insertAtIndex?: number) => {
     setEditedData((prev) => {
       if (!prev) return null;
       const newItem: ParsedCertificateItem = {
-        line_no: prev.items.length + 1,
+        line_no: 0, // Will be re-calculated
         hs_code: '',
         item_name: '',
         approved_quantity: 0,
         uom: '',
+        is_dummy: false,
       };
+      
+      let items = [...prev.items];
+      if (typeof insertAtIndex === 'number') {
+        items.splice(insertAtIndex, 0, newItem);
+      } else {
+        items.push(newItem);
+      }
+
       return {
         ...prev,
-        items: [...prev.items, newItem],
+        items: items.map((item, i) => ({ ...item, line_no: i + 1 })),
       };
+    });
+  };
+
+  // Toggle Dummy status
+  const handleToggleDummy = (index: number) => {
+    setEditedData((prev) => {
+      if (!prev) return null;
+      const items = [...prev.items];
+      const current = items[index];
+      const isDummy = !current.is_dummy;
+      
+      items[index] = {
+        ...current,
+        is_dummy: isDummy,
+        // If becoming dummy, clear values and zero quantities
+        ...(isDummy ? {
+            hs_code: '',
+            item_name: '',
+            uom: '',
+            approved_quantity: 0,
+            station_split: { PORT_KLANG: 0, KLIA: 0, BUKIT_KAYU_HITAM: 0 }
+        } : {})
+      };
+      
+      return { ...prev, items };
     });
   };
 
@@ -316,6 +397,7 @@ export function CertificateParser() {
           port_klang_qty: item.station_split?.PORT_KLANG,
           klia_qty: item.station_split?.KLIA,
           bukit_kayu_hitam_qty: item.station_split?.BUKIT_KAYU_HITAM,
+          is_dummy: item.is_dummy,
         })),
         raw_ocr_json: editedData,
       };
@@ -344,7 +426,7 @@ export function CertificateParser() {
             Certificate Parser
           </CardTitle>
           <CardDescription>
-            Upload a MIDA certificate PDF to extract data automatically
+            Upload a MIDA certificate PDF to extract data automatically, or create a new certificate manually
           </CardDescription>
         </CardHeader>
 
@@ -367,6 +449,19 @@ export function CertificateParser() {
               leftIcon={<Upload className="w-4 h-4" />}
             >
               Parse Certificate
+            </Button>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 border-t border-gray-300"></div>
+              <span className="text-gray-500 text-sm">OR</span>
+              <div className="flex-1 border-t border-gray-300"></div>
+            </div>
+            <Button
+              onClick={handleNewCertificate}
+              size="lg"
+              variant="primary"
+              leftIcon={<FilePlus className="w-4 h-4" />}
+            >
+              New Certificate (Manual Entry)
             </Button>
           </div>
         </div>
@@ -436,6 +531,7 @@ export function CertificateParser() {
               error={getFieldError('company_name') ? 'Required' : undefined}
               className={getFieldError('company_name') ? 'border-red-500' : ''}
               options={[
+                { value: '', label: 'Select Company...' }, 
                 { value: 'HONG LEONG YAMAHA MOTOR SDN BHD', label: 'HONG LEONG YAMAHA MOTOR SDN BHD' },
                 { value: 'HICOM YAMAHA MOTOR SDN BHD', label: 'HICOM YAMAHA MOTOR SDN BHD' },
               ]}
@@ -556,7 +652,14 @@ export function CertificateParser() {
                 {editedData.items.map((item, index) => {
                   const hasError = getItemHasError(index);
                   const hasWarning = getItemHasWarning(index);
-                  const cardClass = hasError ? 'bg-red-50 border-red-200' : hasWarning ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50 border-gray-200';
+                  const isDummy = item.is_dummy;
+                  const cardClass = isDummy 
+                    ? 'bg-gray-100 border-gray-300 opacity-90' 
+                    : hasError 
+                      ? 'bg-red-50 border-red-200' 
+                      : hasWarning 
+                        ? 'bg-yellow-50 border-yellow-200' 
+                        : 'bg-gray-50 border-gray-200';
                   
                   return (
                     <div
@@ -564,17 +667,44 @@ export function CertificateParser() {
                       className={`rounded-lg p-4 border ${cardClass}`}
                     >
                       <div className="flex items-start justify-between mb-4">
-                        <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded font-semibold text-sm">
-                          Item #{item.line_no}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveItem(index)}
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded font-semibold text-sm">
+                            Item #{item.line_no}
+                          </span>
+                          {isDummy && (
+                            <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded font-semibold text-xs flex items-center gap-1 border border-gray-300">
+                              <Ghost className="w-3 h-3" /> Dummy
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleToggleDummy(index)}
+                            className={isDummy ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'}
+                            title={isDummy ? "Unmark as dummy" : "Mark as dummy"}
+                          >
+                            <Ghost className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddItem(index + 1)}
+                            className="text-blue-600 hover:bg-blue-50"
+                            title="Add item below"
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveItem(index)}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="grid md:grid-cols-4 gap-4 mb-4">
@@ -582,16 +712,18 @@ export function CertificateParser() {
                           label="HS Code"
                           value={item.hs_code}
                           onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
-                          required
-                          error={getFieldError('hs_code', index) ? 'Required' : undefined}
+                          required={!isDummy}
+                          disabled={!!isDummy}
+                          error={!isDummy && getFieldError('hs_code', index) ? 'Required' : undefined}
                           className={getCellClass('hs_code', index)}
                         />
                         <Input
                           label="Item Name"
                           value={item.item_name}
                           onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
-                          required
-                          error={getFieldError('item_name', index) ? 'Required' : undefined}
+                          required={!isDummy}
+                          disabled={!!isDummy}
+                          error={!isDummy && getFieldError('item_name', index) ? 'Required' : undefined}
                           className={getCellClass('item_name', index)}
                         />
                         <Input
@@ -599,8 +731,9 @@ export function CertificateParser() {
                           type="number"
                           value={item.approved_quantity}
                           onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
-                          required
-                          error={getFieldError('approved_quantity', index) ? 'Must be > 0' : undefined}
+                          required={!isDummy}
+                          disabled={!!isDummy} // Already handled by logic that sets it to 0 and clears field? No, disabling input is better UX.
+                          error={!isDummy && getFieldError('approved_quantity', index) ? 'Must be > 0' : undefined}
                           className={getCellClass('approved_quantity', index)}
                         />
                         <div>
@@ -608,7 +741,8 @@ export function CertificateParser() {
                           <select
                             value={item.uom}
                             onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${getCellClass('uom', index)}`}
+                            disabled={!!isDummy}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${getCellClass('uom', index)} ${isDummy ? 'bg-gray-100' : ''}`}
                           >
                             <option value="">Select...</option>
                             <option value="KGM">KGM</option>
@@ -617,7 +751,7 @@ export function CertificateParser() {
                         </div>
                       </div>
                       {/* Port Allocation */}
-                      <div className="bg-white rounded border border-gray-200 p-3">
+                      <div className={`rounded border border-gray-200 p-3 ${isDummy ? 'bg-gray-50' : 'bg-white'}`}>
                         <p className="text-xs font-semibold text-gray-600 mb-2">Port Allocation</p>
                         <div className="grid md:grid-cols-3 gap-4">
                           <Input
@@ -625,18 +759,21 @@ export function CertificateParser() {
                             type="number"
                             value={item.station_split?.PORT_KLANG || 0}
                             onChange={(e) => handleStationSplitChange(index, 'PORT_KLANG', parseFloat(e.target.value) || 0)}
+                            disabled={!!isDummy}
                           />
                           <Input
                             label="KLIA"
                             type="number"
                             value={item.station_split?.KLIA || 0}
                             onChange={(e) => handleStationSplitChange(index, 'KLIA', parseFloat(e.target.value) || 0)}
+                            disabled={!!isDummy}
                           />
                           <Input
                             label="Bukit Kayu Hitam"
                             type="number"
                             value={item.station_split?.BUKIT_KAYU_HITAM || 0}
                             onChange={(e) => handleStationSplitChange(index, 'BUKIT_KAYU_HITAM', parseFloat(e.target.value) || 0)}
+                            disabled={!!isDummy}
                           />
                         </div>
                       </div>
@@ -680,21 +817,51 @@ export function CertificateParser() {
                     {editedData.items.map((item, index) => {
                       const hasError = getItemHasError(index);
                       const hasWarning = getItemHasWarning(index);
-                      const rowClass = hasError ? 'bg-red-50' : hasWarning ? 'bg-yellow-50' : 'hover:bg-gray-50';
+                      const isDummy = item.is_dummy;
+                      const rowClass = isDummy 
+                        ? 'bg-gray-100 opacity-90' 
+                        : hasError 
+                          ? 'bg-red-50' 
+                          : hasWarning 
+                            ? 'bg-yellow-50' 
+                            : 'hover:bg-gray-50';
                       
                       return (
-                        <tr key={index} className={rowClass}>
+                        <Fragment key={index}>
+                        { index > 0 && (
+                            <tr className="h-1 hover:h-8 group transition-all duration-200 bg-transparent">
+                                <td colSpan={9} className="p-0 border-0 relative">
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-10 hover:bg-blue-50/10">
+                                        <div className="w-full h-px bg-blue-200 absolute top-1/2 left-0 right-0 transform -translate-y-1/2"></div>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            className="h-6 text-xs px-2 py-0 bg-blue-50 border border-blue-200 text-blue-700 shadow-sm relative z-20 rounded-full"
+                                            onClick={() => handleAddItem(index)}
+                                            leftIcon={<Plus className="w-3 h-3" />}
+                                        >
+                                            Insert Row
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                        <tr className={rowClass}>
                           <td className="px-3 py-2">
-                            <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-semibold">
-                              {item.line_no}
-                            </span>
+                            <div className="flex items-center gap-1">
+                                <span className={`px-2 py-1 rounded text-xs font-semibold ${isDummy ? 'bg-gray-200 text-gray-600' : 'bg-purple-100 text-purple-700'}`}>
+                                  {item.line_no}
+                                </span>
+                                {isDummy && <Ghost className="w-3 h-3 text-gray-400" />}
+                            </div>
                           </td>
                           <td className="px-3 py-2">
                             <input
                               type="text"
                               value={item.hs_code}
                               onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
-                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm ${getCellClass('hs_code', index)}`}
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm ${getCellClass('hs_code', index)} ${isDummy ? 'bg-gray-100' : ''}`}
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -702,7 +869,8 @@ export function CertificateParser() {
                               type="text"
                               value={item.item_name}
                               onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
-                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('item_name', index)}`}
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('item_name', index)} ${isDummy ? 'bg-gray-100' : ''}`}
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -710,14 +878,16 @@ export function CertificateParser() {
                               type="number"
                               value={item.approved_quantity}
                               onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
-                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('approved_quantity', index)}`}
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('approved_quantity', index)} ${isDummy ? 'bg-gray-100' : ''}`}
                             />
                           </td>
                           <td className="px-3 py-2">
                             <select
                               value={item.uom}
                               onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('uom', index)}`}
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('uom', index)} ${isDummy ? 'bg-gray-100' : ''}`}
                             >
                               <option value="">Select...</option>
                               <option value="KGM">KGM</option>
@@ -729,7 +899,8 @@ export function CertificateParser() {
                               type="number"
                               value={item.station_split?.PORT_KLANG || 0}
                               onChange={(e) => handleStationSplitChange(index, 'PORT_KLANG', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${isDummy ? 'bg-gray-100' : ''}`}
                               title="Port Klang Quantity"
                             />
                           </td>
@@ -738,7 +909,8 @@ export function CertificateParser() {
                               type="number"
                               value={item.station_split?.KLIA || 0}
                               onChange={(e) => handleStationSplitChange(index, 'KLIA', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${isDummy ? 'bg-gray-100' : ''}`}
                               title="KLIA Quantity"
                             />
                           </td>
@@ -747,21 +919,32 @@ export function CertificateParser() {
                               type="number"
                               value={item.station_split?.BUKIT_KAYU_HITAM || 0}
                               onChange={(e) => handleStationSplitChange(index, 'BUKIT_KAYU_HITAM', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right"
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${isDummy ? 'bg-gray-100' : ''}`}
                               title="Bukit Kayu Hitam Quantity"
                             />
                           </td>
                           <td className="px-3 py-2 text-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveItem(index)}
-                              className="text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center justify-between gap-1">
+                                <button
+                                     onClick={() => handleToggleDummy(index)}
+                                     className={`p-1.5 rounded hover:bg-gray-200 ${isDummy ? 'text-gray-700 bg-gray-200' : 'text-gray-400'}`}
+                                     title={isDummy ? "Unmark as dummy" : "Mark as dummy"}
+                                   >
+                                     <Ghost className="w-4 h-4" />
+                                   </button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveItem(index)}
+                                  className="text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </div>
                           </td>
                         </tr>
+                        </Fragment>
                       );
                     })}
                     {editedData.items.length === 0 && (

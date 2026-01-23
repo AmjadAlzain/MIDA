@@ -190,6 +190,7 @@ export interface ParsedCertificateItem {
     KLIA?: number;
     BUKIT_KAYU_HITAM?: number;
   };
+  is_dummy?: boolean;
 }
 
 export interface ParsedCertificate {
@@ -220,6 +221,7 @@ export interface SaveCertificateRequest {
     port_klang_qty?: number;
     klia_qty?: number;
     bukit_kayu_hitam_qty?: number;
+    is_dummy?: boolean;
   }[];
   raw_ocr_json?: ParsedCertificate;
 }

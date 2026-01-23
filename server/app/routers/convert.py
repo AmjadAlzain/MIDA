@@ -1302,18 +1302,6 @@ async def classify_invoice(
             certificates = get_certificates_by_ids(db, cert_uuids)
             
             if certificates:
-                # Build mida_items_by_cert dict for multi-cert matching
-                mida_items_by_cert: dict[str, list[MatcherMidaItem]] = {}
-                
-                for certificate in certificates:
-                    cert_id = str(certificate.id)
-                    if certificate.items:
-                        mida_items_by_cert[cert_id] = _convert_to_matcher_mida_items_with_cert_info(
-                            certificate.items, certificate
-                        )
-                    else:
-                        mida_items_by_cert[cert_id] = []
-
                 # Convert invoice items to matcher format
                 matcher_invoice_items = [
                     MatcherInvoiceItem(
@@ -1330,13 +1318,49 @@ async def classify_invoice(
                 
                 matcher_mode = _convert_schema_match_mode(mode)
 
-                # Perform multi-certificate matching
-                matching_result = match_items_multi_certificate(
-                    invoice_items=matcher_invoice_items,
-                    mida_items_by_cert=mida_items_by_cert,
-                    mode=matcher_mode,
-                    threshold=match_threshold,
-                )
+                # Use single-certificate matching when only one certificate is selected
+                # (no model_no requirement, simpler matching by item name only)
+                # Use multi-certificate matching when multiple certificates are selected
+                # (requires model_no to disambiguate which certificate each item belongs to)
+                if len(certificates) == 1:
+                    # Single certificate mode - use simpler matching (no model_no required)
+                    certificate = certificates[0]
+                    mida_items = _convert_to_matcher_mida_items_with_cert_info(
+                        certificate.items, certificate
+                    ) if certificate.items else []
+                    
+                    matching_result = match_items(
+                        invoice_items=matcher_invoice_items,
+                        mida_items=mida_items,
+                        mode=matcher_mode,
+                        threshold=match_threshold,
+                    )
+                    
+                    # Add certificate info to matches (match_items doesn't set these)
+                    for match_result in matching_result.matches:
+                        if match_result.matched and match_result.mida_item:
+                            match_result.certificate_id = str(certificate.id)
+                            match_result.certificate_number = certificate.certificate_number
+                else:
+                    # Multi-certificate mode - requires model_no for disambiguation
+                    # Build mida_items_by_cert dict for multi-cert matching
+                    mida_items_by_cert: dict[str, list[MatcherMidaItem]] = {}
+                    
+                    for certificate in certificates:
+                        cert_id = str(certificate.id)
+                        if certificate.items:
+                            mida_items_by_cert[cert_id] = _convert_to_matcher_mida_items_with_cert_info(
+                                certificate.items, certificate
+                            )
+                        else:
+                            mida_items_by_cert[cert_id] = []
+
+                    matching_result = match_items_multi_certificate(
+                        invoice_items=matcher_invoice_items,
+                        mida_items_by_cert=mida_items_by_cert,
+                        mode=matcher_mode,
+                        threshold=match_threshold,
+                    )
 
                 # Build mida_matches dict for classification
                 for match in matching_result.matches:
