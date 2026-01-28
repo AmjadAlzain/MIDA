@@ -65,19 +65,12 @@ def _format_hs_code(hs_code: str, export_type: str = EXPORT_TYPE_FORM_D) -> str:
     """
     Format HS code for K1 Import: digits only.
     
-    Add '00' suffix ONLY for:
-    - Form-D export
-    
-    Do NOT add suffix for:
-    - MIDA export
-    - Duties Payable export
+    NOTE: "00" suffix is now appended during invoice classification for Form-D items,
+    so we no longer add it here during export.
     """
     digits = _digits_only(hs_code)
     if not digits:
         return ""
-        
-    if export_type == EXPORT_TYPE_FORM_D:
-        return digits + "00"
         
     return digits
 

@@ -1500,8 +1500,8 @@ async def classify_invoice(
                         })
 
     # ===== UOM LOOKUP (after MIDA matching, before classification) =====
-    # Now that all HSCODEs are finalized (including MIDA HS codes), look up UOM for each item
-    # For MIDA-matched items, use the MIDA HSCODE; for others, use the invoice HSCODE
+    # For MIDA-matched items, use the remaining_uom from the MIDA certificate directly.
+    # For non-MIDA items, look up UOM from HSCODE_UOM table.
     for item in invoice_items:
         line_no = item.get("line_no")
         mida_match = mida_matches.get(line_no)
@@ -1510,11 +1510,13 @@ async def classify_invoice(
         if item.get("uom"):
             continue
         
-        # Use MIDA HSCODE if matched, otherwise use invoice HSCODE
-        if mida_match and mida_match.get("mida_hs_code"):
-            hs_code = mida_match["mida_hs_code"]
-        else:
-            hs_code = item.get("hs_code", "")
+        # For MIDA-matched items, use the remaining_uom from the certificate
+        if mida_match and mida_match.get("remaining_uom"):
+            item["uom"] = mida_match["remaining_uom"]
+            continue
+        
+        # For non-MIDA items, look up UOM from HSCODE_UOM table
+        hs_code = item.get("hs_code", "")
         
         if hs_code:
             try:
@@ -1536,6 +1538,18 @@ async def classify_invoice(
                 "reason": "No HSCODE available - UOM left empty",
                 "severity": "warning",
             })
+
+    # ===== APPEND "00" TO FORM-D ITEMS' HSCODES =====
+    # For Form-D flagged items only, append "00" to their HSCODE during classification
+    for item in invoice_items:
+        is_form_d = item.get("form_flag", "").upper() == "FORM-D"
+        if is_form_d:
+            hs_code = item.get("hs_code", "")
+            if hs_code:
+                # Remove any non-digit characters first, then append "00"
+                digits_only = "".join(c for c in hs_code if c.isdigit())
+                if digits_only:
+                    item["hs_code"] = digits_only + "00"
 
     # Classify items into 3 categories
     form_d_items, mida_items, duties_payable_items = classify_items(
@@ -1573,9 +1587,9 @@ Export items from any of the 3 classification tables (Form-D, MIDA, Duties Payab
 - If sst_exempted=True: SSTMethod=Exemption, Method=E, Percentage=100
 - If sst_exempted=False: Empty SST columns
 
-**UOM is determined from HSCODE mapping table:**
-- Each item's UOM (StatisticalUOM, DeclaredUOM) is looked up by HSCODE
-- Falls back to invoice UOM if HSCODE not found in mapping table
+**UOM is taken from item's stored value:**
+- Each item's UOM (StatisticalUOM, DeclaredUOM) uses the UOM set during classification
+- This preserves correct UOM even when items are moved between tables
 """,
     responses={
         200: {"description": "K1 Import XLS file"},
@@ -1593,25 +1607,20 @@ async def export_classified_k1_xls(
     This endpoint handles all 3 export types (Form-D, MIDA, Duties Payable)
     with appropriate duty/SST column settings.
     
-    UOM is looked up from HSCODE mapping table for each item.
+    UOM is taken directly from the item's stored UOM value (set during classification).
+    This preserves the correct UOM even when items are moved between tables.
     """
-    # Convert items to dict list for K1 export, looking up UOM from HSCODE table
+    # Convert items to dict list for K1 export, using the item's stored UOM directly
     items_for_export = []
     for item in request.items:
-        # Look up UOM from HSCODE mapping table
-        uom_from_hscode = item.uom  # Default to item's UOM
-        try:
-            uom_from_hscode = get_uom_by_hscode(db, item.hs_code)
-            logger.debug(f"HSCODE {item.hs_code} -> UOM: {uom_from_hscode}")
-        except HscodeNotFoundError:
-            logger.warning(f"HSCODE {item.hs_code} not found in UOM mapping table, using invoice UOM: {item.uom}")
-        
+        # Use the item's stored UOM directly - it was set correctly during classification
+        # and should be preserved even if the item was moved between tables
         items_for_export.append({
             "hs_code": item.hs_code,
             "description": item.description,
             "description2": item.description2,
             "quantity": item.quantity,
-            "uom": uom_from_hscode,  # Use UOM from HSCODE lookup
+            "uom": item.uom,  # Use item's stored UOM directly
             "amount": item.amount,
             "net_weight_kg": item.net_weight_kg,
             "sst_exempted": item.sst_exempted,

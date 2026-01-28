@@ -266,8 +266,10 @@ export function InvoiceConverter() {
       
       const targetItem = list.find((i) => i.id === itemId);
       if (targetItem) {
-        targetItem.sst_exempted = !targetItem.sst_exempted;
-        targetItem.sst_manually_changed = true;
+        const newSstValue = !targetItem.sst_exempted;
+        targetItem.sst_exempted = newSstValue;
+        // Only mark as manually changed if different from default
+        targetItem.sst_manually_changed = newSstValue !== targetItem.sst_exempted_default;
       }
       return newResult;
     });
@@ -284,7 +286,8 @@ export function InvoiceConverter() {
       
       list.forEach((item) => {
         item.sst_exempted = setExempted;
-        item.sst_manually_changed = true;
+        // Only mark as manually changed if different from default
+        item.sst_manually_changed = setExempted !== item.sst_exempted_default;
       });
       return newResult;
     });
