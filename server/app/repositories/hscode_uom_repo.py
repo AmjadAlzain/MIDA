@@ -225,7 +225,7 @@ def seed_hscode_uom_from_csv(db: Session, csv_path: str) -> int:
             # Normalize UOM
             unit_lower = unit.lower()
             if unit_lower in ("unt", "unit", "units"):
-                uom = "UNIT"
+                uom = "UNT"
             elif unit_lower in ("kgm", "kg", "kgs", "kilogram", "kilograms", "tonne"):
                 uom = "KGM"
             else:

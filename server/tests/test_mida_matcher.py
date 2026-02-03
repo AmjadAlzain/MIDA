@@ -139,11 +139,12 @@ class TestNormalizeUom:
     """Tests for UOM normalization."""
 
     def test_normalize_unit_variants(self):
-        """Test unit variants normalize to UNIT."""
-        assert normalize_uom("UNT") == "UNIT"
-        assert normalize_uom("pcs") == "UNIT"
-        assert normalize_uom("PIECES") == "UNIT"
-        assert normalize_uom("ea") == "UNIT"
+        """Test unit variants normalize to UNT."""
+        assert normalize_uom("UNT") == "UNT"
+        assert normalize_uom("UNIT") == "UNT"
+        assert normalize_uom("pcs") == "UNT"
+        assert normalize_uom("PIECES") == "UNT"
+        assert normalize_uom("ea") == "UNT"
 
     def test_normalize_kg_variants(self):
         """Test kilogram variants normalize to KGM."""
@@ -158,9 +159,9 @@ class TestNormalizeUom:
         assert normalize_uom("Custom") == "CUSTOM"
 
     def test_normalize_empty_uom(self):
-        """Test empty UOM defaults to UNIT."""
-        assert normalize_uom("") == "UNIT"
-        assert normalize_uom("  ") == "UNIT"
+        """Test empty UOM defaults to UNT."""
+        assert normalize_uom("") == "UNT"
+        assert normalize_uom("  ") == "UNT"
 
 
 class TestUomCompatibility:
@@ -168,7 +169,7 @@ class TestUomCompatibility:
 
     def test_same_uom_compatible(self):
         """Test same UOM is compatible."""
-        assert are_uoms_compatible("UNIT", "UNIT") is True
+        assert are_uoms_compatible("UNT", "UNT") is True
         assert are_uoms_compatible("KGM", "KGM") is True
 
     def test_uom_variants_compatible(self):
@@ -179,7 +180,7 @@ class TestUomCompatibility:
 
     def test_different_uom_not_compatible(self):
         """Test different UOMs are not compatible."""
-        assert are_uoms_compatible("UNIT", "KGM") is False
+        assert are_uoms_compatible("UNT", "KGM") is False
         assert are_uoms_compatible("KGM", "MTR") is False
         assert are_uoms_compatible("pcs", "kg") is False
 
@@ -639,15 +640,15 @@ class TestTieBreaking:
 
 
 # =============================================================================
-# 1-to-1 Matching Tests
+# Duplicate Item Matching Tests
 # =============================================================================
 
 
-class TestOneToOneMatching:
-    """Tests for 1-to-1 matching (no MIDA item reuse)."""
+class TestDuplicateItemMatching:
+    """Tests for matching multiple invoice items with same name to same MIDA item."""
 
-    def test_no_mida_item_reuse(self):
-        """Test that each MIDA item is only matched once."""
+    def test_duplicate_invoice_items_all_match_same_mida(self):
+        """Test that duplicate invoice items all match the same MIDA item."""
         mida_items = [
             MidaItem(
                 line_no=1,
@@ -679,11 +680,137 @@ class TestOneToOneMatching:
             threshold=1.0,
         )
 
-        # First invoice item matches, second doesn't (MIDA item already used)
-        assert result.matched_count == 1
-        assert result.unmatched_count == 1
+        # Both invoice items should match the same MIDA item
+        assert result.matched_count == 2
+        assert result.unmatched_count == 0
         assert result.matches[0].matched is True
-        assert result.matches[1].matched is False
+        assert result.matches[1].matched is True
+        # Both matched to the same MIDA line
+        assert result.matches[0].mida_item.line_no == 1
+        assert result.matches[1].mida_item.line_no == 1
+
+    def test_duplicate_items_balance_decremented_for_each(self):
+        """Test that balance is decremented for each duplicate item match."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="TEST ITEM",
+                hs_code="12345678",
+                approved_quantity=Decimal("100"),
+                uom="UNIT",
+            )
+        ]
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Test Item",
+                quantity=Decimal("30"),
+                quantity_uom="UNIT",
+            ),
+            InvoiceItem(
+                line_no=2,
+                item_name="Test Item",
+                quantity=Decimal("40"),
+                quantity_uom="UNIT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        # Both matched
+        assert result.matched_count == 2
+        # First match: 100 - 30 = 70 remaining
+        assert result.matches[0].remaining_qty == Decimal("70")
+        # Second match: 70 - 40 = 30 remaining
+        assert result.matches[1].remaining_qty == Decimal("30")
+
+    def test_duplicate_items_warning_generated(self):
+        """Test that informational warning is generated for duplicate matches."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="TEST ITEM",
+                hs_code="12345678",
+                approved_quantity=Decimal("100"),
+                uom="UNIT",
+            )
+        ]
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Test Item",
+                quantity=Decimal("10"),
+                quantity_uom="UNIT",
+            ),
+            InvoiceItem(
+                line_no=2,
+                item_name="Test Item",
+                quantity=Decimal("10"),
+                quantity_uom="UNIT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        # Should have warning about multiple items matching same MIDA line
+        duplicate_warnings = [
+            w for w in result.warnings 
+            if "Multiple invoice items matched same MIDA line" in w.reason
+        ]
+        assert len(duplicate_warnings) == 1
+        assert duplicate_warnings[0].severity == WarningSeverity.info
+
+    def test_duplicate_items_exceeds_balance_warning(self):
+        """Test that warning is generated when duplicate items exceed balance."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="TEST ITEM",
+                hs_code="12345678",
+                approved_quantity=Decimal("50"),  # Only 50 available
+                uom="UNIT",
+            )
+        ]
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Test Item",
+                quantity=Decimal("30"),  # First takes 30
+                quantity_uom="UNIT",
+            ),
+            InvoiceItem(
+                line_no=2,
+                item_name="Test Item",
+                quantity=Decimal("30"),  # Second needs 30 but only 20 left
+                quantity_uom="UNIT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        # Both should still match (warn and continue)
+        assert result.matched_count == 2
+        # Should have warning about exceeding remaining quantity
+        exceed_warnings = [
+            w for w in result.warnings 
+            if "Exceeds remaining" in w.reason
+        ]
+        assert len(exceed_warnings) == 1
 
     def test_multiple_matches_different_items(self, sample_mida_items):
         """Test multiple invoice items match different MIDA items."""

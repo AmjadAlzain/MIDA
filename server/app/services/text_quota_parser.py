@@ -12,12 +12,12 @@ def parse_number(s: str) -> Optional[float]:
         return None
 
 def normalize_uom(uom: str) -> str:
-    """Normalize UOM: kg -> KGM, u -> UNIT."""
+    """Normalize UOM: kg -> KGM, u -> UNT."""
     uom_upper = uom.upper().strip()
     if uom_upper in ("KG", "K.G", "KGS", "KGM"):
         return "KGM"
-    if uom_upper in ("U", "UNIT", "UNITS", "PCS", "PC"):
-        return "UNIT"
+    if uom_upper in ("U", "UNIT", "UNT", "UNITS", "PCS", "PC"):
+        return "UNT"
     return uom_upper
 
 # Patterns for handwriting/edit marker detection

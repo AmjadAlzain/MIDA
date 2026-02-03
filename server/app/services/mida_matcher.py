@@ -16,7 +16,7 @@ MIDA certificate items have:
 - item_name: str
 - hs_code: str
 - approved_quantity: Decimal
-- uom: str (e.g., "UNIT", "KGM", "KGS")
+- uom: str (e.g., "UNT", "KGM", "KGS")
 
 Matching Strategy:
 ------------------
@@ -72,19 +72,19 @@ class WarningSeverity(str, Enum):
 
 # UOM normalization mapping
 UOM_ALIASES: dict[str, str] = {
-    # Unit/piece variants
-    "unt": "UNIT",
-    "unit": "UNIT",
-    "units": "UNIT",
-    "pcs": "UNIT",
-    "pc": "UNIT",
-    "piece": "UNIT",
-    "pieces": "UNIT",
-    "ea": "UNIT",
-    "each": "UNIT",
-    "nos": "UNIT",
-    "no": "UNIT",
-    "number": "UNIT",
+    # Unit/piece variants - normalized to UNT
+    "unt": "UNT",
+    "unit": "UNT",
+    "units": "UNT",
+    "pcs": "UNT",
+    "pc": "UNT",
+    "piece": "UNT",
+    "pieces": "UNT",
+    "ea": "UNT",
+    "each": "UNT",
+    "nos": "UNT",
+    "no": "UNT",
+    "number": "UNT",
     # Kilogram variants
     "kgm": "KGM",
     "kgs": "KGM",
@@ -109,7 +109,7 @@ UOM_ALIASES: dict[str, str] = {
 
 # UOM compatibility groups (UOMs in same group are compatible)
 UOM_COMPATIBILITY: dict[str, set[str]] = {
-    "UNIT": {"UNIT"},
+    "UNT": {"UNT"},
     "KGM": {"KGM"},
     "MTR": {"MTR"},
     "LTR": {"LTR"},
@@ -138,7 +138,7 @@ class InvoiceItem:
 
     @property
     def effective_quantity(self) -> Decimal:
-        """Get effective quantity based on UOM."""
+        """Get effective quantity based on UOM. Uses net_weight for KGM, quantity for UNT/others."""
         norm_uom = normalize_uom(self.quantity_uom)
         if norm_uom == "KGM" and self.net_weight is not None:
             return self.net_weight
@@ -271,14 +271,14 @@ def normalize_uom(uom: str) -> str:
         uom: Input UOM string
 
     Returns:
-        Normalized UOM (e.g., "UNIT", "KGM", "MTR")
+        Normalized UOM (e.g., "UNT", "KGM", "MTR")
     """
     if not uom:
-        return "UNIT"  # Default to UNIT
+        return "UNT"  # Default to UNT
 
     norm = uom.strip().lower()
     if not norm:
-        return "UNIT"  # Default to UNIT for whitespace-only input
+        return "UNT"  # Default to UNT for whitespace-only input
 
     return UOM_ALIASES.get(norm, uom.strip().upper())
 
@@ -360,22 +360,23 @@ def calculate_similarity(text1: str, text2: str) -> float:
 def find_best_match(
     invoice_item: InvoiceItem,
     mida_items: list[MidaItem],
-    used_mida_indices: set[int],
     mode: MatchMode,
     threshold: float,
+    remaining_qtys: Optional[dict[int, Decimal]] = None,
 ) -> tuple[Optional[int], float, bool]:
     """
     Find the best matching MIDA item for an invoice item.
 
-    Implements 1-to-1 matching by excluding already-used MIDA items.
-    Uses deterministic tie-breaking: higher score wins, prefer exact.
+    Allows same MIDA item to match multiple invoice items (for duplicates).
+    Uses deterministic tie-breaking: higher score wins, prefer exact,
+    then prefer items with more remaining quantity.
 
     Args:
         invoice_item: Invoice item to match
         mida_items: List of MIDA items
-        used_mida_indices: Set of already-matched MIDA item indices
         mode: Matching mode (exact or fuzzy)
         threshold: Minimum score threshold for fuzzy matching
+        remaining_qtys: Optional dict of remaining quantities by item index
 
     Returns:
         Tuple of (best_match_index, score, is_exact)
@@ -391,10 +392,6 @@ def find_best_match(
     best_is_exact: bool = False
 
     for idx, mida_item in enumerate(mida_items):
-        # Skip already-used MIDA items (1-to-1 matching)
-        if idx in used_mida_indices:
-            continue
-
         norm_mida = normalize(mida_item.item_name)
 
         if not norm_mida:
@@ -418,7 +415,8 @@ def find_best_match(
         # Deterministic tie-breaking:
         # 1. Higher score wins
         # 2. If same score, prefer exact over fuzzy
-        # 3. If still tied, prefer lower line_no (stable ordering)
+        # 3. If same score and exactness, prefer items with more remaining qty
+        # 4. If still tied, prefer lower line_no (stable ordering)
         should_update = False
 
         if score > best_score:
@@ -427,8 +425,17 @@ def find_best_match(
             if is_exact and not best_is_exact:
                 should_update = True
             elif is_exact == best_is_exact:
-                # Same score, same exactness - prefer lower line_no
-                if best_idx is not None and mida_item.line_no < mida_items[best_idx].line_no:
+                # Same score, same exactness - prefer more remaining quantity
+                if remaining_qtys is not None and best_idx is not None:
+                    current_remaining = remaining_qtys.get(idx, Decimal(0))
+                    best_remaining = remaining_qtys.get(best_idx, Decimal(0))
+                    if current_remaining > best_remaining:
+                        should_update = True
+                    elif current_remaining == best_remaining:
+                        # Same remaining - prefer lower line_no
+                        if mida_item.line_no < mida_items[best_idx].line_no:
+                            should_update = True
+                elif best_idx is not None and mida_item.line_no < mida_items[best_idx].line_no:
                     should_update = True
 
         if should_update:
@@ -535,8 +542,8 @@ def match_items(
     """
     Match invoice items to MIDA certificate items.
 
-    Implements 1-to-1 matching with deterministic tie-breaking.
-    Each MIDA item can only be matched once.
+    Allows same MIDA item to match multiple invoice items (for duplicate items).
+    Each match is treated as a separate entry with its own balance deduction.
 
     Args:
         invoice_items: List of invoice items to match
@@ -550,7 +557,6 @@ def match_items(
     matches: list[MatchResult] = []
     unmatched: list[InvoiceItem] = []
     all_warnings: list[MatchWarning] = []
-    used_mida_indices: set[int] = set()
 
     # Track remaining quantities (will be modified as we match)
     # TODO: Initialize from actual remaining quantities when available
@@ -558,13 +564,17 @@ def match_items(
         idx: item.remaining_quantity for idx, item in enumerate(mida_items)
     }
 
+    # Track which invoice items matched to which MIDA items (for duplicate warnings)
+    # Key: mida_item index, Value: list of invoice line numbers that matched it
+    mida_match_tracker: dict[int, list[int]] = {}
+
     for invoice_item in invoice_items:
         best_idx, score, is_exact = find_best_match(
             invoice_item=invoice_item,
             mida_items=mida_items,
-            used_mida_indices=used_mida_indices,
             mode=mode,
             threshold=threshold,
+            remaining_qtys=remaining_qtys,
         )
 
         if best_idx is None:
@@ -590,14 +600,17 @@ def match_items(
         warnings = check_quantity_warnings(invoice_item, mida_item, remaining_qty)
         all_warnings.extend(warnings)
 
+        # Track this match for duplicate detection
+        invoice_line = invoice_item.line_no or 0
+        if best_idx not in mida_match_tracker:
+            mida_match_tracker[best_idx] = []
+        mida_match_tracker[best_idx].append(invoice_line)
+
         # Update remaining quantity for this MIDA item
         # Use effective quantity based on UOM
         if are_uoms_compatible(invoice_item.quantity_uom, mida_item.uom):
             consumed = invoice_item.effective_quantity
             remaining_qtys[best_idx] = max(Decimal(0), remaining_qty - consumed)
-
-        # Mark as used (1-to-1 matching)
-        used_mida_indices.add(best_idx)
 
         matches.append(
             MatchResult(
@@ -609,6 +622,23 @@ def match_items(
                 warnings=warnings,
             )
         )
+
+    # Add informational warnings for MIDA items matched by multiple invoice items
+    for mida_idx, invoice_lines in mida_match_tracker.items():
+        if len(invoice_lines) > 1:
+            mida_item = mida_items[mida_idx]
+            mida_desc = f"Line {mida_item.line_no}: {mida_item.item_name[:40]}"
+            line_list = ", ".join(f"#{ln}" for ln in invoice_lines)
+            all_warnings.append(
+                MatchWarning(
+                    invoice_item=f"Invoice lines {line_list}",
+                    mida_item=mida_desc,
+                    reason="Multiple invoice items matched same MIDA line",
+                    severity=WarningSeverity.info,
+                    details=f"Invoice lines {line_list} all matched to MIDA line {mida_item.line_no}. "
+                    f"Balance will be deducted for each item separately.",
+                )
+            )
 
     matched_count = sum(1 for m in matches if m.matched)
 
@@ -638,7 +668,7 @@ def match_items_multi_certificate(
        a. Certificate with nearest expiration date
        b. If dates are equal, pick certificate with highest remaining balance for that item
        c. If still tied, pick alphabetically by certificate_number (deterministic)
-    4. Each MIDA item can only be matched once per certificate
+    4. Same MIDA item can match multiple invoice items (for duplicates)
 
     Args:
         invoice_items: List of invoice items to match
@@ -654,14 +684,15 @@ def match_items_multi_certificate(
     all_warnings: list[MatchWarning] = []
     missing_model_no_count = 0
     
-    # Track used items per certificate to enforce 1-to-1 matching within each cert
-    used_items_by_cert: dict[str, set[int]] = {cert_id: set() for cert_id in mida_items_by_cert}
-    
     # Track remaining quantities by (cert_id, item_idx) - will be updated as we match
     remaining_qtys: dict[tuple[str, int], Decimal] = {}
     for cert_id, mida_items in mida_items_by_cert.items():
         for idx, item in enumerate(mida_items):
             remaining_qtys[(cert_id, idx)] = item.remaining_quantity
+
+    # Track which invoice items matched to which MIDA items (for duplicate warnings)
+    # Key: (cert_id, item_idx), Value: list of invoice line numbers that matched it
+    mida_match_tracker: dict[tuple[str, int], list[int]] = {}
 
     for invoice_item in invoice_items:
         # Rule 1: Items without model_no cannot be matched
@@ -697,10 +728,6 @@ def match_items_multi_certificate(
         
         for cert_id, mida_items in mida_items_by_cert.items():
             for idx, mida_item in enumerate(mida_items):
-                # Skip already-used items in this certificate
-                if idx in used_items_by_cert[cert_id]:
-                    continue
-                
                 # Rule 2: Certificate model_number must match invoice model_no
                 cert_model = mida_item.certificate_model_number or ""
                 norm_cert_model = normalize(cert_model)
@@ -768,14 +795,18 @@ def match_items_multi_certificate(
         # Check for quantity warnings
         warnings = check_quantity_warnings(invoice_item, best_mida_item, remaining_qty)
         all_warnings.extend(warnings)
+
+        # Track this match for duplicate detection
+        invoice_line = invoice_item.line_no or 0
+        match_key = (best_cert_id, best_idx)
+        if match_key not in mida_match_tracker:
+            mida_match_tracker[match_key] = []
+        mida_match_tracker[match_key].append(invoice_line)
         
         # Update remaining quantity
         if are_uoms_compatible(invoice_item.quantity_uom, best_mida_item.uom):
             consumed = invoice_item.effective_quantity
             remaining_qtys[(best_cert_id, best_idx)] = max(Decimal(0), remaining_qty - consumed)
-        
-        # Mark as used in this certificate
-        used_items_by_cert[best_cert_id].add(best_idx)
         
         matches.append(
             MatchResult(
@@ -789,6 +820,25 @@ def match_items_multi_certificate(
                 certificate_number=best_mida_item.certificate_number,
             )
         )
+
+    # Add informational warnings for MIDA items matched by multiple invoice items
+    for (cert_id, mida_idx), invoice_lines in mida_match_tracker.items():
+        if len(invoice_lines) > 1:
+            # Find the mida item to get its details
+            mida_item = mida_items_by_cert[cert_id][mida_idx]
+            mida_desc = f"Line {mida_item.line_no}: {mida_item.item_name[:40]}"
+            line_list = ", ".join(f"#{ln}" for ln in invoice_lines)
+            cert_num = mida_item.certificate_number or cert_id
+            all_warnings.append(
+                MatchWarning(
+                    invoice_item=f"Invoice lines {line_list}",
+                    mida_item=mida_desc,
+                    reason="Multiple invoice items matched same MIDA line",
+                    severity=WarningSeverity.info,
+                    details=f"Invoice lines {line_list} all matched to MIDA line {mida_item.line_no} "
+                    f"(Certificate: {cert_num}). Balance will be deducted for each item separately.",
+                )
+            )
 
     matched_count = sum(1 for m in matches if m.matched)
 
