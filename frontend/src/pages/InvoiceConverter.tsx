@@ -10,10 +10,12 @@ import {
   CheckCircle,
   ArrowRightLeft,
   RotateCcw,
+  Edit2,
 } from 'lucide-react';
 import { Button, Card, CardHeader, CardTitle, FileUpload, Badge, Select, Input, Modal } from '@/components/ui';
+import { MidaCertificateSelector } from '@/components/MidaCertificateSelector';
 import { classificationService, companyService, certificateService, importService } from '@/services';
-import { ClassificationResponse, ClassificationItem, Company, K1ExportItem, Certificate, COUNTRIES, ImportPreviewResponse } from '@/types';
+import { ClassificationResponse, ClassificationItem, Company, K1ExportItem, Certificate, CertificateItem, COUNTRIES, ImportPreviewResponse, Port } from '@/types';
 import { cn, formatNumber } from '@/utils';
 
 // Tab types for the Invoice Converter
@@ -44,6 +46,10 @@ export function InvoiceConverter() {
   const [previewData, setPreviewData] = useState<ImportPreviewResponse | null>(null);
   const [isUpdatingBalance, setIsUpdatingBalance] = useState(false);
   const [updatedItemIds, setUpdatedItemIds] = useState<Set<string>>(new Set()); // Track items with balance already updated
+
+  // MIDA Certificate Selector State
+  const [showMidaSelector, setShowMidaSelector] = useState(false);
+  const [editingMidaItem, setEditingMidaItem] = useState<ClassificationItem | null>(null);
 
   // Fetch companies
   const { data: companies = [] } = useQuery<Company[]>({
@@ -80,14 +86,36 @@ export function InvoiceConverter() {
 
   // Check for manual changes
   const hasChanges = useMemo(() => {
-    if (!classificationResult) return false;
+    if (!classificationResult || !originalResult) return false;
     const allItems = [
       ...classificationResult.form_d_items,
       ...classificationResult.mida_items,
       ...classificationResult.duties_payable_items
     ];
-    return allItems.some(i => i.manually_moved || i.sst_manually_changed);
-  }, [classificationResult]);
+    const originalAllItems = [
+      ...originalResult.form_d_items,
+      ...originalResult.mida_items,
+      ...originalResult.duties_payable_items
+    ];
+    
+    // Check for moved items or SST changes
+    const hasMovedOrSstChanges = allItems.some(i => i.manually_moved || i.sst_manually_changed);
+    
+    // Check for MIDA match changes
+    const hasMidaMatchChanges = allItems.some(item => {
+      const originalItem = originalAllItems.find(o => o.id === item.id);
+      if (!originalItem) return false;
+      return item.mida_certificate_id !== originalItem.mida_certificate_id ||
+             item.mida_item_id !== originalItem.mida_item_id;
+    });
+    
+    return hasMovedOrSstChanges || hasMidaMatchChanges;
+  }, [classificationResult, originalResult]);
+
+  // Get selected certificates for MIDA selector
+  const selectedCertificatesForSelector = useMemo(() => {
+    return companyCertificates.filter(cert => selectedCertificateIds.includes(cert.id));
+  }, [companyCertificates, selectedCertificateIds]);
 
   // Computed data
   const tabData = useMemo((): Record<ConverterTab, ClassificationItem[]> => {
@@ -295,6 +323,81 @@ export function InvoiceConverter() {
     toast.success(`All items set to SST ${setExempted ? 'Exempt' : 'Taxable'}`);
   };
 
+  // Handle opening the MIDA certificate selector
+  const handleOpenMidaSelector = (item: ClassificationItem) => {
+    setEditingMidaItem(item);
+    setShowMidaSelector(true);
+  };
+
+  // Handle manual MIDA match confirmation
+  const handleManualMidaMatch = (
+    item: ClassificationItem,
+    certificate: Certificate,
+    certificateItem: CertificateItem
+  ) => {
+    if (!classificationResult) return;
+
+    const newResult = JSON.parse(JSON.stringify(classificationResult)) as ClassificationResponse;
+    
+    // Find the item in the MIDA list
+    const targetItem = newResult.mida_items.find((i) => i.id === item.id);
+    if (!targetItem) return;
+
+    // Get port-specific balance
+    const getPortBalance = (port: string): number => {
+      switch (port) {
+        case 'port_klang':
+          return certificateItem.remaining_port_klang ?? certificateItem.port_klang_qty ?? 0;
+        case 'klia':
+          return certificateItem.remaining_klia ?? certificateItem.klia_qty ?? 0;
+        case 'bukit_kayu_hitam':
+          return certificateItem.remaining_bukit_kayu_hitam ?? certificateItem.bukit_kayu_hitam_qty ?? 0;
+        default:
+          return 0;
+      }
+    };
+
+    // Update MIDA matching fields
+    targetItem.mida_certificate_id = certificate.id;
+    targetItem.mida_certificate_number = certificate.certificate_number;
+    targetItem.mida_item_id = certificateItem.id;
+    targetItem.mida_line_no = certificateItem.line_no;
+    targetItem.mida_item_name = certificateItem.item_name;
+    targetItem.mida_hs_code = certificateItem.hs_code;
+    
+    // Update UOM to match the MIDA certificate item's UOM
+    const newUom = certificateItem.uom;
+    targetItem.uom = newUom;
+    
+    // Determine deduction quantity based on the MIDA certificate item's UOM
+    // Weight-based UOMs (KGM, KGS, KG) use net_weight_kg, others use quantity
+    const normalizedUom = newUom.toUpperCase();
+    const isWeightBasedUom = ['KGM', 'KGS', 'KG', 'KILOGRAM', 'KILOGRAMS'].includes(normalizedUom);
+    
+    if (isWeightBasedUom && targetItem.net_weight_kg) {
+      targetItem.deduction_quantity = targetItem.net_weight_kg;
+    } else {
+      targetItem.deduction_quantity = targetItem.quantity;
+    }
+    
+    // Update balances
+    // Use remaining balance fields if available, otherwise use the allocated quantities
+    const remainingTotal = certificateItem.remaining_port_klang !== undefined 
+      ? (certificateItem.remaining_port_klang ?? 0) + (certificateItem.remaining_klia ?? 0) + (certificateItem.remaining_bukit_kayu_hitam ?? 0)
+      : (certificateItem.port_klang_qty ?? 0) + (certificateItem.klia_qty ?? 0) + (certificateItem.bukit_kayu_hitam_qty ?? 0);
+    targetItem.remaining_qty = Number(remainingTotal);
+    targetItem.remaining_port_klang = Number(certificateItem.remaining_port_klang ?? certificateItem.port_klang_qty ?? 0);
+    targetItem.remaining_klia = Number(certificateItem.remaining_klia ?? certificateItem.klia_qty ?? 0);
+    targetItem.remaining_bukit_kayu_hitam = Number(certificateItem.remaining_bukit_kayu_hitam ?? certificateItem.bukit_kayu_hitam_qty ?? 0);
+    targetItem.port_specific_remaining = getPortBalance(selectedPort);
+
+    setClassificationResult(newResult);
+    setShowMidaSelector(false);
+    setEditingMidaItem(null);
+    
+    toast.success(`Matched to ${certificate.certificate_number} Line ${certificateItem.line_no}`);
+  };
+
   // Handle Update Balance (Step 1: Preview)
   const handleUpdateBalance = async () => {
     if (!declarationRefNo.trim()) {
@@ -443,7 +546,10 @@ export function InvoiceConverter() {
 
     setIsExporting(true);
     try {
-      const items = selectedIndices.map((i) => tabData[tabKey][i]);
+      // Get selected items and sort by line_no (ascending) to match original invoice order
+      const items = selectedIndices
+        .map((i) => tabData[tabKey][i])
+        .sort((a, b) => a.line_no - b.line_no);
       const exportType = tabKey === 'formd' ? 'form_d' : tabKey === 'mida' ? 'mida' : 'duties_payable';
       
       const k1Items: K1ExportItem[] = items.map((item) => {
@@ -488,11 +594,17 @@ export function InvoiceConverter() {
     }
   };
 
-  // Get quantity status class
+  // Get quantity status class based on port-specific remaining balance
   const getQtyStatusClass = (item: ClassificationItem): string => {
-    if (!item.remaining_qty) return '';
-    if (item.remaining_qty <= 0) return 'text-red-600 font-bold';
-    if (item.remaining_qty < item.quantity) return 'text-yellow-600';
+    // Use port_specific_remaining if available (what's displayed in Balance column)
+    const balance = item.port_specific_remaining ?? item.remaining_qty;
+    if (balance === undefined || balance === null) return '';
+    
+    // Compare against deduction quantity (or quantity if not set)
+    const deductionQty = item.deduction_quantity ?? item.quantity;
+    
+    if (balance <= 0) return 'text-red-600 font-bold';
+    if (balance < deductionQty) return 'text-yellow-600';
     return 'text-green-600';
   };
 
@@ -866,9 +978,14 @@ export function InvoiceConverter() {
                         {activeTab === 'mida' && (
                           <>
                             <td className="px-2 py-2">
-                              <span className="text-purple-600 font-medium whitespace-nowrap">
-                                {item.mida_certificate_number || '-'}
-                              </span>
+                              <button
+                                onClick={() => handleOpenMidaSelector(item)}
+                                className="flex items-center gap-1 text-purple-600 font-medium whitespace-nowrap hover:text-purple-800 hover:bg-purple-50 px-2 py-1 rounded transition-colors group"
+                                title="Click to change MIDA certificate/item match"
+                              >
+                                {item.mida_certificate_number || 'Select...'}
+                                <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </button>
                             </td>
                             <td className={cn('px-2 py-2 text-right font-semibold', getQtyStatusClass(item))}>
                               <div
@@ -1022,6 +1139,21 @@ export function InvoiceConverter() {
           </div>
         </div>
       </Modal>
+
+      {/* MIDA Certificate Selector Modal */}
+      {editingMidaItem && (
+        <MidaCertificateSelector
+          isOpen={showMidaSelector}
+          onClose={() => {
+            setShowMidaSelector(false);
+            setEditingMidaItem(null);
+          }}
+          item={editingMidaItem}
+          availableCertificates={selectedCertificatesForSelector}
+          selectedPort={selectedPort as Port}
+          onConfirmMatch={handleManualMidaMatch}
+        />
+      )}
     </div>
   );
 }

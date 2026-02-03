@@ -37,6 +37,12 @@ export interface CertificateItem {
   port_klang_qty: number;
   klia_qty: number;
   bukit_kayu_hitam_qty: number;
+  // Remaining balances (included when fetching certificate by ID)
+  remaining_quantity?: number;
+  remaining_port_klang?: number;
+  remaining_klia?: number;
+  remaining_bukit_kayu_hitam?: number;
+  quantity_status?: 'normal' | 'warning' | 'depleted' | 'overdrawn';
 }
 
 export interface CertificateItemBalance extends CertificateItem {
