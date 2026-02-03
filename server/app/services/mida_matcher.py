@@ -363,13 +363,15 @@ def find_best_match(
     mode: MatchMode,
     threshold: float,
     remaining_qtys: Optional[dict[int, Decimal]] = None,
+    exhausted_indices: Optional[set[int]] = None,
 ) -> tuple[Optional[int], float, bool]:
     """
     Find the best matching MIDA item for an invoice item.
 
-    Allows same MIDA item to match multiple invoice items (for duplicates).
-    Uses deterministic tie-breaking: higher score wins, prefer exact,
-    then prefer items with more remaining quantity.
+    Implements sequential deduction for duplicate items:
+    - When multiple MIDA items have the same name, prefer the one with the
+      lowest line_no that can still cover the invoice quantity.
+    - Skip items marked as exhausted (balance too low to cover any more invoices).
 
     Args:
         invoice_item: Invoice item to match
@@ -377,6 +379,7 @@ def find_best_match(
         mode: Matching mode (exact or fuzzy)
         threshold: Minimum score threshold for fuzzy matching
         remaining_qtys: Optional dict of remaining quantities by item index
+        exhausted_indices: Optional set of item indices to skip (balance exhausted)
 
     Returns:
         Tuple of (best_match_index, score, is_exact)
@@ -387,11 +390,21 @@ def find_best_match(
     if not norm_invoice:
         return None, 0.0, False
 
+    if exhausted_indices is None:
+        exhausted_indices = set()
+
+    # Get invoice quantity for checking if MIDA item can cover it
+    invoice_qty = invoice_item.effective_quantity
+
     best_idx: Optional[int] = None
     best_score: float = 0.0
     best_is_exact: bool = False
 
     for idx, mida_item in enumerate(mida_items):
+        # Skip exhausted items
+        if idx in exhausted_indices:
+            continue
+
         norm_mida = normalize(mida_item.item_name)
 
         if not norm_mida:
@@ -412,11 +425,19 @@ def find_best_match(
         if not is_exact and score < threshold:
             continue
 
+        # Check if this item has sufficient balance to cover invoice quantity
+        # If not, skip it (Option B: move to next duplicate entirely)
+        if remaining_qtys is not None:
+            item_remaining = remaining_qtys.get(idx, Decimal(0))
+            if item_remaining < invoice_qty:
+                # This item can't cover the full invoice quantity, skip it
+                # unless there's no other option (will be handled by fallback below)
+                continue
+
         # Deterministic tie-breaking:
         # 1. Higher score wins
         # 2. If same score, prefer exact over fuzzy
-        # 3. If same score and exactness, prefer items with more remaining qty
-        # 4. If still tied, prefer lower line_no (stable ordering)
+        # 3. If same score and exactness, prefer LOWER line_no (sequential deduction)
         should_update = False
 
         if score > best_score:
@@ -425,23 +446,44 @@ def find_best_match(
             if is_exact and not best_is_exact:
                 should_update = True
             elif is_exact == best_is_exact:
-                # Same score, same exactness - prefer more remaining quantity
-                if remaining_qtys is not None and best_idx is not None:
-                    current_remaining = remaining_qtys.get(idx, Decimal(0))
-                    best_remaining = remaining_qtys.get(best_idx, Decimal(0))
-                    if current_remaining > best_remaining:
-                        should_update = True
-                    elif current_remaining == best_remaining:
-                        # Same remaining - prefer lower line_no
-                        if mida_item.line_no < mida_items[best_idx].line_no:
-                            should_update = True
-                elif best_idx is not None and mida_item.line_no < mida_items[best_idx].line_no:
+                # Same score, same exactness - prefer lower line_no for sequential deduction
+                if best_idx is not None and mida_item.line_no < mida_items[best_idx].line_no:
+                    should_update = True
+                elif best_idx is None:
                     should_update = True
 
         if should_update:
             best_idx = idx
             best_score = score
             best_is_exact = is_exact
+
+    # Fallback: if no item with sufficient balance found, try any matching item
+    # (even if balance is insufficient - will generate warning)
+    if best_idx is None:
+        for idx, mida_item in enumerate(mida_items):
+            if idx in exhausted_indices:
+                continue
+
+            norm_mida = normalize(mida_item.item_name)
+            if not norm_mida:
+                continue
+
+            if norm_invoice == norm_mida:
+                score = 1.0
+                is_exact = True
+            elif mode == MatchMode.fuzzy:
+                score = calculate_similarity(norm_invoice, norm_mida)
+                is_exact = False
+                if score < threshold:
+                    continue
+            else:
+                continue
+
+            # Accept first match by line_no order (items are already in order)
+            if best_idx is None or mida_item.line_no < mida_items[best_idx].line_no:
+                best_idx = idx
+                best_score = score
+                best_is_exact = is_exact
 
     return best_idx, best_score, best_is_exact
 
@@ -542,8 +584,11 @@ def match_items(
     """
     Match invoice items to MIDA certificate items.
 
-    Allows same MIDA item to match multiple invoice items (for duplicate items).
-    Each match is treated as a separate entry with its own balance deduction.
+    Implements sequential deduction for duplicate MIDA items:
+    - When a MIDA certificate has multiple items with the same name, deduct from
+      the first one (by line_no) until its balance can't cover new invoices.
+    - Then move to the next duplicate entry.
+    - If an item's balance is too low to cover an invoice, skip to the next duplicate.
 
     Args:
         invoice_items: List of invoice items to match
@@ -559,14 +604,33 @@ def match_items(
     all_warnings: list[MatchWarning] = []
 
     # Track remaining quantities (will be modified as we match)
-    # TODO: Initialize from actual remaining quantities when available
     remaining_qtys: dict[int, Decimal] = {
         idx: item.remaining_quantity for idx, item in enumerate(mida_items)
     }
 
+    # Track exhausted items (balance too low to cover any reasonable invoice)
+    # Items are marked exhausted when their balance reaches 0 or becomes insufficient
+    exhausted_indices: set[int] = set()
+
     # Track which invoice items matched to which MIDA items (for duplicate warnings)
     # Key: mida_item index, Value: list of invoice line numbers that matched it
     mida_match_tracker: dict[int, list[int]] = {}
+
+    # Track spillover events (when invoice switches from one duplicate to another)
+    # Key: normalized item name, Value: list of (from_line_no, to_line_no, invoice_line) tuples
+    spillover_tracker: dict[str, list[tuple[int, int, int]]] = {}
+
+    # Group MIDA items by normalized name for tracking duplicates
+    mida_items_by_name: dict[str, list[int]] = {}
+    for idx, mida_item in enumerate(mida_items):
+        norm_name = normalize(mida_item.item_name)
+        if norm_name not in mida_items_by_name:
+            mida_items_by_name[norm_name] = []
+        mida_items_by_name[norm_name].append(idx)
+
+    # Sort each group by line_no for sequential deduction
+    for name in mida_items_by_name:
+        mida_items_by_name[name].sort(key=lambda idx: mida_items[idx].line_no)
 
     for invoice_item in invoice_items:
         best_idx, score, is_exact = find_best_match(
@@ -575,6 +639,7 @@ def match_items(
             mode=mode,
             threshold=threshold,
             remaining_qtys=remaining_qtys,
+            exhausted_indices=exhausted_indices,
         )
 
         if best_idx is None:
@@ -610,7 +675,33 @@ def match_items(
         # Use effective quantity based on UOM
         if are_uoms_compatible(invoice_item.quantity_uom, mida_item.uom):
             consumed = invoice_item.effective_quantity
-            remaining_qtys[best_idx] = max(Decimal(0), remaining_qty - consumed)
+            new_remaining = max(Decimal(0), remaining_qty - consumed)
+            remaining_qtys[best_idx] = new_remaining
+
+            # Check if this item is now exhausted (balance is 0 or very low)
+            # Mark as exhausted so next invoice with same name goes to next duplicate
+            if new_remaining <= Decimal(0):
+                exhausted_indices.add(best_idx)
+
+                # Track spillover: find if there's a next duplicate in line
+                norm_name = normalize(mida_item.item_name)
+                if norm_name in mida_items_by_name:
+                    name_group = mida_items_by_name[norm_name]
+                    current_pos = name_group.index(best_idx) if best_idx in name_group else -1
+                    if current_pos >= 0 and current_pos < len(name_group) - 1:
+                        # There's a next duplicate
+                        next_idx = name_group[current_pos + 1]
+                        next_mida = mida_items[next_idx]
+                        all_warnings.append(
+                            MatchWarning(
+                                invoice_item=f"Line {invoice_line}: {invoice_item.item_name[:40]}",
+                                mida_item=f"Line {mida_item.line_no}: {mida_item.item_name[:40]}",
+                                reason="MIDA item balance exhausted, switching to next duplicate",
+                                severity=WarningSeverity.info,
+                                details=f"MIDA line {mida_item.line_no} balance exhausted after this deduction. "
+                                f"Future matches for '{mida_item.item_name[:30]}' will use MIDA line {next_mida.line_no}.",
+                            )
+                        )
 
         matches.append(
             MatchResult(
@@ -690,9 +781,26 @@ def match_items_multi_certificate(
         for idx, item in enumerate(mida_items):
             remaining_qtys[(cert_id, idx)] = item.remaining_quantity
 
+    # Track exhausted items by (cert_id, item_idx)
+    exhausted_keys: set[tuple[str, int]] = set()
+
     # Track which invoice items matched to which MIDA items (for duplicate warnings)
     # Key: (cert_id, item_idx), Value: list of invoice line numbers that matched it
     mida_match_tracker: dict[tuple[str, int], list[int]] = {}
+
+    # Group MIDA items by (cert_id, normalized_name) for tracking duplicates within each certificate
+    mida_items_by_cert_name: dict[tuple[str, str], list[int]] = {}
+    for cert_id, mida_items in mida_items_by_cert.items():
+        for idx, mida_item in enumerate(mida_items):
+            norm_name = normalize(mida_item.item_name)
+            key = (cert_id, norm_name)
+            if key not in mida_items_by_cert_name:
+                mida_items_by_cert_name[key] = []
+            mida_items_by_cert_name[key].append(idx)
+    # Sort each group by line_no for sequential deduction
+    for key in mida_items_by_cert_name:
+        cert_id = key[0]
+        mida_items_by_cert_name[key].sort(key=lambda idx: mida_items_by_cert[cert_id][idx].line_no)
 
     for invoice_item in invoice_items:
         # Rule 1: Items without model_no cannot be matched
@@ -722,12 +830,21 @@ def match_items_multi_certificate(
         norm_invoice_name = normalize(invoice_item.item_name)
         norm_invoice_model = normalize(invoice_item.model_no)
         
+        # Get invoice quantity for checking if MIDA item can cover it
+        invoice_qty = invoice_item.effective_quantity
+
         # Find all potential matches across all certificates
         # Each match is: (cert_id, item_idx, mida_item, score, is_exact)
         potential_matches: list[tuple[str, int, MidaItem, float, bool]] = []
+        # Also track fallback matches (insufficient balance but still matching)
+        fallback_matches: list[tuple[str, int, MidaItem, float, bool]] = []
         
         for cert_id, mida_items in mida_items_by_cert.items():
             for idx, mida_item in enumerate(mida_items):
+                # Skip exhausted items
+                if (cert_id, idx) in exhausted_keys:
+                    continue
+
                 # Rule 2: Certificate model_number must match invoice model_no
                 cert_model = mida_item.certificate_model_number or ""
                 norm_cert_model = normalize(cert_model)
@@ -752,29 +869,37 @@ def match_items_multi_certificate(
                 else:
                     continue  # Exact mode but not an exact match
                 
-                potential_matches.append((cert_id, idx, mida_item, score, is_exact))
+                # Check if this item has sufficient balance (Option B: skip if can't cover full amount)
+                item_remaining = remaining_qtys.get((cert_id, idx), Decimal(0))
+                if item_remaining >= invoice_qty:
+                    potential_matches.append((cert_id, idx, mida_item, score, is_exact))
+                else:
+                    # Track as fallback in case no item has sufficient balance
+                    fallback_matches.append((cert_id, idx, mida_item, score, is_exact))
         
+        # Use fallback matches if no item has sufficient balance
         if not potential_matches:
-            # No match found
-            unmatched.append(invoice_item)
-            matches.append(
-                MatchResult(
-                    invoice_item=invoice_item,
-                    mida_item=None,
-                    match_score=0.0,
-                    is_exact_match=False,
-                    remaining_qty=Decimal(0),
-                    warnings=[],
+            if fallback_matches:
+                potential_matches = fallback_matches
+            else:
+                # No match found at all
+                unmatched.append(invoice_item)
+                matches.append(
+                    MatchResult(
+                        invoice_item=invoice_item,
+                        mida_item=None,
+                        match_score=0.0,
+                        is_exact_match=False,
+                        remaining_qty=Decimal(0),
+                        warnings=[],
+                    )
                 )
-            )
-            continue
+                continue
         
         # Rule 3: Apply tie-breaking for items matching in multiple certificates
-        # Sort by: (score DESC, expiration_date ASC, remaining_balance DESC, cert_number ASC)
+        # Sort by: (score DESC, expiration_date ASC, line_no ASC for sequential deduction, cert_number ASC)
         def sort_key(match_tuple: tuple[str, int, MidaItem, float, bool]):
             cert_id, item_idx, mida_item, score, is_exact = match_tuple
-            # Get remaining balance for this specific item
-            remaining = remaining_qtys.get((cert_id, item_idx), Decimal(0))
             # Expiration date: None treated as far future (9999-12-31)
             exp_date = mida_item.certificate_end_date or date(9999, 12, 31)
             cert_num = mida_item.certificate_number or ""
@@ -782,7 +907,7 @@ def match_items_multi_certificate(
             return (
                 -score,  # Higher score first (negative for ascending sort)
                 exp_date,  # Nearest expiration first
-                -float(remaining),  # Higher remaining balance first
+                mida_item.line_no,  # Lower line_no first (sequential deduction)
                 cert_num,  # Alphabetical by cert number (deterministic tie-breaker)
             )
         
@@ -806,7 +931,34 @@ def match_items_multi_certificate(
         # Update remaining quantity
         if are_uoms_compatible(invoice_item.quantity_uom, best_mida_item.uom):
             consumed = invoice_item.effective_quantity
-            remaining_qtys[(best_cert_id, best_idx)] = max(Decimal(0), remaining_qty - consumed)
+            new_remaining = max(Decimal(0), remaining_qty - consumed)
+            remaining_qtys[(best_cert_id, best_idx)] = new_remaining
+
+            # Check if this item is now exhausted
+            if new_remaining <= Decimal(0):
+                exhausted_keys.add((best_cert_id, best_idx))
+
+                # Track spillover: find if there's a next duplicate in this certificate
+                norm_name = normalize(best_mida_item.item_name)
+                group_key = (best_cert_id, norm_name)
+                if group_key in mida_items_by_cert_name:
+                    name_group = mida_items_by_cert_name[group_key]
+                    current_pos = name_group.index(best_idx) if best_idx in name_group else -1
+                    if current_pos >= 0 and current_pos < len(name_group) - 1:
+                        # There's a next duplicate in this certificate
+                        next_idx = name_group[current_pos + 1]
+                        next_mida = mida_items_by_cert[best_cert_id][next_idx]
+                        cert_num = best_mida_item.certificate_number or best_cert_id
+                        all_warnings.append(
+                            MatchWarning(
+                                invoice_item=f"Line {invoice_item.line_no}: {invoice_item.item_name[:40]}",
+                                mida_item=f"Line {best_mida_item.line_no}: {best_mida_item.item_name[:40]}",
+                                reason="MIDA item balance exhausted, switching to next duplicate",
+                                severity=WarningSeverity.info,
+                                details=f"MIDA line {best_mida_item.line_no} (Cert: {cert_num}) balance exhausted after this deduction. "
+                                f"Future matches for '{best_mida_item.item_name[:30]}' will use MIDA line {next_mida.line_no}.",
+                            )
+                        )
         
         matches.append(
             MatchResult(
