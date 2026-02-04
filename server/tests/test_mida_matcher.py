@@ -139,11 +139,12 @@ class TestNormalizeUom:
     """Tests for UOM normalization."""
 
     def test_normalize_unit_variants(self):
-        """Test unit variants normalize to UNIT."""
-        assert normalize_uom("UNT") == "UNIT"
-        assert normalize_uom("pcs") == "UNIT"
-        assert normalize_uom("PIECES") == "UNIT"
-        assert normalize_uom("ea") == "UNIT"
+        """Test unit variants normalize to UNT."""
+        assert normalize_uom("UNT") == "UNT"
+        assert normalize_uom("UNIT") == "UNT"
+        assert normalize_uom("pcs") == "UNT"
+        assert normalize_uom("PIECES") == "UNT"
+        assert normalize_uom("ea") == "UNT"
 
     def test_normalize_kg_variants(self):
         """Test kilogram variants normalize to KGM."""
@@ -158,9 +159,9 @@ class TestNormalizeUom:
         assert normalize_uom("Custom") == "CUSTOM"
 
     def test_normalize_empty_uom(self):
-        """Test empty UOM defaults to UNIT."""
-        assert normalize_uom("") == "UNIT"
-        assert normalize_uom("  ") == "UNIT"
+        """Test empty UOM defaults to UNT."""
+        assert normalize_uom("") == "UNT"
+        assert normalize_uom("  ") == "UNT"
 
 
 class TestUomCompatibility:
@@ -168,7 +169,7 @@ class TestUomCompatibility:
 
     def test_same_uom_compatible(self):
         """Test same UOM is compatible."""
-        assert are_uoms_compatible("UNIT", "UNIT") is True
+        assert are_uoms_compatible("UNT", "UNT") is True
         assert are_uoms_compatible("KGM", "KGM") is True
 
     def test_uom_variants_compatible(self):
@@ -179,7 +180,7 @@ class TestUomCompatibility:
 
     def test_different_uom_not_compatible(self):
         """Test different UOMs are not compatible."""
-        assert are_uoms_compatible("UNIT", "KGM") is False
+        assert are_uoms_compatible("UNT", "KGM") is False
         assert are_uoms_compatible("KGM", "MTR") is False
         assert are_uoms_compatible("pcs", "kg") is False
 
@@ -639,15 +640,15 @@ class TestTieBreaking:
 
 
 # =============================================================================
-# 1-to-1 Matching Tests
+# Duplicate Item Matching Tests
 # =============================================================================
 
 
-class TestOneToOneMatching:
-    """Tests for 1-to-1 matching (no MIDA item reuse)."""
+class TestDuplicateItemMatching:
+    """Tests for matching multiple invoice items with same name to same MIDA item."""
 
-    def test_no_mida_item_reuse(self):
-        """Test that each MIDA item is only matched once."""
+    def test_duplicate_invoice_items_all_match_same_mida(self):
+        """Test that duplicate invoice items all match the same MIDA item."""
         mida_items = [
             MidaItem(
                 line_no=1,
@@ -679,11 +680,137 @@ class TestOneToOneMatching:
             threshold=1.0,
         )
 
-        # First invoice item matches, second doesn't (MIDA item already used)
-        assert result.matched_count == 1
-        assert result.unmatched_count == 1
+        # Both invoice items should match the same MIDA item
+        assert result.matched_count == 2
+        assert result.unmatched_count == 0
         assert result.matches[0].matched is True
-        assert result.matches[1].matched is False
+        assert result.matches[1].matched is True
+        # Both matched to the same MIDA line
+        assert result.matches[0].mida_item.line_no == 1
+        assert result.matches[1].mida_item.line_no == 1
+
+    def test_duplicate_items_balance_decremented_for_each(self):
+        """Test that balance is decremented for each duplicate item match."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="TEST ITEM",
+                hs_code="12345678",
+                approved_quantity=Decimal("100"),
+                uom="UNIT",
+            )
+        ]
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Test Item",
+                quantity=Decimal("30"),
+                quantity_uom="UNIT",
+            ),
+            InvoiceItem(
+                line_no=2,
+                item_name="Test Item",
+                quantity=Decimal("40"),
+                quantity_uom="UNIT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        # Both matched
+        assert result.matched_count == 2
+        # First match: 100 - 30 = 70 remaining
+        assert result.matches[0].remaining_qty == Decimal("70")
+        # Second match: 70 - 40 = 30 remaining
+        assert result.matches[1].remaining_qty == Decimal("30")
+
+    def test_duplicate_items_warning_generated(self):
+        """Test that informational warning is generated for duplicate matches."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="TEST ITEM",
+                hs_code="12345678",
+                approved_quantity=Decimal("100"),
+                uom="UNIT",
+            )
+        ]
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Test Item",
+                quantity=Decimal("10"),
+                quantity_uom="UNIT",
+            ),
+            InvoiceItem(
+                line_no=2,
+                item_name="Test Item",
+                quantity=Decimal("10"),
+                quantity_uom="UNIT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        # Should have warning about multiple items matching same MIDA line
+        duplicate_warnings = [
+            w for w in result.warnings 
+            if "Multiple invoice items matched same MIDA line" in w.reason
+        ]
+        assert len(duplicate_warnings) == 1
+        assert duplicate_warnings[0].severity == WarningSeverity.info
+
+    def test_duplicate_items_exceeds_balance_warning(self):
+        """Test that warning is generated when duplicate items exceed balance."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="TEST ITEM",
+                hs_code="12345678",
+                approved_quantity=Decimal("50"),  # Only 50 available
+                uom="UNIT",
+            )
+        ]
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Test Item",
+                quantity=Decimal("30"),  # First takes 30
+                quantity_uom="UNIT",
+            ),
+            InvoiceItem(
+                line_no=2,
+                item_name="Test Item",
+                quantity=Decimal("30"),  # Second needs 30 but only 20 left
+                quantity_uom="UNIT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        # Both should still match (warn and continue)
+        assert result.matched_count == 2
+        # Should have warning about exceeding remaining quantity
+        exceed_warnings = [
+            w for w in result.warnings 
+            if "Exceeds remaining" in w.reason
+        ]
+        assert len(exceed_warnings) == 1
 
     def test_multiple_matches_different_items(self, sample_mida_items):
         """Test multiple invoice items match different MIDA items."""
@@ -762,3 +889,312 @@ class TestIntegration:
             if m1.matched and m2.matched:
                 assert m1.mida_item.line_no == m2.mida_item.line_no
                 assert m1.match_score == m2.match_score
+
+
+# =============================================================================
+# Sequential Deduction Tests (Duplicate MIDA Items)
+# =============================================================================
+
+
+class TestSequentialDeduction:
+    """Tests for sequential deduction when MIDA certificate has duplicate items."""
+
+    def test_duplicate_mida_items_sequential_deduction(self):
+        """Test that duplicate MIDA items are deducted sequentially by line_no."""
+        # MIDA certificate has 2 items with same name
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="WIDGET",
+                hs_code="12345678",
+                approved_quantity=Decimal("100"),
+                uom="UNT",
+            ),
+            MidaItem(
+                line_no=2,
+                item_name="WIDGET",  # Same name as line 1
+                hs_code="12345678",
+                approved_quantity=Decimal("100"),
+                uom="UNT",
+            ),
+        ]
+
+        # 3 invoice items for "WIDGET"
+        # Expected behavior with sequential deduction (Option B):
+        # - Always prefer lower line_no that can cover the invoice quantity
+        # - Only skip to next line when current line can't cover the full amount
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Widget",
+                quantity=Decimal("50"),
+                quantity_uom="UNT",
+            ),
+            InvoiceItem(
+                line_no=2,
+                item_name="Widget",
+                quantity=Decimal("60"),  # Line 1 has 50 left, can't cover → use line 2
+                quantity_uom="UNT",
+            ),
+            InvoiceItem(
+                line_no=3,
+                item_name="Widget",
+                quantity=Decimal("30"),  # Line 1 still has 50 left, can cover → use line 1
+                quantity_uom="UNT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        assert result.matched_count == 3
+
+        # First invoice (50) should match MIDA line 1
+        assert result.matches[0].mida_item.line_no == 1
+        assert result.matches[0].remaining_qty == Decimal("50")  # 100 - 50 = 50
+
+        # Second invoice (60) - line 1 can't cover 60 (only 50 left), should go to line 2
+        assert result.matches[1].mida_item.line_no == 2
+        assert result.matches[1].remaining_qty == Decimal("40")  # 100 - 60 = 40
+
+        # Third invoice (30) - line 1 STILL has 50 (sufficient), so use line 1 again
+        # This is Option B: only skip when can't cover, not when previously skipped
+        assert result.matches[2].mida_item.line_no == 1
+        assert result.matches[2].remaining_qty == Decimal("20")  # 50 - 30 = 20
+
+    def test_duplicate_mida_items_first_exhausted_then_second(self):
+        """Test that when first duplicate is exhausted (0), second is used."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="GADGET",
+                hs_code="87654321",
+                approved_quantity=Decimal("50"),
+                uom="UNT",
+            ),
+            MidaItem(
+                line_no=2,
+                item_name="GADGET",
+                hs_code="87654321",
+                approved_quantity=Decimal("50"),
+                uom="UNT",
+            ),
+        ]
+
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Gadget",
+                quantity=Decimal("50"),  # Exactly exhausts line 1
+                quantity_uom="UNT",
+            ),
+            InvoiceItem(
+                line_no=2,
+                item_name="Gadget",
+                quantity=Decimal("30"),  # Should use line 2
+                quantity_uom="UNT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        assert result.matched_count == 2
+
+        # First invoice exhausts line 1
+        assert result.matches[0].mida_item.line_no == 1
+        assert result.matches[0].remaining_qty == Decimal("0")
+
+        # Second invoice should automatically use line 2
+        assert result.matches[1].mida_item.line_no == 2
+        assert result.matches[1].remaining_qty == Decimal("20")  # 50 - 30 = 20
+
+    def test_spillover_warning_generated(self):
+        """Test that a warning is generated when switching to next duplicate."""
+        mida_items = [
+            MidaItem(
+                line_no=10,
+                item_name="COMPONENT",
+                hs_code="11111111",
+                approved_quantity=Decimal("100"),
+                uom="UNT",
+            ),
+            MidaItem(
+                line_no=20,
+                item_name="COMPONENT",
+                hs_code="11111111",
+                approved_quantity=Decimal("100"),
+                uom="UNT",
+            ),
+        ]
+
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Component",
+                quantity=Decimal("100"),  # Exhausts line 10
+                quantity_uom="UNT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        # Should have warning about balance exhausted
+        spillover_warnings = [
+            w for w in result.warnings
+            if "exhausted" in w.reason.lower() and "switching" in w.reason.lower()
+        ]
+        assert len(spillover_warnings) == 1
+        assert "line 20" in spillover_warnings[0].details.lower()
+
+    def test_skip_to_next_duplicate_when_insufficient_balance(self):
+        """Test Option B: Skip to next duplicate entirely when balance insufficient."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="PART",
+                hs_code="22222222",
+                approved_quantity=Decimal("30"),  # Too small for invoice of 50
+                uom="UNT",
+            ),
+            MidaItem(
+                line_no=2,
+                item_name="PART",
+                hs_code="22222222",
+                approved_quantity=Decimal("100"),  # Sufficient
+                uom="UNT",
+            ),
+        ]
+
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Part",
+                quantity=Decimal("50"),  # Can't be covered by line 1 (30)
+                quantity_uom="UNT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        assert result.matched_count == 1
+        # Should skip line 1 (insufficient) and go directly to line 2
+        assert result.matches[0].mida_item.line_no == 2
+        assert result.matches[0].remaining_qty == Decimal("50")  # 100 - 50 = 50
+
+    def test_fallback_to_insufficient_when_no_alternative(self):
+        """Test fallback: use insufficient balance item when no alternative exists."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="RARE_ITEM",
+                hs_code="33333333",
+                approved_quantity=Decimal("20"),  # Less than invoice needs
+                uom="UNT",
+            ),
+        ]
+
+        invoice_items = [
+            InvoiceItem(
+                line_no=1,
+                item_name="Rare Item",
+                quantity=Decimal("50"),  # Exceeds the only available MIDA item
+                quantity_uom="UNT",
+            ),
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.fuzzy,
+            threshold=0.5,
+        )
+
+        # Should still match (with warning) since it's the only option
+        assert result.matched_count == 1
+        assert result.matches[0].mida_item.line_no == 1
+
+        # Should have "exceeds remaining" warning
+        exceed_warnings = [
+            w for w in result.warnings
+            if "exceeds" in w.reason.lower()
+        ]
+        assert len(exceed_warnings) == 1
+
+    def test_three_duplicates_sequential(self):
+        """Test sequential deduction across 3 duplicate MIDA items."""
+        mida_items = [
+            MidaItem(
+                line_no=1,
+                item_name="TRIPLE ITEM",
+                hs_code="44444444",
+                approved_quantity=Decimal("40"),
+                uom="UNT",
+            ),
+            MidaItem(
+                line_no=2,
+                item_name="TRIPLE ITEM",
+                hs_code="44444444",
+                approved_quantity=Decimal("40"),
+                uom="UNT",
+            ),
+            MidaItem(
+                line_no=3,
+                item_name="TRIPLE ITEM",
+                hs_code="44444444",
+                approved_quantity=Decimal("40"),
+                uom="UNT",
+            ),
+        ]
+
+        # 4 invoices that will use multiple MIDA items based on Option B logic
+        # (skip to next duplicate only when current can't cover full amount)
+        invoice_items = [
+            InvoiceItem(line_no=1, item_name="Triple Item", quantity=Decimal("30"), quantity_uom="UNT"),
+            InvoiceItem(line_no=2, item_name="Triple Item", quantity=Decimal("30"), quantity_uom="UNT"),  # Line 1 has 10 left, insufficient → line 2
+            InvoiceItem(line_no=3, item_name="Triple Item", quantity=Decimal("30"), quantity_uom="UNT"),  # Line 2 has 10 left, insufficient → line 3
+            InvoiceItem(line_no=4, item_name="Triple Item", quantity=Decimal("10"), quantity_uom="UNT"),  # All have 10 left, line 1 (lowest) can cover
+        ]
+
+        result = match_items(
+            invoice_items=invoice_items,
+            mida_items=mida_items,
+            mode=MatchMode.exact,
+            threshold=1.0,
+        )
+
+        assert result.matched_count == 4
+
+        # Invoice 1 (30): Line 1 has 40, sufficient → use line 1, remaining 10
+        assert result.matches[0].mida_item.line_no == 1
+        assert result.matches[0].remaining_qty == Decimal("10")
+
+        # Invoice 2 (30): Line 1 has 10 (insufficient), skip to line 2 → remaining 10
+        assert result.matches[1].mida_item.line_no == 2
+        assert result.matches[1].remaining_qty == Decimal("10")
+
+        # Invoice 3 (30): Line 2 has 10 (insufficient), skip to line 3 → remaining 10
+        assert result.matches[2].mida_item.line_no == 3
+        assert result.matches[2].remaining_qty == Decimal("10")
+
+        # Invoice 4 (10): Line 1 has 10 (just enough!), line 1 is lowest → use line 1
+        assert result.matches[3].mida_item.line_no == 1
+        assert result.matches[3].remaining_qty == Decimal("0")

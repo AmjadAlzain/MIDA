@@ -50,12 +50,12 @@ def _calculate_row_score(row_text: str) -> float:
 
 
 def _normalize_uom(uom_text: str) -> str:
-    """Normalize UOM: kg variants -> KGM, unit variants -> UNIT."""
+    """Normalize UOM: kg variants -> KGM, unit variants -> UNT."""
     uom_upper = uom_text.upper().strip()
     if uom_upper in ("KG", "K.G", "KGS", "KGM"):
         return "KGM"
-    if uom_upper in ("U", "UNIT", "UNITS", "PCS", "PC"):
-        return "UNIT"
+    if uom_upper in ("U", "UNIT", "UNT", "UNITS", "PCS", "PC"):
+        return "UNT"
     return uom_upper
 
 
