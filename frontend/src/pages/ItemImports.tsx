@@ -32,7 +32,6 @@ import {
   ImportRecordsResponse,
   Certificate,
   CertificateItemBalance,
-  CertificateItemsResponse,
   Port,
   PORT_DISPLAY_NAMES,
   PORTS,
@@ -46,14 +45,13 @@ export function ItemImports() {
 
   // State
   const [selectedPort, setSelectedPort] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // asc = oldest first
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingImport, setEditingImport] = useState<ImportRecord | null>(null);
   const [deleteImportId, setDeleteImportId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [newImport, setNewImport] = useState({
     import_date: getTodayISO(),
-    invoice_number: '',
-    invoice_line: '1',
     declaration_form_reg_no: '',
     quantity_imported: '',
     port: 'port_klang' as Port,
@@ -61,8 +59,6 @@ export function ItemImports() {
   });
   const [editForm, setEditForm] = useState({
     import_date: '',
-    invoice_number: '',
-    invoice_line: '',
     declaration_form_reg_no: '',
     quantity_imported: '',
     port: 'port_klang' as Port,
@@ -76,19 +72,14 @@ export function ItemImports() {
     enabled: !!certId,
   });
 
-  // Fetch item balances to get current item details
-  const { data: balancesResponse, isLoading: isLoadingBalances } = useQuery<CertificateItemsResponse>({
-    queryKey: ['certificate-balances', certId],
-    queryFn: () => certificateService.getItemBalances(certId!),
-    enabled: !!certId,
+  // Fetch single item balance directly (more efficient than listing all)
+  const { data: currentItem, isLoading: isLoadingBalances } = useQuery<CertificateItemBalance>({
+    queryKey: ['item-balance', itemId],
+    queryFn: () => importService.getItemBalance(itemId!),
+    enabled: !!itemId,
     staleTime: 0, // Always refetch balance data to ensure up-to-date values
     refetchOnMount: 'always', // Always refetch when component mounts
   });
-
-  // Find current item from balances (includes remaining quantities)
-  const currentItem: CertificateItemBalance | undefined = balancesResponse?.items?.find(
-    (item) => item.item_id === itemId
-  );
 
   // Fetch imports for this item
   const {
@@ -102,7 +93,14 @@ export function ItemImports() {
     enabled: !!itemId,
   });
 
-  const imports = importsResponse?.imports ?? [];
+  const rawImports = importsResponse?.imports ?? [];
+  
+  // Sort imports by date (oldest first for ascending, newest first for descending)
+  const sortedImports = [...rawImports].sort((a, b) => {
+    const dateA = new Date(a.import_date).getTime();
+    const dateB = new Date(b.import_date).getTime();
+    return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+  });
 
   // Add import mutation
   const addMutation = useMutation({
@@ -112,9 +110,7 @@ export function ItemImports() {
           {
             certificate_item_id: itemId!,
             import_date: data.import_date,
-            invoice_number: data.invoice_number,
-            invoice_line: parseInt(data.invoice_line) || 1,
-            declaration_form_reg_no: data.declaration_form_reg_no || undefined,
+            declaration_form_reg_no: data.declaration_form_reg_no,
             quantity_imported: parseFloat(data.quantity_imported),
             port: data.port,
             remarks: data.remarks || undefined,
@@ -124,12 +120,11 @@ export function ItemImports() {
     onSuccess: () => {
       toast.success('Import record added successfully');
       queryClient.invalidateQueries({ queryKey: ['imports', itemId] });
+      queryClient.invalidateQueries({ queryKey: ['item-balance', itemId] });
       queryClient.invalidateQueries({ queryKey: ['certificate-balances', certId] });
       setShowAddModal(false);
       setNewImport({
         import_date: getTodayISO(),
-        invoice_number: '',
-        invoice_line: '1',
         declaration_form_reg_no: '',
         quantity_imported: '',
         port: 'port_klang',
@@ -148,6 +143,7 @@ export function ItemImports() {
     onSuccess: () => {
       toast.success('Import record updated successfully');
       queryClient.invalidateQueries({ queryKey: ['imports', itemId] });
+      queryClient.invalidateQueries({ queryKey: ['item-balance', itemId] });
       queryClient.invalidateQueries({ queryKey: ['certificate-balances', certId] });
       setEditingImport(null);
     },
@@ -162,6 +158,7 @@ export function ItemImports() {
     onSuccess: () => {
       toast.success('Import record deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['imports', itemId] });
+      queryClient.invalidateQueries({ queryKey: ['item-balance', itemId] });
       queryClient.invalidateQueries({ queryKey: ['certificate-balances', certId] });
       setDeleteImportId(null);
     },
@@ -172,8 +169,8 @@ export function ItemImports() {
 
   // Handle add import
   const handleAddImport = () => {
-    if (!newImport.quantity_imported || !newImport.invoice_number) {
-      toast.error('Quantity and Invoice Number are required');
+    if (!newImport.quantity_imported || !newImport.declaration_form_reg_no) {
+      toast.error('Quantity and Declaration Form Reg No are required');
       return;
     }
 
@@ -218,8 +215,6 @@ export function ItemImports() {
     setEditingImport(imp);
     setEditForm({
       import_date: imp.import_date,
-      invoice_number: imp.invoice_number,
-      invoice_line: imp.invoice_line?.toString() || '',
       declaration_form_reg_no: imp.declaration_form_reg_no || '',
       quantity_imported: imp.quantity_imported.toString(),
       port: imp.port as Port,
@@ -279,12 +274,6 @@ export function ItemImports() {
     
     if (editForm.import_date !== editingImport.import_date) {
       data.import_date = editForm.import_date;
-    }
-    if (editForm.invoice_number !== editingImport.invoice_number) {
-      data.invoice_number = editForm.invoice_number;
-    }
-    if (editForm.invoice_line !== (editingImport.invoice_line?.toString() || '')) {
-      data.invoice_line = parseInt(editForm.invoice_line) || undefined;
     }
     if (editForm.declaration_form_reg_no !== (editingImport.declaration_form_reg_no || '')) {
       data.declaration_form_reg_no = editForm.declaration_form_reg_no || undefined;
@@ -469,30 +458,40 @@ export function ItemImports() {
           <CardTitle icon={<FileText className="w-5 h-5 text-green-600" />}>
             Import Records
             <Badge variant="info" className="ml-2">
-              {imports.length}
+              {sortedImports.length}
             </Badge>
           </CardTitle>
         </CardHeader>
 
         <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
-          <div className="flex gap-2">
-            <Button
-              variant={selectedPort === 'all' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedPort('all')}
-            >
-              All Ports
-            </Button>
-            {PORTS.map((port) => (
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
               <Button
-                key={port.value}
-                variant={selectedPort === port.value ? 'primary' : 'outline'}
+                variant={selectedPort === 'all' ? 'primary' : 'outline'}
                 size="sm"
-                onClick={() => setSelectedPort(port.value)}
+                onClick={() => setSelectedPort('all')}
               >
-                {port.label}
+                All Ports
               </Button>
-            ))}
+              {PORTS.map((port) => (
+                <Button
+                  key={port.value}
+                  variant={selectedPort === port.value ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedPort(port.value)}
+                >
+                  {port.label}
+                </Button>
+              ))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              title={sortOrder === 'asc' ? 'Showing oldest first' : 'Showing newest first'}
+            >
+              {sortOrder === 'asc' ? '↑ Oldest First' : '↓ Newest First'}
+            </Button>
           </div>
         </div>
 
@@ -500,14 +499,13 @@ export function ItemImports() {
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
-        ) : imports.length > 0 ? (
+        ) : sortedImports.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-center font-semibold w-12">#</th>
                   <th className="px-4 py-3 text-left font-semibold">Date</th>
-                  <th className="px-4 py-3 text-left font-semibold">Invoice #</th>
-                  <th className="px-4 py-3 text-left font-semibold">Line</th>
                   <th className="px-4 py-3 text-left font-semibold">Form Reg No</th>
                   <th className="px-4 py-3 text-left font-semibold">Port</th>
                   <th className="px-4 py-3 text-right font-semibold">Quantity</th>
@@ -516,12 +514,11 @@ export function ItemImports() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {imports.map((imp: ImportRecord) => (
+                {sortedImports.map((imp: ImportRecord, index: number) => (
                   <tr key={imp.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-center text-gray-500 font-mono">{index + 1}</td>
                     <td className="px-4 py-3">{formatDate(imp.import_date)}</td>
-                    <td className="px-4 py-3 font-medium">{imp.invoice_number}</td>
-                    <td className="px-4 py-3">{imp.invoice_line}</td>
-                    <td className="px-4 py-3">{imp.declaration_form_reg_no || '-'}</td>
+                    <td className="px-4 py-3 font-medium">{imp.declaration_form_reg_no}</td>
                     <td className="px-4 py-3">{PORT_DISPLAY_NAMES[imp.port]}</td>
                     <td className="px-4 py-3 text-right">{formatNumber(imp.quantity_imported)}</td>
                     <td className="px-4 py-3 text-right font-semibold">
@@ -599,29 +596,13 @@ export function ItemImports() {
               required
             />
             <Input
-              label="Invoice Number"
-              value={newImport.invoice_number}
-              onChange={(e) => setNewImport({ ...newImport, invoice_number: e.target.value })}
-              placeholder="e.g., INV-2024-001"
-              required
-            />
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <Input
-              label="Invoice Line"
-              type="number"
-              value={newImport.invoice_line}
-              onChange={(e) => setNewImport({ ...newImport, invoice_line: e.target.value })}
-              placeholder="1"
-            />
-            <Input
               label="Declaration Form Reg No"
               value={newImport.declaration_form_reg_no}
               onChange={(e) =>
                 setNewImport({ ...newImport, declaration_form_reg_no: e.target.value })
               }
-              placeholder="Optional"
+              placeholder="e.g., B18109037033"
+              required
             />
           </div>
 
@@ -683,27 +664,11 @@ export function ItemImports() {
               required
             />
             <Input
-              label="Invoice Number"
-              value={editForm.invoice_number}
-              onChange={(e) => setEditForm({ ...editForm, invoice_number: e.target.value })}
-              placeholder="e.g., INV-2024-001"
-              required
-            />
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <Input
-              label="Invoice Line"
-              type="number"
-              value={editForm.invoice_line}
-              onChange={(e) => setEditForm({ ...editForm, invoice_line: e.target.value })}
-              placeholder="1"
-            />
-            <Input
               label="Declaration Form Reg No"
               value={editForm.declaration_form_reg_no}
               onChange={(e) => setEditForm({ ...editForm, declaration_form_reg_no: e.target.value })}
-              placeholder="Optional"
+              placeholder="e.g., B18109037033"
+              required
             />
           </div>
 

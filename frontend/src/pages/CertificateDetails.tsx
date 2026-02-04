@@ -19,6 +19,7 @@ import {
   LayoutList,
   AlertCircle,
   AlertTriangle,
+  Upload,
 } from 'lucide-react';
 import {
   Button,
@@ -496,6 +497,13 @@ export function CertificateDetails() {
                         </div>
                       )}
                     </div>
+                    <Button
+                      variant="secondary"
+                      onClick={() => navigate(`/migration?certificate=${encodeURIComponent(certificate.certificate_number)}`)}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Update Balance Sheet
+                    </Button>
                   </>
                 )}
               </>

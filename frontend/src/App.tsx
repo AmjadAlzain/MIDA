@@ -5,7 +5,8 @@ import {
   CertificateParser, 
   DatabaseView, 
   CertificateDetails, 
-  ItemImports 
+  ItemImports,
+  BalanceMigration,
 } from './pages';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
         <Route path="database" element={<DatabaseView />} />
         <Route path="database/certificates/:id" element={<CertificateDetails />} />
         <Route path="database/certificates/:certId/items/:itemId/imports" element={<ItemImports />} />
+        <Route path="migration" element={<BalanceMigration />} />
       </Route>
     </Routes>
   );

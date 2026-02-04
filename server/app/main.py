@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_settings
 from app.logging_config import setup_logging, get_logger
-from app.routers import mida_certificate, mida_certificates, mida_imports, convert, hscode_uom, hscode_master
+from app.routers import mida_certificate, mida_certificates, mida_imports, convert, hscode_uom, hscode_master, migration
 from app.db.session import get_session_factory
 from app.repositories.hscode_master_repo import load_cache_from_db, get_cache_size
 
@@ -77,6 +77,7 @@ app.add_middleware(
 app.include_router(mida_certificate.router, prefix="/api/mida/certificate", tags=["mida"])
 app.include_router(mida_certificates.router, prefix="/api/mida/certificates", tags=["mida-crud"])
 app.include_router(mida_imports.router, prefix="/api/mida/imports", tags=["mida-imports"])
+app.include_router(migration.router, prefix="/api/mida/migration", tags=["mida-migration"])
 app.include_router(convert.router, prefix="/api", tags=["convert"])
 app.include_router(hscode_uom.router, prefix="/api/hscode-uom", tags=["hscode-uom"])
 app.include_router(hscode_master.router, prefix="/api/hscode-master", tags=["hscode-master"])

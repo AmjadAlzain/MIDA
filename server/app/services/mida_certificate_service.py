@@ -44,8 +44,42 @@ class CertificateRestoreConflictError(Exception):
     pass
 
 
+from decimal import Decimal
+
+
 def _build_item_model(item_in: CertificateItemIn, certificate_id: UUID) -> MidaCertificateItem:
-    """Convert a CertificateItemIn schema to a MidaCertificateItem model."""
+    """Convert a CertificateItemIn schema to a MidaCertificateItem model.
+    
+    Initializes remaining quantities to match approved quantities so items
+    start with full balance before any imports.
+    """
+    # Calculate initial remaining quantities
+    # If port-specific quantities are set, use those; otherwise use approved_quantity
+    port_klang_qty = item_in.port_klang_qty
+    klia_qty = item_in.klia_qty
+    bukit_kayu_hitam_qty = item_in.bukit_kayu_hitam_qty
+    approved_qty = item_in.approved_quantity or Decimal("0")
+    
+    # Check if port allocations are provided
+    has_port_allocations = (
+        (port_klang_qty is not None and port_klang_qty > 0) or
+        (klia_qty is not None and klia_qty > 0) or
+        (bukit_kayu_hitam_qty is not None and bukit_kayu_hitam_qty > 0)
+    )
+    
+    if has_port_allocations:
+        # Use port-specific quantities for remaining
+        remaining_port_klang = port_klang_qty or Decimal("0")
+        remaining_klia = klia_qty or Decimal("0")
+        remaining_bukit_kayu_hitam = bukit_kayu_hitam_qty or Decimal("0")
+        remaining_quantity = remaining_port_klang + remaining_klia + remaining_bukit_kayu_hitam
+    else:
+        # Use approved_quantity as the total pool (shared across all ports)
+        remaining_quantity = approved_qty
+        remaining_port_klang = approved_qty
+        remaining_klia = approved_qty
+        remaining_bukit_kayu_hitam = approved_qty
+    
     return MidaCertificateItem(
         certificate_id=certificate_id,
         line_no=item_in.line_no,
@@ -54,9 +88,14 @@ def _build_item_model(item_in: CertificateItemIn, certificate_id: UUID) -> MidaC
         approved_quantity=item_in.approved_quantity,
         uom=item_in.uom,
         is_dummy=item_in.is_dummy,
-        port_klang_qty=item_in.port_klang_qty,
-        klia_qty=item_in.klia_qty,
-        bukit_kayu_hitam_qty=item_in.bukit_kayu_hitam_qty,
+        port_klang_qty=port_klang_qty,
+        klia_qty=klia_qty,
+        bukit_kayu_hitam_qty=bukit_kayu_hitam_qty,
+        remaining_quantity=remaining_quantity,
+        remaining_port_klang=remaining_port_klang,
+        remaining_klia=remaining_klia,
+        remaining_bukit_kayu_hitam=remaining_bukit_kayu_hitam,
+        quantity_status="normal",
     )
 
 

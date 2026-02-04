@@ -67,9 +67,7 @@ export interface ImportRecord {
   id: string;
   certificate_item_id: string;
   import_date: string;
-  declaration_form_reg_no?: string;
-  invoice_number: string;
-  invoice_line: number;
+  declaration_form_reg_no: string;
   quantity_imported: number;
   port: 'port_klang' | 'klia' | 'bukit_kayu_hitam';
   balance_before: number;
@@ -87,9 +85,7 @@ export interface BulkImportRequest {
   records: {
     certificate_item_id: string;
     import_date: string;
-    declaration_form_reg_no?: string;
-    invoice_number: string;
-    invoice_line: number;
+    declaration_form_reg_no: string;
     quantity_imported: number;
     port: string;
     remarks?: string;
@@ -474,3 +470,91 @@ export const PORTS: { value: Port; label: string }[] = [
   { value: 'klia', label: 'KLIA' },
   { value: 'bukit_kayu_hitam', label: 'Bukit Kayu Hitam' },
 ];
+
+// ==========================================
+// Migration Types
+// ==========================================
+export type ItemMatchStatus = 'matched' | 'name_mismatch' | 'not_found';
+export type ConflictResolution = 'rename_db' | 'keep_db_name' | 'skip';
+
+export interface MigrationInvoiceRow {
+  import_date: string;
+  form_reg_no: string;
+  balance_before: number;
+  quantity_imported: number;
+  balance_after: number;
+}
+
+export interface MigrationItemPreview {
+  sheet_name: string;
+  line_no: number;
+  xlsx_item_name: string;
+  xlsx_approved_qty: number;
+  invoice_count: number;
+  status: ItemMatchStatus;
+  db_item_id?: string;
+  db_item_name?: string;
+  db_approved_qty?: number;
+  duplicate_invoices: string[];
+  resolution?: ConflictResolution;
+  invoices: MigrationInvoiceRow[];
+}
+
+export interface MigrationPreviewResponse {
+  xlsx_certificate_number: string;
+  xlsx_company_name?: string;
+  xlsx_exemption_date?: string;
+  xlsx_validity_period?: string;
+  db_certificate_id?: string;
+  db_certificate_number?: string;
+  certificate_found: boolean;
+  port: Port;
+  items: MigrationItemPreview[];
+  total_items: number;
+  matched_count: number;
+  mismatch_count: number;
+  not_found_count: number;
+  total_invoices: number;
+  total_duplicates: number;
+}
+
+export interface ItemResolution {
+  line_no: number;
+  resolution: ConflictResolution;
+}
+
+export interface MigrationApplyRequest {
+  certificate_id: string;
+  port: Port;
+  resolutions: ItemResolution[];
+  items: MigrationItemPreview[];
+}
+
+export interface MigrationApplyResult {
+  line_no: number;
+  item_name: string;
+  status: 'success' | 'skipped' | 'error';
+  records_created: number;
+  duplicates_skipped: number;
+  error_message?: string;
+  name_updated: boolean;
+}
+
+export interface FlaggedDuplicate {
+  line_no: number;
+  item_name: string;
+  invoice_number: string;
+  import_date: string;
+  quantity: number;
+}
+
+export interface MigrationApplyResponse {
+  success: boolean;
+  results: MigrationApplyResult[];
+  total_items_processed: number;
+  total_records_created: number;
+  total_duplicates_skipped: number;
+  items_skipped: number;
+  items_failed: number;
+  flagged_duplicates: FlaggedDuplicate[];
+}

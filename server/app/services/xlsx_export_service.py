@@ -31,7 +31,39 @@ from app.models.mida_certificate import (
 
 logger = logging.getLogger(__name__)
 
-# Styling constants
+# ============ MIDA Template Styling Constants ============
+# Font: Times New Roman throughout
+MIDA_TITLE_FONT = Font(name="Times New Roman", size=18)  # Row 1 title
+MIDA_LABEL_FONT = Font(name="Times New Roman", size=24)  # Rows 4-10, 13-14 labels
+MIDA_LABEL_BOLD_FONT = Font(name="Times New Roman", size=24, bold=True)  # Item name in row 8
+MIDA_DATA_FONT = Font(name="Times New Roman", size=22)  # Data rows 15+
+
+# Borders - Headers use medium, data uses thin
+MIDA_HEADER_BORDER_TOP = Border(
+    top=Side(style="medium"),
+    left=Side(style="medium"),
+    right=Side(style="medium"),
+)
+MIDA_HEADER_BORDER_BOTTOM = Border(
+    left=Side(style="medium"),
+    right=Side(style="medium"),
+)
+MIDA_DATA_BORDER = Border(
+    left=Side(style="thin"),
+    right=Side(style="thin"),
+    top=Side(style="thin"),
+    bottom=Side(style="thin"),
+)
+
+# Column widths matching template
+MIDA_COLUMN_WIDTHS = [25.5, 40.5, 32.5, 26.5, 25.5, 26.5, 25.0]
+
+# Row heights
+MIDA_TITLE_ROW_HEIGHT = 36.0
+MIDA_LABEL_ROW_HEIGHT = 30.6
+MIDA_DATA_ROW_HEIGHT = 31.2
+
+# Old styling constants (kept for backward compatibility with certificate export)
 HEADER_FILL = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
 HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
 TITLE_FONT = Font(bold=True, size=14, color="1F4E79")
@@ -67,10 +99,149 @@ def _format_date(value: Optional[date]) -> str:
     return value.strftime("%Y-%m-%d")
 
 
-def _set_column_widths(ws, widths: list[int]) -> None:
+def _format_date_malay(value: Optional[date]) -> str:
+    """Format a date value for Malay display (DD/MM/YYYY)."""
+    if value is None:
+        return "-"
+    return value.strftime("%d/%m/%Y")
+
+
+def _set_column_widths(ws, widths: list[float]) -> None:
     """Set column widths for a worksheet."""
     for i, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = width
+
+
+def _set_mida_row_heights(ws, data_start_row: int = 15, data_count: int = 0) -> None:
+    """Set row heights to match MIDA template."""
+    ws.row_dimensions[1].height = MIDA_TITLE_ROW_HEIGHT
+    for row in range(2, 15):
+        ws.row_dimensions[row].height = MIDA_LABEL_ROW_HEIGHT
+    for row in range(15, 15 + max(data_count, 1)):
+        ws.row_dimensions[row].height = MIDA_DATA_ROW_HEIGHT
+
+
+def _write_mida_balance_sheet(
+    ws,
+    certificate: MidaCertificate,
+    item: MidaCertificateItem,
+    records: list,
+    port_approved: Decimal,
+) -> None:
+    """
+    Write a MIDA-format balance sheet to a worksheet.
+    Matches the exact formatting of the template.
+    """
+    # Set column widths
+    _set_column_widths(ws, MIDA_COLUMN_WIDTHS)
+    
+    # Row 1: Title "BALANCE SHEET (KASTAM 1)" - merged C1:D1, centered
+    ws.merge_cells(start_row=1, start_column=3, end_row=1, end_column=4)
+    title_cell = ws.cell(row=1, column=3, value="BALANCE SHEET (KASTAM 1)")
+    title_cell.font = MIDA_TITLE_FONT
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Row 4: Company name
+    ws.cell(row=4, column=1, value=f"NO FAIL / NAMA PENGIMPORT : {certificate.company_name}").font = MIDA_LABEL_FONT
+    
+    # Row 5: Certificate number
+    ws.cell(row=5, column=1, value=f"NO SURAT PENGECUALIAN PERBENDAHARAAN : {certificate.certificate_number}").font = MIDA_LABEL_FONT
+    
+    # Row 6: Exemption date
+    exemption_date_str = _format_date_malay(certificate.exemption_start_date)
+    ws.cell(row=6, column=1, value=f"TARIKH SURAT PENGECUALIAN : {exemption_date_str}").font = MIDA_LABEL_FONT
+    
+    # Row 7: Validity period
+    start_date_str = _format_date_malay(certificate.exemption_start_date)
+    end_date_str = _format_date_malay(certificate.exemption_end_date)
+    ws.cell(row=7, column=1, value=f"TEMPOH PENGECUALIAN :  {start_date_str} HINGGA {end_date_str}").font = MIDA_LABEL_FONT
+    
+    # Row 8: Item label and name (label in A, bold item name in C)
+    ws.cell(row=8, column=1, value="JENIS BARANG / NO ITEM : ").font = MIDA_LABEL_FONT
+    item_name_with_line = f"{item.item_name} ({item.line_no})"
+    ws.cell(row=8, column=3, value=item_name_with_line).font = MIDA_LABEL_BOLD_FONT
+    
+    # Row 9: Approved quantity (label in A, value in C)
+    ws.cell(row=9, column=1, value="KUANTIIT DI LULUSKAN : ").font = MIDA_LABEL_FONT
+    qty_str = f"{_format_decimal(port_approved)} {item.uom or 'UNT'} "
+    ws.cell(row=9, column=3, value=qty_str).font = MIDA_LABEL_FONT
+    
+    # Row 10: Exemption type
+    ws.cell(row=10, column=1, value="PENGECULIAN * SEPENUHNYA / SEPARA : ").font = MIDA_LABEL_FONT
+    
+    # Row 13-14: Table headers (2 rows) with medium borders
+    uom = (item.uom or "pcs").lower()
+    
+    # Row 13 headers (top part)
+    headers_row13 = ["TARIKH ", "NO DAFTAR ", "BAKI DI BAWA", "KUANTITI", "BAKI", "T/TANGAN ", "T/TANGAN "]
+    for col, header in enumerate(headers_row13, start=1):
+        cell = ws.cell(row=13, column=col, value=header)
+        cell.font = MIDA_LABEL_FONT
+        cell.border = MIDA_HEADER_BORDER_TOP
+        if col == 4:  # KUANTITI centered
+            cell.alignment = Alignment(horizontal="center")
+    
+    # Row 14 headers (bottom part)
+    headers_row14 = ["IMPORT", "BORANG IKRAR", "KEHADAPAN", uom, f"({uom})", "PIK", "PNK"]
+    for col, header in enumerate(headers_row14, start=1):
+        cell = ws.cell(row=14, column=col, value=header)
+        cell.font = MIDA_LABEL_FONT
+        cell.border = MIDA_HEADER_BORDER_BOTTOM
+        if col in [4, 5]:  # UOM columns centered
+            cell.alignment = Alignment(horizontal="center")
+    
+    # Row 15+: Data rows with thin borders, center aligned
+    data_row = 15
+    if records:
+        for record in sorted(records, key=lambda r: (r.import_date, r.created_at)):
+            # Date (DD/MM/YYYY format)
+            date_str = record.import_date.strftime("%d/%m/%Y") if record.import_date else "-"
+            date_cell = ws.cell(row=data_row, column=1, value=date_str)
+            date_cell.font = MIDA_DATA_FONT
+            date_cell.border = MIDA_DATA_BORDER
+            date_cell.alignment = Alignment(horizontal="center")
+            
+            # Declaration Form Reg No
+            reg_cell = ws.cell(row=data_row, column=2, value=record.declaration_form_reg_no or "-")
+            reg_cell.font = MIDA_DATA_FONT
+            reg_cell.border = MIDA_DATA_BORDER
+            reg_cell.alignment = Alignment(horizontal="center")
+            
+            # Balance Before
+            before_cell = ws.cell(row=data_row, column=3, value=float(record.balance_before))
+            before_cell.font = MIDA_DATA_FONT
+            before_cell.border = MIDA_DATA_BORDER
+            before_cell.alignment = Alignment(horizontal="center")
+            before_cell.number_format = '#,##0.00'
+            
+            # Quantity Imported
+            qty_cell = ws.cell(row=data_row, column=4, value=float(record.quantity_imported))
+            qty_cell.font = MIDA_DATA_FONT
+            qty_cell.border = MIDA_DATA_BORDER
+            qty_cell.alignment = Alignment(horizontal="center")
+            qty_cell.number_format = '#,##0.00'
+            
+            # Balance After
+            after_cell = ws.cell(row=data_row, column=5, value=float(record.balance_after))
+            after_cell.font = MIDA_DATA_FONT
+            after_cell.border = MIDA_DATA_BORDER
+            after_cell.alignment = Alignment(horizontal="center")
+            after_cell.number_format = '#,##0.00'
+            
+            # T/TANGAN PIK (empty)
+            pik_cell = ws.cell(row=data_row, column=6, value="")
+            pik_cell.font = MIDA_DATA_FONT
+            pik_cell.border = MIDA_DATA_BORDER
+            
+            # T/TANGAN PNK (empty)
+            pnk_cell = ws.cell(row=data_row, column=7, value="")
+            pnk_cell.font = MIDA_DATA_FONT
+            pnk_cell.border = MIDA_DATA_BORDER
+            
+            data_row += 1
+    
+    # Set row heights
+    _set_mida_row_heights(ws, data_start_row=15, data_count=len(records))
 
 
 def _write_header_row(
@@ -295,9 +466,7 @@ def generate_item_balance_sheet_xlsx(
     If port is None, generates a workbook with 3 sheets (one per port).
     If port is specified, generates a single sheet for that port.
     
-    Format per sheet:
-    - Item and certificate info header at top
-    - Import history table below
+    Format matches the MIDA balance sheet template exactly.
     
     Args:
         item: The certificate item
@@ -323,54 +492,21 @@ def generate_item_balance_sheet_xlsx(
         records = [r for r in all_records if r.port == port_key]
         
         # Create sheet
-        sheet_name = PORT_DISPLAY_NAMES.get(port_key, port_key)
-        ws = wb.create_sheet(title=sheet_name)
+        port_display = PORT_DISPLAY_NAMES.get(port_key, port_key)
+        ws = wb.create_sheet(title=port_display)
         
-        # Write item header
-        row = _write_item_header(ws, item, certificate)
-        row += 1
-        
-        # Write import history title
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
-        history_title = ws.cell(
-            row=row, column=1,
-            value=f"Import History - {sheet_name}"
-        )
-        history_title.font = SUBTITLE_FONT
-        row += 1
-        
-        # Write import table header
-        headers = [
-            "Date", "Invoice #", "Line", "Form Reg No",
-            "Quantity", "Balance Before", "Balance After"
-        ]
-        _write_header_row(ws, row, headers)
-        row += 1
-        
-        # Write import records
-        if records:
-            for record in sorted(records, key=lambda r: (r.import_date, r.created_at)):
-                ws.cell(row=row, column=1, value=record.import_date).border = THIN_BORDER
-                ws.cell(row=row, column=2, value=record.invoice_number).border = THIN_BORDER
-                ws.cell(row=row, column=3, value=record.invoice_line or "-").border = THIN_BORDER
-                ws.cell(row=row, column=4, value=record.declaration_form_reg_no or "-").border = THIN_BORDER
-                ws.cell(row=row, column=5, value=float(record.quantity_imported)).border = THIN_BORDER
-                ws.cell(row=row, column=6, value=float(record.balance_before)).border = THIN_BORDER
-                ws.cell(row=row, column=7, value=float(record.balance_after)).border = THIN_BORDER
-                
-                # Number formatting
-                for col in [5, 6, 7]:
-                    ws.cell(row=row, column=col).number_format = '#,##0.000'
-                
-                row += 1
+        # Get the port-specific approved quantity
+        if port_key == "port_klang":
+            port_approved = item.port_klang_qty or item.approved_quantity or 0
+        elif port_key == "klia":
+            port_approved = item.klia_qty or item.approved_quantity or 0
+        elif port_key == "bukit_kayu_hitam":
+            port_approved = item.bukit_kayu_hitam_qty or item.approved_quantity or 0
         else:
-            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
-            no_data_cell = ws.cell(row=row, column=1, value="No import records for this port")
-            no_data_cell.font = Font(italic=True, color="999999")
-            no_data_cell.alignment = Alignment(horizontal="center")
+            port_approved = item.approved_quantity or 0
         
-        # Set column widths
-        _set_column_widths(ws, [12, 18, 8, 18, 14, 14, 14])
+        # Write MIDA-format balance sheet using the helper
+        _write_mida_balance_sheet(ws, certificate, item, records, port_approved)
     
     # Output
     output = BytesIO()
@@ -388,6 +524,14 @@ def generate_all_items_balance_sheets_xlsx(
     Generate an XLSX file with balance sheets for ALL items in a certificate,
     for a specific port. Each item gets its own sheet.
     
+    Format matches the MIDA balance sheet template exactly:
+    - Font: Times New Roman
+    - Row 1: Title "BALANCE SHEET (KASTAM 1)" (size 18, centered in C1:D1)
+    - Row 4-10: Labels (size 24)
+    - Row 8 col C: Item name (size 24, bold)
+    - Rows 13-14: Two-row headers with medium borders
+    - Row 15+: Data with thin borders, size 22, centered
+    
     Args:
         certificate: The certificate with items loaded
         port: The port to export (port_klang, klia, bukit_kayu_hitam)
@@ -401,8 +545,6 @@ def generate_all_items_balance_sheets_xlsx(
     # Remove default sheet
     wb.remove(wb.active)
     
-    port_display = PORT_DISPLAY_NAMES.get(port, port)
-    
     for item in certificate.items:
         # Get records for this item from the dict, or fall back to item.import_records
         item_records = []
@@ -415,66 +557,28 @@ def generate_all_items_balance_sheets_xlsx(
         records = [r for r in item_records if r.port == port]
         
         # Create sheet with format "ItemName (line_no)" - truncate item name to fit Excel's 31 char limit
-        # Format: "ItemName (X)" where X is the MIDA line number
-        # Also sanitize for Excel: remove invalid characters /\*?:[]
         line_suffix = f" ({item.line_no})"
         max_name_length = 31 - len(line_suffix)
         # Sanitize item name - remove characters not allowed in Excel sheet names
         sanitized_name = item.item_name
         for char in ['/', '\\', '*', '?', ':', '[', ']']:
-            sanitized_name = sanitized_name.replace(char, '-')
+            sanitized_name = sanitized_name.replace(char, ',')
         truncated_name = sanitized_name[:max_name_length] if len(sanitized_name) > max_name_length else sanitized_name
         sheet_name = f"{truncated_name}{line_suffix}"
         ws = wb.create_sheet(title=sheet_name)
         
-        # Create full title for the header (not truncated)
-        header_title = f"{item.item_name} ({item.line_no})"
-        
-        # Write item header with custom title
-        row = _write_item_header(ws, item, certificate, include_certificate=True, custom_title=header_title)
-        row += 1
-        
-        # Write import history title
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
-        history_title = ws.cell(
-            row=row, column=1,
-            value=f"Import History - {port_display}"
-        )
-        history_title.font = SUBTITLE_FONT
-        row += 1
-        
-        # Write import table header
-        headers = [
-            "Date", "Invoice #", "Line", "Form Reg No",
-            "Quantity", "Balance Before", "Balance After"
-        ]
-        _write_header_row(ws, row, headers)
-        row += 1
-        
-        # Write import records
-        if records:
-            for record in sorted(records, key=lambda r: (r.import_date, r.created_at)):
-                ws.cell(row=row, column=1, value=record.import_date).border = THIN_BORDER
-                ws.cell(row=row, column=2, value=record.invoice_number).border = THIN_BORDER
-                ws.cell(row=row, column=3, value=record.invoice_line or "-").border = THIN_BORDER
-                ws.cell(row=row, column=4, value=record.declaration_form_reg_no or "-").border = THIN_BORDER
-                ws.cell(row=row, column=5, value=float(record.quantity_imported)).border = THIN_BORDER
-                ws.cell(row=row, column=6, value=float(record.balance_before)).border = THIN_BORDER
-                ws.cell(row=row, column=7, value=float(record.balance_after)).border = THIN_BORDER
-                
-                # Number formatting
-                for col in [5, 6, 7]:
-                    ws.cell(row=row, column=col).number_format = '#,##0.000'
-                
-                row += 1
+        # Get the port-specific approved quantity
+        if port == "port_klang":
+            port_approved = item.port_klang_qty or item.approved_quantity or 0
+        elif port == "klia":
+            port_approved = item.klia_qty or item.approved_quantity or 0
+        elif port == "bukit_kayu_hitam":
+            port_approved = item.bukit_kayu_hitam_qty or item.approved_quantity or 0
         else:
-            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
-            no_data_cell = ws.cell(row=row, column=1, value="No import records for this port")
-            no_data_cell.font = Font(italic=True, color="999999")
-            no_data_cell.alignment = Alignment(horizontal="center")
+            port_approved = item.approved_quantity or 0
         
-        # Set column widths
-        _set_column_widths(ws, [12, 18, 8, 18, 14, 14, 14])
+        # Write MIDA-format balance sheet using the helper
+        _write_mida_balance_sheet(ws, certificate, item, records, port_approved)
     
     # Output
     output = BytesIO()

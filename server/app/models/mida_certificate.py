@@ -207,12 +207,10 @@ class MidaImportRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # Import details
     import_date: Mapped[date] = mapped_column(Date, nullable=False)
-    declaration_form_reg_no: Mapped[Optional[str]] = mapped_column(
-        String(100), nullable=True,
+    declaration_form_reg_no: Mapped[str] = mapped_column(
+        String(100), nullable=False,
         comment="Declaration Form Registration Number"
     )
-    invoice_number: Mapped[str] = mapped_column(String(100), nullable=False)
-    invoice_line: Mapped[Optional[int]] = mapped_column(nullable=True)
     quantity_imported: Mapped[Decimal] = mapped_column(Numeric(18, 3), nullable=False)
     port: Mapped[str] = mapped_column(
         String(30), nullable=False,
@@ -235,7 +233,7 @@ class MidaImportRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Index("ix_mida_import_records_certificate_item_id", "certificate_item_id"),
         Index("ix_mida_import_records_port", "port"),
         Index("ix_mida_import_records_import_date", "import_date"),
-        Index("ix_mida_import_records_invoice_number", "invoice_number"),
+        Index("ix_mida_import_records_declaration_form_reg_no", "declaration_form_reg_no"),
         Index(
             "ix_mida_import_records_item_port_date",
             "certificate_item_id", "port", "import_date"

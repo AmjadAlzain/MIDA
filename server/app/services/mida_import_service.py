@@ -295,8 +295,6 @@ def record_import(
         certificate_item_id=import_data.certificate_item_id,
         import_date=import_data.import_date,
         declaration_form_reg_no=import_data.declaration_form_reg_no,
-        invoice_number=import_data.invoice_number,
-        invoice_line=import_data.invoice_line,
         quantity_imported=import_data.quantity_imported,
         port=port,
         balance_before=current_balance,
@@ -407,8 +405,6 @@ def update_import(
         record_id=record_id,
         import_date=update_data.import_date,
         declaration_form_reg_no=update_data.declaration_form_reg_no,
-        invoice_number=update_data.invoice_number,
-        invoice_line=update_data.invoice_line,
         quantity_imported=update_data.quantity_imported,
         port=update_data.port.value if update_data.port else None,
         remarks=update_data.remarks,
@@ -477,10 +473,33 @@ def get_item_balance(
     total_imports = len(imports)
     total_imported = sum(i.quantity_imported for i in imports) if imports else Decimal("0")
     
+    # Handle NULL remaining quantities - treat as "full" (equal to approved)
+    approved_qty = item.approved_quantity or Decimal("0")
+    
+    # Check if port allocations are set
+    has_port_allocations = (
+        (item.port_klang_qty is not None and item.port_klang_qty > 0) or
+        (item.klia_qty is not None and item.klia_qty > 0) or
+        (item.bukit_kayu_hitam_qty is not None and item.bukit_kayu_hitam_qty > 0)
+    )
+    
+    if has_port_allocations:
+        # Port-specific mode
+        remaining_port_klang = item.remaining_port_klang if item.remaining_port_klang is not None else (item.port_klang_qty or Decimal("0"))
+        remaining_klia = item.remaining_klia if item.remaining_klia is not None else (item.klia_qty or Decimal("0"))
+        remaining_bkh = item.remaining_bukit_kayu_hitam if item.remaining_bukit_kayu_hitam is not None else (item.bukit_kayu_hitam_qty or Decimal("0"))
+        remaining_quantity = item.remaining_quantity if item.remaining_quantity is not None else (remaining_port_klang + remaining_klia + remaining_bkh)
+    else:
+        # Pooled mode - use approved_quantity as the total
+        remaining_quantity = item.remaining_quantity if item.remaining_quantity is not None else approved_qty
+        remaining_port_klang = remaining_quantity
+        remaining_klia = remaining_quantity
+        remaining_bkh = remaining_quantity
+    
     # Calculate remaining percentage
     remaining_percentage = None
-    if item.approved_quantity and item.approved_quantity > 0 and item.remaining_quantity is not None:
-        remaining_percentage = (item.remaining_quantity / item.approved_quantity) * 100
+    if approved_qty > 0:
+        remaining_percentage = (remaining_quantity / approved_qty) * 100
     
     return ItemBalanceRead(
         item_id=item.id,
@@ -495,10 +514,10 @@ def get_item_balance(
         port_klang_qty=item.port_klang_qty,
         klia_qty=item.klia_qty,
         bukit_kayu_hitam_qty=item.bukit_kayu_hitam_qty,
-        remaining_quantity=item.remaining_quantity,
-        remaining_port_klang=item.remaining_port_klang,
-        remaining_klia=item.remaining_klia,
-        remaining_bukit_kayu_hitam=item.remaining_bukit_kayu_hitam,
+        remaining_quantity=remaining_quantity,
+        remaining_port_klang=remaining_port_klang,
+        remaining_klia=remaining_klia,
+        remaining_bukit_kayu_hitam=remaining_bkh,
         remaining_percentage=remaining_percentage,
         total_imports=total_imports,
         total_imported=total_imported,
@@ -633,8 +652,6 @@ def get_port_summary(db: Session, port: str) -> PortSummary:
             certificate_item_id=record.certificate_item_id,
             import_date=record.import_date,
             declaration_form_reg_no=record.declaration_form_reg_no,
-            invoice_number=record.invoice_number,
-            invoice_line=record.invoice_line,
             quantity_imported=record.quantity_imported,
             port=record.port,
             balance_before=record.balance_before,
@@ -688,7 +705,7 @@ def get_import_history(
     item_id: Optional[UUID] = None,
     port: Optional[str] = None,
     certificate_id: Optional[UUID] = None,
-    invoice_number: Optional[str] = None,
+    declaration_form_reg_no: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     limit: int = 50,
@@ -700,7 +717,7 @@ def get_import_history(
         certificate_item_id=item_id,
         port=port,
         certificate_id=certificate_id,
-        invoice_number=invoice_number,
+        declaration_form_reg_no=declaration_form_reg_no,
         start_date=start_date,
         end_date=end_date,
         limit=limit,
@@ -714,8 +731,6 @@ def get_import_history(
             certificate_item_id=record.certificate_item_id,
             import_date=record.import_date,
             declaration_form_reg_no=record.declaration_form_reg_no,
-            invoice_number=record.invoice_number,
-            invoice_line=record.invoice_line,
             quantity_imported=record.quantity_imported,
             port=record.port,
             balance_before=record.balance_before,

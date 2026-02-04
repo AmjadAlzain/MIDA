@@ -113,7 +113,7 @@ export const certificateService = {
     params: { limit?: number; offset?: number } = {}
   ): Promise<CertificateItemsResponse> {
     const response = await api.get<CertificateItemsResponse>('/mida/imports/balances', {
-      params: { certificate_id: certificateId, ...params },
+      params: { certificate_id: certificateId, limit: 5000, ...params },
     });
     return response.data;
   },

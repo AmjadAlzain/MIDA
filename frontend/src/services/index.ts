@@ -3,3 +3,4 @@ export { companyService } from './companyService';
 export { certificateService } from './certificateService';
 export { importService } from './importService';
 export { classificationService } from './classificationService';
+export { migrationService } from './migrationService';

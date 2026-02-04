@@ -50,6 +50,38 @@
 - **Port Allocation Editing**: Card view and table view now include editable port quantity fields
 - **Preview Modal**: Shows port allocation in preview before saving
 
+## ✅ Phase 12 Completed: Balance Sheet Migration & XLSX Export (Feb 2026)
+
+### Database Schema Changes
+- **Migration 011**: Renamed `invoice_number` to `declaration_form_reg_no`, removed `invoice_line` column
+- **Field Simplification**: Single `declaration_form_reg_no` field (required) replaces invoice_number + invoice_line
+- **Updated Views**: All import record views updated to use new column name
+
+### Backend Updates
+- **Model**: `MidaImportRecord` updated with `declaration_form_reg_no` field
+- **Schemas**: All import schemas simplified (ImportRecordCreate, ImportRecordUpdate, ImportRecordRead)
+- **API Limit Increase**: Raised pagination limits from 50/500 to 5000 across all endpoints
+- **Router**: Query parameter renamed from `invoice_number` to `declaration_form_reg_no`
+
+### XLSX Export Service - MIDA Template Format
+- **Template-Matching Export**: Generates balance sheets matching official MIDA template exactly
+- **Font Styling**: Times New Roman throughout (18pt title, 24pt labels, 22pt data)
+- **Two-Row Headers**: Rows 13-14 with medium borders for header labels
+- **Data Formatting**: Row 15+ with thin borders, center-aligned, proper number formatting
+- **Column Layout**:
+  - TARIKH IMPORT / NO DAFTAR BORANG IKRAR / BAKI DI BAWA KEHADAPAN / KUANTITI / BAKI / T/TANGAN PIK / T/TANGAN PNK
+- **Sheet Naming**: Each item gets its own sheet named "ItemName (line_no)" with 31-char Excel limit handling
+- **Port-Specific Export**: Certificate-level export dropdown with Port Klang, KLIA, Bukit Kayu Hitam options
+- **Malay Labels**: All header labels in Malay matching the official template
+
+### Frontend Updates
+- **ItemImports Page**: 
+  - Removed "Line" column entirely
+  - Renamed "Invoice #" to "Form Reg No"
+  - Updated Add/Edit modals with single "Declaration Form Reg No" field
+- **Types**: Updated `ImportRecord` and `BulkImportRequest` interfaces
+- **Services**: Updated `UpdateImportRequest` type
+
 ## ✅ Phase 2 Completed: Certificate OCR
 
 ### Implemented Parsers
@@ -578,14 +610,14 @@ frontend/
 
 ---
 
-## Phase 11: ALDEC Integration (TODO)
+## Phase 13: ALDEC Integration (TODO)
 
-### 11.1 Post-ALDEC Workflow
+### 13.1 Post-ALDEC Workflow
 - [ ] After ALDEC approval → user inputs BXXXXX (kagayaku_ref_no)
 - [ ] Link imports to ALDEC declaration reference
 - [ ] Support batch import from ALDEC export file
 
-### 11.2 Declaration Reference Tracking
+### 13.2 Declaration Reference Tracking
 - [ ] Add declaration_reg_no field validation
 - [ ] Auto-generate sequential kagayaku_ref_no
 
@@ -596,9 +628,10 @@ frontend/
 | Phase | Description | Priority | Effort | Status |
 |-------|-------------|----------|--------|--------|
 | 10 | React TypeScript Frontend | 🔴 High | Large | ✅ DONE |
-| 11.1 | ALDEC post-approval workflow | 🟢 Low | Medium | TODO |
-| 11.2 | Declaration reference tracking | 🟢 Low | Small | TODO |
-| 12 | Balance sheet export (Excel/PDF) | 🟡 Medium | Medium | TODO |
+| 11 | UI Enhancements & Validation | 🔴 High | Medium | ✅ DONE |
+| 12 | Balance Sheet Migration & XLSX Export | 🔴 High | Medium | ✅ DONE |
+| 13.1 | ALDEC post-approval workflow | 🟢 Low | Medium | TODO |
+| 13.2 | Declaration reference tracking | 🟢 Low | Small | TODO |
 
 ---
 

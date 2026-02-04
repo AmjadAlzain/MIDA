@@ -95,6 +95,12 @@ def recalculate_item_remaining_quantities(
     - remaining_quantity (total)
     - quantity_status
     
+    Handles two modes:
+    1. Port-specific mode: When port_klang_qty, klia_qty, bukit_kayu_hitam_qty are set,
+       each port has its own allocation and remaining is calculated per-port.
+    2. Pooled mode: When port quantities are NOT set but approved_quantity is set,
+       all ports share a single pool of approved_quantity.
+    
     Args:
         db: Database session
         certificate_item_id: The certificate item ID
@@ -127,17 +133,37 @@ def recalculate_item_remaining_quantities(
     port_klang_imported = imported_by_port.get(ImportPort.PORT_KLANG.value, Decimal("0"))
     klia_imported = imported_by_port.get(ImportPort.KLIA.value, Decimal("0"))
     bkh_imported = imported_by_port.get(ImportPort.BUKIT_KAYU_HITAM.value, Decimal("0"))
+    total_imported = port_klang_imported + klia_imported + bkh_imported
     
-    item.remaining_port_klang = (item.port_klang_qty or Decimal("0")) - port_klang_imported
-    item.remaining_klia = (item.klia_qty or Decimal("0")) - klia_imported
-    item.remaining_bukit_kayu_hitam = (item.bukit_kayu_hitam_qty or Decimal("0")) - bkh_imported
-    
-    # Calculate total remaining
-    item.remaining_quantity = (
-        item.remaining_port_klang +
-        item.remaining_klia +
-        item.remaining_bukit_kayu_hitam
+    # Check if port-specific quantities are set
+    has_port_allocations = (
+        (item.port_klang_qty is not None and item.port_klang_qty > 0) or
+        (item.klia_qty is not None and item.klia_qty > 0) or
+        (item.bukit_kayu_hitam_qty is not None and item.bukit_kayu_hitam_qty > 0)
     )
+    
+    if has_port_allocations:
+        # Port-specific mode: Each port has its own allocation
+        item.remaining_port_klang = (item.port_klang_qty or Decimal("0")) - port_klang_imported
+        item.remaining_klia = (item.klia_qty or Decimal("0")) - klia_imported
+        item.remaining_bukit_kayu_hitam = (item.bukit_kayu_hitam_qty or Decimal("0")) - bkh_imported
+        
+        # Calculate total remaining as sum of port remainings
+        item.remaining_quantity = (
+            item.remaining_port_klang +
+            item.remaining_klia +
+            item.remaining_bukit_kayu_hitam
+        )
+    else:
+        # Pooled mode: All ports share a single pool from approved_quantity
+        approved = item.approved_quantity or Decimal("0")
+        item.remaining_quantity = approved - total_imported
+        
+        # Distribute remaining proportionally to imports (for display purposes)
+        # If no port-specific allocation, show total imports as reduction from each port's remaining
+        item.remaining_port_klang = approved - total_imported  # Show total remaining for default port
+        item.remaining_klia = approved - total_imported
+        item.remaining_bukit_kayu_hitam = approved - total_imported
     
     # Update quantity status
     default_threshold = get_default_warning_threshold(db)
@@ -163,13 +189,11 @@ def create_import_record(
     db: Session,
     certificate_item_id: UUID,
     import_date: date,
-    invoice_number: str,
+    declaration_form_reg_no: str,
     quantity_imported: Decimal,
     port: str,
     balance_before: Decimal,
     balance_after: Decimal,
-    declaration_form_reg_no: Optional[str] = None,
-    invoice_line: Optional[int] = None,
     remarks: Optional[str] = None,
 ) -> MidaImportRecord:
     """
@@ -182,8 +206,6 @@ def create_import_record(
         certificate_item_id=certificate_item_id,
         import_date=import_date,
         declaration_form_reg_no=declaration_form_reg_no,
-        invoice_number=invoice_number,
-        invoice_line=invoice_line,
         quantity_imported=quantity_imported,
         port=port,
         balance_before=balance_before,
@@ -209,8 +231,6 @@ def update_import_record(
     record_id: UUID,
     import_date: Optional[date] = None,
     declaration_form_reg_no: Optional[str] = None,
-    invoice_number: Optional[str] = None,
-    invoice_line: Optional[int] = None,
     quantity_imported: Optional[Decimal] = None,
     port: Optional[str] = None,
     remarks: Optional[str] = None,
@@ -244,10 +264,6 @@ def update_import_record(
         record.import_date = import_date
     if declaration_form_reg_no is not None:
         record.declaration_form_reg_no = declaration_form_reg_no
-    if invoice_number is not None:
-        record.invoice_number = invoice_number
-    if invoice_line is not None:
-        record.invoice_line = invoice_line
     if remarks is not None:
         record.remarks = remarks
     if quantity_imported is not None:
@@ -328,7 +344,7 @@ def list_import_records(
     certificate_item_id: Optional[UUID] = None,
     port: Optional[str] = None,
     certificate_id: Optional[UUID] = None,
-    invoice_number: Optional[str] = None,
+    declaration_form_reg_no: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     limit: int = 50,
@@ -356,9 +372,9 @@ def list_import_records(
         stmt = stmt.where(MidaImportRecord.port == port)
     if certificate_id:
         stmt = stmt.where(MidaCertificateItem.certificate_id == certificate_id)
-    if invoice_number:
+    if declaration_form_reg_no:
         stmt = stmt.where(
-            MidaImportRecord.invoice_number.ilike(f"%{invoice_number}%")
+            MidaImportRecord.declaration_form_reg_no.ilike(f"%{declaration_form_reg_no}%")
         )
     if start_date:
         stmt = stmt.where(MidaImportRecord.import_date >= start_date)

@@ -12,12 +12,20 @@ MIDA Certificate OCR + Invoice Matching + 3-Tab Classification System + Quota Tr
 - **Invoice Matching**: Match invoice items against MIDA certificate quotas
 - **Multi-Certificate Matching**: Match items against multiple MIDA certificates simultaneously
 - **HSCODE UOM Mapping**: Determine balance deduction units (UNIT or KGM) by HSCODE
+- **High-Volume API Support**: Pagination limits up to 5000 records for bulk operations
 
 ### Certificate Processing
 - **Multi-table parsing**: Parses ALL matching quota tables across documents
 - **Page-by-page parsing**: Extracts text per page, parses separately, merges and de-duplicates
 - **Station split parsing**: PORT_KLANG, KLIA, BUKIT_KAYU_HITAM support
 - **Handwritten amendment handling**: Extracts values from cells with pen crossouts and stamps
+
+### Balance Sheet Export
+- **MIDA Template Format**: Generates XLSX matching official MIDA balance sheet template exactly
+- **Malay Headers**: TARIKH IMPORT, NO DAFTAR BORANG IKRAR, BAKI DI BAWA KEHADAPAN, KUANTITI, BAKI, T/TANGAN PIK/PNK
+- **Port-Specific Export**: Export balance sheets per port (Port Klang, KLIA, Bukit Kayu Hitam)
+- **Multi-Item Workbooks**: Each certificate item gets its own sheet named "ItemName (line_no)"
+- **Professional Styling**: Times New Roman font, proper borders, number formatting matching template
 
 ### Data & API
 - **PostgreSQL Database**: Tracks import records and exemption approvals
@@ -28,6 +36,7 @@ MIDA Certificate OCR + Invoice Matching + 3-Tab Classification System + Quota Tr
 - **Certificate Details**: View/edit certificate items with remaining balances per port
 - **Port Allocation Display**: Visual breakdown of approved/remaining quantities per port (Port Klang, KLIA, Bukit Kayu Hitam)
 - **Import Tracking**: Record and view import history for each certificate item with port-specific balances
+- **Balance Sheet Export**: Export MIDA-format XLSX balance sheets per port from certificate details page
 - **Invoice Converter**: Classify invoices with 3-tab UI and K1 export
 - **Certificate Parser**: Upload PDF certificates for OCR parsing with validation warnings
   - Real-time validation (errors, warnings, info messages)
@@ -105,9 +114,10 @@ MIDA/
 │   │       ├── mida_certificate_service.py
 │   │       ├── mida_import_service.py
 │   │       ├── mida_matcher.py         # Invoice-to-MIDA matching
-│   │       └── mida_matching_service.py
+│   │       ├── mida_matching_service.py
+│   │       └── xlsx_export_service.py  # MIDA template XLSX export
 │   ├── alembic/                        # Database migrations
-│   │   └── versions/                   # 9 migration files
+│   │   └── versions/                   # 11 migration files
 │   ├── templates/
 │   │   └── K1_Import_Template.xls      # K1 export template
 │   ├── tests/                          # Unit and integration tests

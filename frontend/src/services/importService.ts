@@ -1,11 +1,9 @@
 import api from './api';
-import { ImportRecordsResponse, BulkImportRequest, ImportRecord, ImportPreviewResponse } from '@/types';
+import { ImportRecordsResponse, BulkImportRequest, ImportRecord, ImportPreviewResponse, CertificateItemBalance } from '@/types';
 
 export interface UpdateImportRequest {
   import_date?: string;
   declaration_form_reg_no?: string;
-  invoice_number?: string;
-  invoice_line?: number;
   quantity_imported?: number;
   port?: string;
   remarks?: string;
@@ -20,7 +18,7 @@ export const importService = {
     params: { port?: string; limit?: number; offset?: number } = {}
   ): Promise<ImportRecordsResponse> {
     const response = await api.get<ImportRecordsResponse>(`/mida/imports/history/item/${itemId}`, {
-      params,
+      params: { limit: 5000, ...params },
     });
     return response.data;
   },
@@ -62,5 +60,13 @@ export const importService = {
    */
   async delete(recordId: string): Promise<void> {
     await api.delete(`/mida/imports/${recordId}`);
+  },
+
+  /**
+   * Get balance for a specific item
+   */
+  async getItemBalance(itemId: string): Promise<CertificateItemBalance> {
+    const response = await api.get<CertificateItemBalance>(`/mida/imports/balances/${itemId}`);
+    return response.data;
   },
 };

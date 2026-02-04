@@ -44,14 +44,8 @@ class ImportRecordCreate(BaseModel):
     import_date: date = Field(
         ..., description="Date of the import"
     )
-    declaration_form_reg_no: Optional[str] = Field(
-        default=None, max_length=100, description="Declaration Form Registration Number"
-    )
-    invoice_number: str = Field(
-        ..., min_length=1, max_length=100, description="Invoice number"
-    )
-    invoice_line: Optional[int] = Field(
-        default=None, ge=1, description="Line number within the invoice"
+    declaration_form_reg_no: str = Field(
+        ..., min_length=1, max_length=100, description="Declaration Form Registration Number"
     )
     quantity_imported: Decimal = Field(
         ..., gt=0, description="Quantity imported (must be positive)"
@@ -81,13 +75,7 @@ class ImportRecordUpdate(BaseModel):
         default=None, description="Date of the import"
     )
     declaration_form_reg_no: Optional[str] = Field(
-        default=None, max_length=100, description="Declaration Form Registration Number"
-    )
-    invoice_number: Optional[str] = Field(
-        default=None, min_length=1, max_length=100, description="Invoice number"
-    )
-    invoice_line: Optional[int] = Field(
-        default=None, ge=1, description="Line number within the invoice"
+        default=None, min_length=1, max_length=100, description="Declaration Form Registration Number"
     )
     quantity_imported: Optional[Decimal] = Field(
         default=None, gt=0, description="Quantity imported (must be positive)"
@@ -108,9 +96,7 @@ class ImportRecordRead(BaseModel):
     id: UUID
     certificate_item_id: UUID
     import_date: date
-    declaration_form_reg_no: Optional[str] = None
-    invoice_number: str
-    invoice_line: Optional[int] = None
+    declaration_form_reg_no: str
     quantity_imported: Decimal
     port: str
     balance_before: Decimal
@@ -238,8 +224,8 @@ class ImportHistoryQuery(BaseModel):
     certificate_id: Optional[UUID] = Field(
         default=None, description="Filter by certificate"
     )
-    invoice_number: Optional[str] = Field(
-        default=None, description="Filter by invoice number"
+    declaration_form_reg_no: Optional[str] = Field(
+        default=None, description="Filter by declaration form registration number"
     )
     start_date: Optional[date] = Field(
         default=None, description="Filter imports from this date"

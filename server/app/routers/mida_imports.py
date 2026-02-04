@@ -209,10 +209,10 @@ async def get_history(
     item_id: Optional[UUID] = Query(None, description="Filter by item ID"),
     port: Optional[ImportPort] = Query(None, description="Filter by port"),
     certificate_id: Optional[UUID] = Query(None, description="Filter by certificate ID"),
-    invoice_number: Optional[str] = Query(None, description="Filter by invoice number"),
+    declaration_form_reg_no: Optional[str] = Query(None, description="Filter by declaration form registration number"),
     start_date: Optional[date] = Query(None, description="Filter from this date"),
     end_date: Optional[date] = Query(None, description="Filter until this date"),
-    limit: int = Query(50, ge=1, le=200, description="Maximum results"),
+    limit: int = Query(50, ge=1, le=5000, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Results to skip"),
     db: Session = Depends(get_db),
 ):
@@ -223,7 +223,7 @@ async def get_history(
         item_id=item_id,
         port=port_value,
         certificate_id=certificate_id,
-        invoice_number=invoice_number,
+        declaration_form_reg_no=declaration_form_reg_no,
         start_date=start_date,
         end_date=end_date,
         limit=limit,
@@ -247,7 +247,7 @@ async def get_history(
 async def get_item_history(
     item_id: UUID,
     port: Optional[ImportPort] = Query(None, description="Filter by port"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=5000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
@@ -292,7 +292,7 @@ async def list_balances(
         None, description="Filter by status (normal, warning, depleted, overdrawn)"
     ),
     hs_code: Optional[str] = Query(None, description="Filter by HS code"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=5000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
@@ -432,7 +432,7 @@ async def get_ports_summary(
 )
 async def get_port_history(
     port: ImportPort,
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=5000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):

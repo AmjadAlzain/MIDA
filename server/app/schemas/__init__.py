@@ -44,6 +44,18 @@ from app.schemas.mida_import import (
     ImportPreviewResponse,
 )
 
+from app.schemas.migration import (
+    ItemMatchStatus,
+    ConflictResolution,
+    MigrationInvoiceRow,
+    MigrationItemPreview,
+    MigrationPreviewResponse,
+    MigrationApplyRequest,
+    MigrationApplyResult,
+    MigrationApplyResponse,
+    ItemResolution,
+)
+
 __all__ = [
     # MIDA Certificate schemas
     "CertificateItemIn",
@@ -83,4 +95,14 @@ __all__ = [
     "DefaultThresholdUpdate",
     "ImportPreview",
     "ImportPreviewResponse",
+    # Migration schemas
+    "ItemMatchStatus",
+    "ConflictResolution",
+    "MigrationInvoiceRow",
+    "MigrationItemPreview",
+    "MigrationPreviewResponse",
+    "MigrationApplyRequest",
+    "MigrationApplyResult",
+    "MigrationApplyResponse",
+    "ItemResolution",
 ]
