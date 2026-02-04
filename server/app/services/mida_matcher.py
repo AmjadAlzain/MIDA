@@ -829,6 +829,9 @@ def match_items_multi_certificate(
         
         norm_invoice_name = normalize(invoice_item.item_name)
         norm_invoice_model = normalize(invoice_item.model_no)
+        # Use only first 3 characters of model number for matching
+        # (if model has less than 3 characters, use all of them)
+        norm_invoice_model_prefix = norm_invoice_model[:3] if norm_invoice_model else ""
         
         # Get invoice quantity for checking if MIDA item can cover it
         invoice_qty = invoice_item.effective_quantity
@@ -846,11 +849,13 @@ def match_items_multi_certificate(
                     continue
 
                 # Rule 2: Certificate model_number must match invoice model_no
+                # Compare only first 3 characters of model numbers
                 cert_model = mida_item.certificate_model_number or ""
                 norm_cert_model = normalize(cert_model)
+                norm_cert_model_prefix = norm_cert_model[:3] if norm_cert_model else ""
                 
-                if not norm_cert_model or norm_invoice_model != norm_cert_model:
-                    continue  # Model number doesn't match
+                if not norm_cert_model_prefix or norm_invoice_model_prefix != norm_cert_model_prefix:
+                    continue  # Model number prefix doesn't match
                 
                 norm_mida_name = normalize(mida_item.item_name)
                 
