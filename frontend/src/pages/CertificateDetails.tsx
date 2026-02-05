@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, Fragment } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -20,6 +20,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Upload,
+  Ghost,
 } from 'lucide-react';
 import {
   Button,
@@ -53,6 +54,8 @@ export function CertificateDetails() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedCertificate, setEditedCertificate] = useState<Certificate | null>(null);
   const [deleteItemIndex, setDeleteItemIndex] = useState<number | null>(null);
+  const [dummyConfirmIndex, setDummyConfirmIndex] = useState<number | null>(null);
+  const [savedDummyValues, setSavedDummyValues] = useState<Record<string, Partial<CertificateItem>>>({});
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
@@ -145,6 +148,9 @@ export function CertificateDetails() {
     }
     
     items.forEach((item, index) => {
+      // Skip validation for dummy items
+      if (item.is_dummy) return;
+      
       const lineLabel = `Item #${item.line_no || index + 1}`;
       const isNewItem = item.id?.startsWith('temp-');
       
@@ -242,12 +248,14 @@ export function CertificateDetails() {
   // Start editing
   const handleStartEdit = () => {
     setEditedCertificate(certificate ? { ...certificate, items: [...(certificate.items || [])] } : null);
+    setSavedDummyValues({}); // Clear any previously saved dummy values
     setIsEditing(true);
   };
 
   // Cancel editing
   const handleCancelEdit = () => {
     setEditedCertificate(null);
+    setSavedDummyValues({}); // Clear saved dummy values on cancel
     setIsEditing(false);
   };
 
@@ -288,6 +296,7 @@ export function CertificateDetails() {
         port_klang_qty: item.port_klang_qty,
         klia_qty: item.klia_qty,
         bukit_kayu_hitam_qty: item.bukit_kayu_hitam_qty,
+        is_dummy: item.is_dummy,
       })) || [],
     };
 
@@ -309,16 +318,14 @@ export function CertificateDetails() {
     });
   };
 
-  // Add new item
-  const handleAddItem = () => {
+  // Add new item (optionally at specific index)
+  const handleAddItem = (insertAtIndex?: number) => {
     setEditedCertificate((prev) => {
       if (!prev) return prev;
       const items = prev.items || [];
-      // Use max line_no + 1 to ensure unique line number
-      const maxLineNo = items.length > 0 ? Math.max(...items.map(i => i.line_no)) : 0;
       const newItem: CertificateItem = {
         id: `temp-${Date.now()}`,
-        line_no: maxLineNo + 1,
+        line_no: 0, // Will be recalculated
         hs_code: '',
         item_name: '',
         uom: '',
@@ -326,9 +333,133 @@ export function CertificateDetails() {
         port_klang_qty: 0,
         klia_qty: 0,
         bukit_kayu_hitam_qty: 0,
+        is_dummy: false,
       };
-      return { ...prev, items: [...items, newItem] };
+      
+      let newItems = [...items];
+      if (typeof insertAtIndex === 'number') {
+        newItems.splice(insertAtIndex, 0, newItem);
+      } else {
+        newItems.push(newItem);
+      }
+      
+      // Renumber line_no for all items
+      return { 
+        ...prev, 
+        items: newItems.map((item, i) => ({ ...item, line_no: i + 1 })) 
+      };
     });
+  };
+
+  // Check if an item has any values filled in
+  const itemHasValues = (item: CertificateItem): boolean => {
+    return !!(
+      item.hs_code?.trim() ||
+      item.item_name?.trim() ||
+      item.uom?.trim() ||
+      item.approved_quantity > 0 ||
+      item.port_klang_qty > 0 ||
+      item.klia_qty > 0 ||
+      item.bukit_kayu_hitam_qty > 0
+    );
+  };
+
+  // Toggle Dummy status - shows confirmation if item has values
+  const handleToggleDummy = (index: number) => {
+    if (!editedCertificate?.items) return;
+    const item = editedCertificate.items[index];
+    
+    // If unmarking as dummy, just proceed
+    if (item.is_dummy) {
+      confirmToggleDummy(index);
+      return;
+    }
+    
+    // If marking as dummy and item has values, show confirmation
+    if (itemHasValues(item)) {
+      setDummyConfirmIndex(index);
+      return;
+    }
+    
+    // Otherwise proceed directly
+    confirmToggleDummy(index);
+  };
+
+  // Actually toggle the dummy status
+  const confirmToggleDummy = (index: number) => {
+    setEditedCertificate((prev) => {
+      if (!prev || !prev.items) return prev;
+      const items = [...prev.items];
+      const current = items[index];
+      const isDummy = !current.is_dummy;
+      const itemKey = current.id || `index-${index}`;
+      
+      if (isDummy) {
+        // Marking as dummy - save current values before clearing (including remaining balances)
+        setSavedDummyValues((prevSaved) => ({
+          ...prevSaved,
+          [itemKey]: {
+            hs_code: current.hs_code,
+            item_name: current.item_name,
+            uom: current.uom,
+            approved_quantity: current.approved_quantity,
+            port_klang_qty: current.port_klang_qty,
+            klia_qty: current.klia_qty,
+            bukit_kayu_hitam_qty: current.bukit_kayu_hitam_qty,
+            // Also save remaining balance values
+            remaining_quantity: current.remaining_quantity,
+            remaining_port_klang: current.remaining_port_klang,
+            remaining_klia: current.remaining_klia,
+            remaining_bukit_kayu_hitam: current.remaining_bukit_kayu_hitam,
+            quantity_status: current.quantity_status,
+          },
+        }));
+        
+        items[index] = {
+          ...current,
+          is_dummy: true,
+          hs_code: '',
+          item_name: '',
+          uom: '',
+          approved_quantity: 0,
+          port_klang_qty: 0,
+          klia_qty: 0,
+          bukit_kayu_hitam_qty: 0,
+        };
+      } else {
+        // Unmarking as dummy - restore saved values if available (including remaining balances)
+        const saved = savedDummyValues[itemKey];
+        items[index] = {
+          ...current,
+          is_dummy: false,
+          ...(saved ? {
+            hs_code: saved.hs_code || '',
+            item_name: saved.item_name || '',
+            uom: saved.uom || '',
+            approved_quantity: saved.approved_quantity || 0,
+            port_klang_qty: saved.port_klang_qty || 0,
+            klia_qty: saved.klia_qty || 0,
+            bukit_kayu_hitam_qty: saved.bukit_kayu_hitam_qty || 0,
+            // Restore remaining balance values
+            remaining_quantity: saved.remaining_quantity,
+            remaining_port_klang: saved.remaining_port_klang,
+            remaining_klia: saved.remaining_klia,
+            remaining_bukit_kayu_hitam: saved.remaining_bukit_kayu_hitam,
+            quantity_status: saved.quantity_status,
+          } : {})
+        };
+        
+        // Clear saved values for this item
+        setSavedDummyValues((prevSaved) => {
+          const newSaved = { ...prevSaved };
+          delete newSaved[itemKey];
+          return newSaved;
+        });
+      }
+      
+      return { ...prev, items };
+    });
+    setDummyConfirmIndex(null);
   };
 
   // Remove item
@@ -652,111 +783,161 @@ export function CertificateDetails() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {editedCertificate.items.map((item, index) => (
-                  <tr key={item.id || index} className={`hover:bg-gray-50 ${getItemHasError(index) ? 'bg-red-50' : getItemHasWarning(index) ? 'bg-yellow-50' : ''}`}>
-                    <td className="px-3 py-2">
-                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-semibold">
-                        {item.line_no}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
-                      <input
-                        type="text"
-                        value={item.hs_code}
-                        onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
-                        className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm ${getCellClass('hs_code', index)}`}
-                      />
-                    </td>
-                    <td className="px-3 py-2" style={{ minWidth: '200px' }}>
-                      <input
-                        type="text"
-                        value={item.item_name}
-                        onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
-                        className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('item_name', index)}`}
-                      />
-                    </td>
-                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
-                      {item.id?.startsWith('temp-') ? (
-                        <input
-                          type="number"
-                          value={item.approved_quantity}
-                          onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
-                          className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('approved_quantity', index)}`}
-                        />
-                      ) : (
-                        <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
-                          {formatNumber(item.approved_quantity)}
-                        </span>
+                {editedCertificate.items.map((item, index) => {
+                  const isDummy = item.is_dummy;
+                  const rowClass = isDummy 
+                    ? 'bg-gray-100 opacity-90' 
+                    : getItemHasError(index) 
+                      ? 'bg-red-50' 
+                      : getItemHasWarning(index) 
+                        ? 'bg-yellow-50' 
+                        : 'hover:bg-gray-50';
+                  
+                  return (
+                    <Fragment key={item.id || index}>
+                      {index > 0 && (
+                        <tr className="h-1 hover:h-8 group transition-all duration-200 bg-transparent">
+                          <td colSpan={9} className="p-0 border-0 relative">
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-10 hover:bg-blue-50/10">
+                              <div className="w-full h-px bg-blue-200 absolute top-1/2 left-0 right-0 transform -translate-y-1/2"></div>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-6 text-xs px-2 py-0 bg-blue-50 border border-blue-200 text-blue-700 shadow-sm relative z-20 rounded-full"
+                                onClick={() => handleAddItem(index)}
+                                leftIcon={<Plus className="w-3 h-3" />}
+                              >
+                                Insert Row
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={item.uom}
-                        onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                        className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('uom', index)}`}
-                      >
-                        <option value="">Select...</option>
-                        <option value="KGM">KGM</option>
-                        <option value="UNT">UNT</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
-                      {item.id?.startsWith('temp-') ? (
-                        <input
-                          type="number"
-                          value={item.port_klang_qty || 0}
-                          onChange={(e) => handleItemChange(index, 'port_klang_qty', parseFloat(e.target.value) || 0)}
-                          className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('port_klang_qty', index)}`}
-                          title="Port Klang Quantity"
-                        />
-                      ) : (
-                        <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
-                          {formatNumber(item.port_klang_qty || 0)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
-                      {item.id?.startsWith('temp-') ? (
-                        <input
-                          type="number"
-                          value={item.klia_qty || 0}
-                          onChange={(e) => handleItemChange(index, 'klia_qty', parseFloat(e.target.value) || 0)}
-                          className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('klia_qty', index)}`}
-                          title="KLIA Quantity"
-                        />
-                      ) : (
-                        <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
-                          {formatNumber(item.klia_qty || 0)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2" style={{ minWidth: '120px' }}>
-                      {item.id?.startsWith('temp-') ? (
-                        <input
-                          type="number"
-                          value={item.bukit_kayu_hitam_qty || 0}
-                          onChange={(e) => handleItemChange(index, 'bukit_kayu_hitam_qty', parseFloat(e.target.value) || 0)}
-                          className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('bukit_kayu_hitam_qty', index)}`}
-                          title="Bukit Kayu Hitam Quantity"
-                        />
-                      ) : (
-                        <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
-                          {formatNumber(item.bukit_kayu_hitam_qty || 0)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeleteItemIndex(index)}
-                        className="text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                      <tr className={rowClass}>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${isDummy ? 'bg-gray-200 text-gray-600' : 'bg-purple-100 text-purple-700'}`}>
+                              {item.line_no}
+                            </span>
+                            {isDummy && <Ghost className="w-3 h-3 text-gray-400" />}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                          <input
+                            type="text"
+                            value={item.hs_code}
+                            onChange={(e) => handleItemChange(index, 'hs_code', e.target.value)}
+                            disabled={!!isDummy}
+                            className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm ${getCellClass('hs_code', index)} ${isDummy ? 'bg-gray-100' : ''}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2" style={{ minWidth: '200px' }}>
+                          <input
+                            type="text"
+                            value={item.item_name}
+                            onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
+                            disabled={!!isDummy}
+                            className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('item_name', index)} ${isDummy ? 'bg-gray-100' : ''}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                          {item.id?.startsWith('temp-') ? (
+                            <input
+                              type="number"
+                              value={item.approved_quantity}
+                              onChange={(e) => handleItemChange(index, 'approved_quantity', parseFloat(e.target.value) || 0)}
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('approved_quantity', index)} ${isDummy ? 'bg-gray-100' : ''}`}
+                            />
+                          ) : (
+                            <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
+                              {formatNumber(item.approved_quantity)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={item.uom}
+                            onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                            disabled={!!isDummy}
+                            className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${getCellClass('uom', index)} ${isDummy ? 'bg-gray-100' : ''}`}
+                          >
+                            <option value="">Select...</option>
+                            <option value="KGM">KGM</option>
+                            <option value="UNT">UNT</option>
+                          </select>
+                        </td>
+                        <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                          {item.id?.startsWith('temp-') ? (
+                            <input
+                              type="number"
+                              value={item.port_klang_qty || 0}
+                              onChange={(e) => handleItemChange(index, 'port_klang_qty', parseFloat(e.target.value) || 0)}
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('port_klang_qty', index)} ${isDummy ? 'bg-gray-100' : ''}`}
+                              title="Port Klang Quantity"
+                            />
+                          ) : (
+                            <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
+                              {formatNumber(item.port_klang_qty || 0)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                          {item.id?.startsWith('temp-') ? (
+                            <input
+                              type="number"
+                              value={item.klia_qty || 0}
+                              onChange={(e) => handleItemChange(index, 'klia_qty', parseFloat(e.target.value) || 0)}
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('klia_qty', index)} ${isDummy ? 'bg-gray-100' : ''}`}
+                              title="KLIA Quantity"
+                            />
+                          ) : (
+                            <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
+                              {formatNumber(item.klia_qty || 0)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2" style={{ minWidth: '120px' }}>
+                          {item.id?.startsWith('temp-') ? (
+                            <input
+                              type="number"
+                              value={item.bukit_kayu_hitam_qty || 0}
+                              onChange={(e) => handleItemChange(index, 'bukit_kayu_hitam_qty', parseFloat(e.target.value) || 0)}
+                              disabled={!!isDummy}
+                              className={`w-full px-2 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-right ${getCellClass('bukit_kayu_hitam_qty', index)} ${isDummy ? 'bg-gray-100' : ''}`}
+                              title="Bukit Kayu Hitam Quantity"
+                            />
+                          ) : (
+                            <span className="block w-full px-2 py-1.5 text-sm text-right text-gray-700">
+                              {formatNumber(item.bukit_kayu_hitam_qty || 0)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleToggleDummy(index)}
+                              className={`p-1.5 rounded hover:bg-gray-200 ${isDummy ? 'text-gray-700 bg-gray-200' : 'text-gray-400'}`}
+                              title={isDummy ? "Unmark as dummy" : "Mark as dummy"}
+                            >
+                              <Ghost className="w-4 h-4" />
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteItemIndex(index)}
+                              className="text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
             {/* Add Item button at bottom */}
@@ -794,15 +975,23 @@ export function CertificateDetails() {
                   const balance = getItemBalance(item.id);
                   const remainingQty = balance?.remaining_quantity ?? item.approved_quantity;
                   const quantityStatus = balance?.quantity_status ?? 'normal';
+                  const isDummy = item.is_dummy;
 
                   return (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">{item.line_no}</td>
-                      <td className="px-4 py-3 font-mono text-blue-600">{item.hs_code}</td>
-                      <td className="px-4 py-3 max-w-xs truncate" title={item.item_name}>
-                        {item.item_name}
+                    <tr key={item.id} className={isDummy ? 'bg-gray-100 opacity-90' : 'hover:bg-gray-50'}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <span className={isDummy ? 'text-gray-500' : ''}>{item.line_no}</span>
+                          {isDummy && <Ghost className="w-3 h-3 text-gray-400" />}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className={`px-4 py-3 font-mono ${isDummy ? 'text-gray-400' : 'text-blue-600'}`}>
+                        {isDummy ? '—' : item.hs_code}
+                      </td>
+                      <td className={`px-4 py-3 max-w-xs truncate ${isDummy ? 'text-gray-400 italic' : ''}`} title={item.item_name}>
+                        {isDummy ? 'Dummy Entry' : item.item_name}
+                      </td>
+                      <td className={`px-4 py-3 text-right ${isDummy ? 'text-gray-400' : ''}`}>
                         {formatNumber(item.approved_quantity)}
                       </td>
                       <td
@@ -913,6 +1102,35 @@ export function CertificateDetails() {
         message="Are you sure you want to remove this item? This change will take effect when you save the certificate."
         confirmText="Remove"
         variant="danger"
+      />
+
+      {/* Mark as Dummy Confirmation */}
+      <ConfirmModal
+        isOpen={dummyConfirmIndex !== null}
+        onClose={() => setDummyConfirmIndex(null)}
+        onConfirm={() => dummyConfirmIndex !== null && confirmToggleDummy(dummyConfirmIndex)}
+        title="Mark as Dummy Entry"
+        message={
+          <>
+            This item has values that will be <strong>cleared</strong> when marked as dummy:
+            {dummyConfirmIndex !== null && editedCertificate?.items?.[dummyConfirmIndex] && (
+              <ul className="mt-2 text-sm text-gray-600 list-disc list-inside">
+                {editedCertificate.items[dummyConfirmIndex].hs_code && (
+                  <li>HS Code: {editedCertificate.items[dummyConfirmIndex].hs_code}</li>
+                )}
+                {editedCertificate.items[dummyConfirmIndex].item_name && (
+                  <li>Item Name: {editedCertificate.items[dummyConfirmIndex].item_name}</li>
+                )}
+                {editedCertificate.items[dummyConfirmIndex].approved_quantity > 0 && (
+                  <li>Approved Qty: {formatNumber(editedCertificate.items[dummyConfirmIndex].approved_quantity)}</li>
+                )}
+              </ul>
+            )}
+            <p className="mt-3">Do you want to proceed?</p>
+          </>
+        }
+        confirmText="Mark as Dummy"
+        variant="warning"
       />
     </div>
   );

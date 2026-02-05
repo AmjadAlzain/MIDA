@@ -37,6 +37,7 @@ export interface CertificateItem {
   port_klang_qty: number;
   klia_qty: number;
   bukit_kayu_hitam_qty: number;
+  is_dummy?: boolean;
   // Remaining balances (included when fetching certificate by ID)
   remaining_quantity?: number;
   remaining_port_klang?: number;
