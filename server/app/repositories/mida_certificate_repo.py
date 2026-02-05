@@ -23,12 +23,14 @@ def get_certificate_by_number(
     Returns:
         MidaCertificate if found, None otherwise
     """
-    stmt = select(MidaCertificate).where(
-        MidaCertificate.certificate_number == certificate_number
+    stmt = (
+        select(MidaCertificate)
+        .options(joinedload(MidaCertificate.items))
+        .where(MidaCertificate.certificate_number == certificate_number)
     )
     if not include_deleted:
         stmt = stmt.where(MidaCertificate.deleted_at.is_(None))
-    return db.execute(stmt).scalar_one_or_none()
+    return db.execute(stmt).unique().scalar_one_or_none()
 
 
 def get_certificate_by_id(

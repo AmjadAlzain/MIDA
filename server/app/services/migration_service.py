@@ -80,6 +80,7 @@ def _parse_date(value) -> Optional[date]:
     - datetime objects (from Excel)
     - "DD.MM.YYYY" strings
     - "DD/MM/YYYY" strings
+    - "DD.MM,YYYY" strings (typo with comma instead of period)
     """
     if value is None:
         return None
@@ -95,6 +96,9 @@ def _parse_date(value) -> Optional[date]:
         if not value:
             return None
         
+        # Fix common typo: comma instead of period (e.g., "06.08,2024" -> "06.08.2024")
+        value = value.replace(",", ".")
+        
         # Try DD.MM.YYYY
         for fmt in ["%d.%m.%Y", "%d/%m/%Y", "%Y-%m-%d"]:
             try:
@@ -108,7 +112,15 @@ def _parse_date(value) -> Optional[date]:
 
 
 def _parse_decimal(value) -> Optional[Decimal]:
-    """Parse a decimal value from cell."""
+    """
+    Parse a decimal value from cell.
+    
+    Handles values with unit suffixes like:
+    - "21828 KGS"
+    - "26460.00 KGM"
+    - "126000 UNT"
+    - "198450.00KGM" (no space before unit)
+    """
     if value is None:
         return None
     
@@ -119,6 +131,11 @@ def _parse_decimal(value) -> Optional[Decimal]:
             # Remove commas and whitespace
             cleaned = value.replace(",", "").strip()
             if cleaned:
+                # Strip unit suffixes (KGS, KGM, UNT, etc.) - common units found in balance sheets
+                # Match: optional decimal number followed by optional unit letters
+                unit_pattern = re.match(r'^([\d.]+)\s*[A-Za-z]*\s*$', cleaned)
+                if unit_pattern:
+                    cleaned = unit_pattern.group(1)
                 return Decimal(cleaned)
     except (InvalidOperation, ValueError):
         logger.warning(f"Could not parse decimal: {value}")
@@ -381,6 +398,16 @@ def preview_migration(
     mismatch_count = 0
     not_found_count = 0
     
+    # When use_certificate is specified, we skip detailed matching validation
+    # and just force-import all items to the target certificate by line number
+    skip_validation = use_certificate is not None
+    
+    # If skipping validation, pre-load items once as a dict for O(1) lookup
+    db_items_by_line = {}
+    if db_certificate and skip_validation:
+        for item in db_certificate.items:
+            db_items_by_line[item.line_no] = item
+    
     for sheet_data in sheets_data:
         line_no = sheet_data.get("line_no")
         xlsx_item_name = sheet_data.get("item_name") or ""
@@ -412,27 +439,36 @@ def preview_migration(
         
         # Try to find matching item in database
         if db_certificate and line_no is not None:
-            db_item = None
-            for item in db_certificate.items:
-                if item.line_no == line_no:
-                    db_item = item
-                    break
+            # Use pre-loaded dict when skip_validation, otherwise iterate
+            if skip_validation:
+                db_item = db_items_by_line.get(line_no)
+            else:
+                db_item = None
+                for item in db_certificate.items:
+                    if item.line_no == line_no:
+                        db_item = item
+                        break
             
             if db_item:
                 preview_item.db_item_id = db_item.id
                 preview_item.db_item_name = db_item.item_name
                 preview_item.db_approved_qty = db_item.approved_quantity
                 
-                # Check if names match (case-insensitive, whitespace-normalized)
-                xlsx_name_normalized = " ".join(xlsx_item_name.upper().split())
-                db_name_normalized = " ".join((db_item.item_name or "").upper().split())
-                
-                if xlsx_name_normalized == db_name_normalized:
+                # When skip_validation, always mark as matched (force import mode)
+                if skip_validation:
                     preview_item.status = ItemMatchStatus.MATCHED
                     matched_count += 1
                 else:
-                    preview_item.status = ItemMatchStatus.NAME_MISMATCH
-                    mismatch_count += 1
+                    # Check if names match (case-insensitive, whitespace-normalized)
+                    xlsx_name_normalized = " ".join(xlsx_item_name.upper().split())
+                    db_name_normalized = " ".join((db_item.item_name or "").upper().split())
+                    
+                    if xlsx_name_normalized == db_name_normalized:
+                        preview_item.status = ItemMatchStatus.MATCHED
+                        matched_count += 1
+                    else:
+                        preview_item.status = ItemMatchStatus.NAME_MISMATCH
+                        mismatch_count += 1
                 
                 # Note: Duplicate detection disabled - all invoices will be imported
                 # since there's no reliable way to identify true duplicates

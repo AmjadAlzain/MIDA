@@ -4,7 +4,7 @@ import { ApiError } from '@/types';
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
   baseURL: '/api',
-  timeout: 120000, // 2 minutes for long operations like classification and OCR
+  timeout: 600000, // 10 minutes for long operations like balance sheet upload, classification and OCR
   headers: {
     'Content-Type': 'application/json',
   },
