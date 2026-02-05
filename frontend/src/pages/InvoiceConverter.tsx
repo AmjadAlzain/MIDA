@@ -1067,7 +1067,7 @@ export function InvoiceConverter() {
           </div>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800">
             <p><strong>Declaration Ref:</strong> {declarationRefNo}</p>
             <p className="mt-1">
