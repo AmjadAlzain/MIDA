@@ -945,7 +945,7 @@ export function CertificateDetails() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={handleAddItem}
+                onClick={() => handleAddItem()}
                 leftIcon={<Plus className="w-4 h-4" />}
               >
                 Add Item
@@ -1084,7 +1084,7 @@ export function CertificateDetails() {
             <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>No items in this certificate</p>
             {isEditing && (
-              <Button variant="secondary" onClick={handleAddItem} className="mt-4">
+              <Button variant="secondary" onClick={() => handleAddItem()} className="mt-4">
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Item
               </Button>
