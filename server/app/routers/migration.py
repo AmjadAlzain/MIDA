@@ -62,6 +62,8 @@ router = APIRouter()
 async def preview_balance_sheet_migration(
     file: Annotated[UploadFile, File(description="XLSX balance sheet file")],
     port: Annotated[ImportPort, Form(description="Import port for all records")],
+    preselected_certificate: Annotated[str | None, Form(description="Pre-selected certificate number from URL")] = None,
+    use_certificate: Annotated[str | None, Form(description="Force use this certificate number for item matching")] = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -103,7 +105,7 @@ async def preview_balance_sheet_migration(
     
     # Preview migration
     try:
-        preview = preview_migration(db, file_content, port)
+        preview = preview_migration(db, file_content, port, preselected_certificate, use_certificate)
         return preview
     except InvalidFileError as e:
         raise HTTPException(

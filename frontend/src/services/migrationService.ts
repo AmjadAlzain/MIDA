@@ -5,10 +5,21 @@ export const migrationService = {
   /**
    * Preview balance sheet migration from XLSX file
    */
-  async previewMigration(file: File, port: string): Promise<MigrationPreviewResponse> {
+  async previewMigration(
+    file: File, 
+    port: string, 
+    preselectedCertificate?: string,
+    useCertificate?: string
+  ): Promise<MigrationPreviewResponse> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('port', port);
+    if (preselectedCertificate) {
+      formData.append('preselected_certificate', preselectedCertificate);
+    }
+    if (useCertificate) {
+      formData.append('use_certificate', useCertificate);
+    }
 
     const response = await api.post<MigrationPreviewResponse>('/mida/migration/preview', formData, {
       headers: {

@@ -514,6 +514,9 @@ export interface MigrationPreviewResponse {
   db_certificate_id?: string;
   db_certificate_number?: string;
   certificate_found: boolean;
+  preselected_certificate?: string;
+  preselected_certificate_id?: string;
+  certificate_mismatch: boolean;
   port: Port;
   items: MigrationItemPreview[];
   total_items: number;

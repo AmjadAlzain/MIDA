@@ -114,6 +114,11 @@ class MigrationPreviewResponse(BaseModel):
     db_certificate_number: Optional[str] = Field(default=None, description="Certificate number in database")
     certificate_found: bool = Field(..., description="Whether certificate was found in database")
     
+    # Preselected certificate mismatch info
+    preselected_certificate: Optional[str] = Field(default=None, description="Preselected certificate number from URL if any")
+    preselected_certificate_id: Optional[UUID] = Field(default=None, description="Preselected certificate ID if found")
+    certificate_mismatch: bool = Field(default=False, description="True if preselected cert differs from XLSX cert")
+    
     # Port selected by user
     port: ImportPort = Field(..., description="Import port selected by user")
     

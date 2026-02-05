@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Check,
   X,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Button,
@@ -24,6 +25,7 @@ import {
   Alert,
   Badge,
   Breadcrumb,
+  Modal,
 } from '@/components/ui';
 import { migrationService } from '@/services';
 import {
@@ -37,6 +39,7 @@ import {
 import { cn, formatNumber } from '@/utils';
 
 type WizardStep = 'upload' | 'certificate' | 'items' | 'apply' | 'summary';
+type CertificateChoice = 'xlsx' | 'preselected';
 
 export function BalanceMigration() {
   const navigate = useNavigate();
@@ -54,37 +57,94 @@ export function BalanceMigration() {
   // Preview state
   const [preview, setPreview] = useState<MigrationPreviewResponse | null>(null);
   
+  // Certificate mismatch modal state
+  const [showMismatchModal, setShowMismatchModal] = useState(false);
+  const [pendingPreview, setPendingPreview] = useState<MigrationPreviewResponse | null>(null);
+  
   // Item resolutions state
   const [resolutions, setResolutions] = useState<Map<number, ConflictResolution>>(new Map());
   
   // Apply result state
   const [applyResult, setApplyResult] = useState<MigrationApplyResponse | null>(null);
 
+  // Helper function to proceed with preview data
+  const proceedWithPreview = (data: MigrationPreviewResponse) => {
+    setPreview(data);
+    
+    // Initialize resolutions for mismatch items with default "keep_db_name"
+    const initialResolutions = new Map<number, ConflictResolution>();
+    data.items.forEach(item => {
+      if (item.status === 'name_mismatch') {
+        initialResolutions.set(item.line_no, 'keep_db_name');
+      }
+    });
+    setResolutions(initialResolutions);
+    
+    // Move to certificate step
+    setCurrentStep('certificate');
+  };
+
   // Preview mutation
   const previewMutation = useMutation({
     mutationFn: () => {
       if (!file) throw new Error('No file selected');
-      return migrationService.previewMigration(file, port);
+      return migrationService.previewMigration(file, port, preselectedCertificate || undefined);
     },
     onSuccess: (data) => {
-      setPreview(data);
-      
-      // Initialize resolutions for mismatch items with default "keep_db_name"
-      const initialResolutions = new Map<number, ConflictResolution>();
-      data.items.forEach(item => {
-        if (item.status === 'name_mismatch') {
-          initialResolutions.set(item.line_no, 'keep_db_name');
-        }
-      });
-      setResolutions(initialResolutions);
-      
-      // Move to certificate step
-      setCurrentStep('certificate');
+      // Check if there's a certificate mismatch
+      if (data.certificate_mismatch && data.preselected_certificate) {
+        // Store the preview and show the modal
+        setPendingPreview(data);
+        setShowMismatchModal(true);
+      } else {
+        proceedWithPreview(data);
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to preview migration');
     },
   });
+
+  // Mutation to re-fetch preview with preselected certificate (for item re-matching)
+  const previewWithPreselectedMutation = useMutation({
+    mutationFn: (certToUse: string) => {
+      if (!file) throw new Error('Missing file');
+      // Re-fetch with use_certificate to force item matching against that certificate
+      return migrationService.previewMigration(file, port, undefined, certToUse);
+    },
+    onSuccess: (data) => {
+      proceedWithPreview(data);
+      setShowMismatchModal(false);
+      setPendingPreview(null);
+      toast.success(`Using certificate: ${data.db_certificate_number}`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to load certificate');
+      setShowMismatchModal(false);
+    },
+  });
+
+  // Handle certificate choice from mismatch modal
+  const handleCertificateChoice = (choice: CertificateChoice) => {
+    if (!pendingPreview) return;
+    
+    if (choice === 'xlsx') {
+      // User wants to use the certificate from the XLSX file
+      proceedWithPreview(pendingPreview);
+      setShowMismatchModal(false);
+      setPendingPreview(null);
+    } else {
+      // User wants to use the preselected certificate
+      // We need to RE-FETCH and re-match items against the preselected certificate
+      if (pendingPreview.preselected_certificate) {
+        previewWithPreselectedMutation.mutate(pendingPreview.preselected_certificate);
+      } else {
+        toast.error('Preselected certificate not found');
+        setShowMismatchModal(false);
+        setPendingPreview(null);
+      }
+    }
+  };
 
   // Apply mutation
   const applyMutation = useMutation({
@@ -718,6 +778,128 @@ export function BalanceMigration() {
           </Button>
         )}
       </div>
+
+      {/* Certificate Mismatch Modal */}
+      <Modal
+        isOpen={showMismatchModal}
+        onClose={() => {
+          setShowMismatchModal(false);
+          setPendingPreview(null);
+        }}
+        title="Certificate Mismatch Detected"
+        size="md"
+      >
+        <div className="space-y-6">
+          <Alert variant="warning" className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">The uploaded file contains a different certificate number.</p>
+              <p className="text-sm mt-1">
+                Please choose which certificate you want to use for this migration.
+              </p>
+            </div>
+          </Alert>
+
+          <div className="space-y-4">
+            {/* Preselected Certificate Option */}
+            <div 
+              className={cn(
+                "border-2 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition-colors",
+                previewWithPreselectedMutation.isPending && "opacity-50 pointer-events-none"
+              )}
+              onClick={() => !previewWithPreselectedMutation.isPending && handleCertificateChoice('preselected')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-500 font-medium">Pre-selected Certificate (URL)</div>
+                  <div className="text-lg font-semibold text-blue-600">
+                    {pendingPreview?.preselected_certificate}
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  disabled={previewWithPreselectedMutation.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCertificateChoice('preselected');
+                  }}
+                >
+                  {previewWithPreselectedMutation.isPending ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    'Use This'
+                  )}
+                </Button>
+              </div>
+              {!pendingPreview?.preselected_certificate_id && (
+                <p className="text-xs text-red-500 mt-2">
+                  ⚠️ This certificate is not found in the database
+                </p>
+              )}
+            </div>
+
+            {/* XLSX Certificate Option */}
+            <div 
+              className={cn(
+                "border-2 rounded-lg p-4 cursor-pointer hover:border-green-500 transition-colors",
+                previewWithPreselectedMutation.isPending && "opacity-50 pointer-events-none"
+              )}
+              onClick={() => !previewWithPreselectedMutation.isPending && handleCertificateChoice('xlsx')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-500 font-medium">Certificate from XLSX File</div>
+                  <div className="text-lg font-semibold text-green-600">
+                    {pendingPreview?.xlsx_certificate_number}
+                  </div>
+                  {pendingPreview?.xlsx_company_name && (
+                    <div className="text-sm text-gray-500 mt-1">
+                      {pendingPreview.xlsx_company_name}
+                    </div>
+                  )}
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  disabled={previewWithPreselectedMutation.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCertificateChoice('xlsx');
+                  }}
+                >
+                  Use This
+                </Button>
+              </div>
+              {pendingPreview?.certificate_found ? (
+                <p className="text-xs text-green-600 mt-2">
+                  ✓ Found in database
+                </p>
+              ) : (
+                <p className="text-xs text-red-500 mt-2">
+                  ⚠️ Not found in database
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button 
+              variant="ghost" 
+              disabled={previewWithPreselectedMutation.isPending}
+              onClick={() => {
+                setShowMismatchModal(false);
+                setPendingPreview(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

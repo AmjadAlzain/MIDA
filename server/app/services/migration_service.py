@@ -330,6 +330,8 @@ def preview_migration(
     db: Session,
     file_content: bytes,
     port: SchemaImportPort,
+    preselected_certificate: str | None = None,
+    use_certificate: str | None = None,
 ) -> MigrationPreviewResponse:
     """
     Preview migration from XLSX file.
@@ -350,8 +352,26 @@ def preview_migration(
     if not xlsx_cert_number:
         raise InvalidFileError("Could not extract certificate number from XLSX")
     
-    # Find certificate in database
-    db_certificate = mida_certificate_repo.get_certificate_by_number(db, xlsx_cert_number)
+    # Determine which certificate to use for item matching
+    # If use_certificate is specified, use that; otherwise use the XLSX cert number
+    cert_for_matching = use_certificate or xlsx_cert_number
+    db_certificate = mida_certificate_repo.get_certificate_by_number(db, cert_for_matching)
+    
+    # Check if preselected certificate differs from XLSX certificate
+    preselected_cert_id = None
+    certificate_mismatch = False
+    if preselected_certificate and not use_certificate:
+        # Only check for mismatch if we're not already forcing a certificate
+        # Normalize both for comparison (handle URL encoding, case, etc.)
+        presel_normalized = preselected_certificate.strip().upper()
+        xlsx_normalized = xlsx_cert_number.strip().upper()
+        
+        if presel_normalized != xlsx_normalized:
+            certificate_mismatch = True
+            # Try to find the preselected certificate in DB
+            presel_cert = mida_certificate_repo.get_certificate_by_number(db, preselected_certificate)
+            if presel_cert:
+                preselected_cert_id = presel_cert.id
     
     # Build items preview
     items_preview = []
@@ -431,6 +451,9 @@ def preview_migration(
         db_certificate_id=db_certificate.id if db_certificate else None,
         db_certificate_number=db_certificate.certificate_number if db_certificate else None,
         certificate_found=db_certificate is not None,
+        preselected_certificate=preselected_certificate if certificate_mismatch else None,
+        preselected_certificate_id=preselected_cert_id,
+        certificate_mismatch=certificate_mismatch,
         port=port,
         items=items_preview,
         total_items=len(items_preview),
