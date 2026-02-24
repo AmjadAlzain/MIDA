@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 import traceback
+import ipaddress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +74,48 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# =============================================================================
+# IP Whitelisting Middleware - Restrict API access to specific IP ranges
+# =============================================================================
+ALLOWED_NETWORKS = [
+    ipaddress.ip_network("192.228.152.0/24"),   # Subnet 1
+    ipaddress.ip_network("162.120.184.0/24"),   # Subnet 2
+    ipaddress.ip_network("127.0.0.0/8"),        # Localhost
+    ipaddress.ip_network("172.28.0.0/16"),      # Docker internal network
+    ipaddress.ip_network("10.0.0.0/8"),         # Private network (Docker)
+]
+
+
+@app.middleware("http")
+async def ip_whitelist_middleware(request: Request, call_next):
+    """Block requests from non-whitelisted IP addresses."""
+    # Get client IP (handle proxy headers)
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "0.0.0.0"
+    
+    try:
+        ip = ipaddress.ip_address(client_ip)
+        allowed = any(ip in network for network in ALLOWED_NETWORKS)
+    except ValueError:
+        allowed = False
+    
+    if not allowed:
+        logger.warning(
+            f"Access denied for IP: {client_ip}",
+            extra={"path": request.url.path, "method": request.method}
+        )
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Access denied. IP not whitelisted.", "client_ip": client_ip}
+        )
+    
+    return await call_next(request)
+
 
 app.include_router(mida_certificate.router, prefix="/api/mida/certificate", tags=["mida"])
 app.include_router(mida_certificates.router, prefix="/api/mida/certificates", tags=["mida-crud"])

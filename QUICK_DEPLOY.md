@@ -105,15 +105,57 @@ curl -I http://localhost
 docker compose logs -f
 ```
 
-### 6. Configure Firewall (Optional but Recommended)
+### 6. Configure Firewall with IP Whitelisting (Required for Production)
+
+**Firewall Management**: UFW is managed via SSH using the server credentials.
+- **Username**: `debian`
+- **Password**: `Leader6639@`
+- **Access**: SSH into server, then use `sudo ufw` commands
 
 ```bash
-# Allow necessary ports
-sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 80/tcp    # HTTP (frontend)
-sudo ufw allow 443/tcp   # HTTPS (future SSL)
+# Reset firewall if needed (removes all existing rules)
+sudo ufw reset
+
+# Allow SSH from anywhere (to avoid lockout)
+sudo ufw allow 22/tcp
+
+# Allow HTTP (port 80) only from whitelisted subnets
+sudo ufw allow from 192.228.152.0/24 to any port 80
+sudo ufw allow from 162.120.184.0/24 to any port 80
+
+# Allow API (port 8000) only from whitelisted subnets
+sudo ufw allow from 192.228.152.0/24 to any port 8000
+sudo ufw allow from 162.120.184.0/24 to any port 8000
+
+# Allow HTTPS for future SSL
+sudo ufw allow 443/tcp
+
+# Enable firewall
 sudo ufw enable
+
+# Verify rules
+sudo ufw status verbose
 ```
+
+**Whitelisted IP Ranges**:
+- `192.228.152.0/24` - All IPs from 192.228.152.0 to 192.228.152.255
+- `162.120.184.0/24` - All IPs from 162.120.184.0 to 162.120.184.255
+
+**To add a new IP or subnet**:
+```bash
+sudo ufw allow from NEW_IP_OR_SUBNET to any port 80
+sudo ufw allow from NEW_IP_OR_SUBNET to any port 8000
+```
+
+**To remove an IP or subnet**:
+```bash
+sudo ufw delete allow from IP_OR_SUBNET to any port 80
+sudo ufw delete allow from IP_OR_SUBNET to any port 8000
+```
+
+**Note**: IP whitelisting is also enforced at the application level:
+- Nginx (frontend): `frontend/nginx.conf` - edit `allow` directives
+- FastAPI (backend): `server/app/main.py` - edit `ALLOWED_NETWORKS` list
 
 ## Access Your Application
 
