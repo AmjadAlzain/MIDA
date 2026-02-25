@@ -82,6 +82,7 @@ app.add_middleware(
 ALLOWED_NETWORKS = [
     ipaddress.ip_network("192.228.152.0/24"),   # Subnet 1
     ipaddress.ip_network("162.120.184.0/24"),   # Subnet 2
+    ipaddress.ip_network("113.211.214.0/24"),   # Subnet 3
     ipaddress.ip_network("127.0.0.0/8"),        # Localhost
     ipaddress.ip_network("172.28.0.0/16"),      # Docker internal network
     ipaddress.ip_network("10.0.0.0/8"),         # Private network (Docker)
