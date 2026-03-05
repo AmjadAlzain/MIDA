@@ -1,505 +1,367 @@
-# MIDA Project
+# MIDA Certificate Management System
 
-MIDA Certificate OCR + Invoice Matching + 3-Tab Classification System + Quota Tracking with PostgreSQL database backend and modern React TypeScript frontend.
+A comprehensive system for managing MIDA (Malaysian Investment Development Authority) import duty exemption certificates with automated OCR parsing, invoice classification, K1 export generation, and quota tracking.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Configuration](#configuration)
+- [API Reference](#api-reference)
+- [Frontend Pages](#frontend-pages)
+- [Database](#database)
+- [Deployment](#deployment)
+- [Development](#development)
+- [License](#license)
+
+---
 
 ## Features
 
-### Core Features
-- **3-Tab Classification System**: Classify invoice items into Form-D, MIDA, and Duties Payable categories
-- **Company-Specific Rules**: HICOM and Hong Leong have different SST and routing rules
-- **K1 XLS Export**: Export classified items to K1 Import format with proper duty/SST settings
-- **Certificate Parsing (TE01 Form)**: Azure Document Intelligence integration for PDF text extraction
-- **Invoice Matching**: Match invoice items against MIDA certificate quotas
-- **Multi-Certificate Matching**: Match items against multiple MIDA certificates simultaneously
-- **HSCODE UOM Mapping**: Determine balance deduction units (UNIT or KGM) by HSCODE
-- **High-Volume API Support**: Pagination limits up to 5000 records for bulk operations
+| Feature | Description |
+|---------|-------------|
+| **Certificate OCR Parsing** | Upload MIDA certificate PDFs — Azure Document Intelligence extracts certificate data, items, and station-split quantities |
+| **3-Tab Invoice Classification** | Classify invoice items into Form-D, MIDA, and Duties Payable categories with company-specific SST rules |
+| **K1 XLS Export** | Export classified items to K1 Import format with proper duty/SST exemption settings |
+| **Multi-Certificate Matching** | Match invoice items against multiple MIDA certificates simultaneously via HS code + description fuzzy matching |
+| **Import Quota Tracking** | Track import history per certificate item with automatic balance recalculation per port |
+| **Balance Sheet Migration** | Upload historical XLSX balance sheets to migrate existing import records |
+| **Balance Sheet Export** | Generate MIDA-template-format XLSX balance sheets per port |
+| **Certificate Editor** | Insert rows, mark dummy entries, inline edit certificate items |
 
-### Certificate Processing
-- **Multi-table parsing**: Parses ALL matching quota tables across documents
-- **Page-by-page parsing**: Extracts text per page, parses separately, merges and de-duplicates
-- **Station split parsing**: PORT_KLANG, KLIA, BUKIT_KAYU_HITAM support
-- **Handwritten amendment handling**: Extracts values from cells with pen crossouts and stamps
+---
 
-### Balance Sheet Export
-- **MIDA Template Format**: Generates XLSX matching official MIDA balance sheet template exactly
-- **Malay Headers**: TARIKH IMPORT, NO DAFTAR BORANG IKRAR, BAKI DI BAWA KEHADAPAN, KUANTITI, BAKI, T/TANGAN PIK/PNK
-- **Port-Specific Export**: Export balance sheets per port (Port Klang, KLIA, Bukit Kayu Hitam)
-- **Multi-Item Workbooks**: Each certificate item gets its own sheet named "ItemName (line_no)"
-- **Professional Styling**: Times New Roman font, proper borders, number formatting matching template
-
-### Data & API
-- **PostgreSQL Database**: Tracks import records and exemption approvals
-- **REST API**: Clean separation between services via HTTP API calls
-
-### Modern React Frontend
-- **Database Management**: View, search, and manage MIDA certificates with pagination
-- **Certificate Details**: View/edit certificate items with remaining balances per port
-- **Port Allocation Display**: Visual breakdown of approved/remaining quantities per port (Port Klang, KLIA, Bukit Kayu Hitam)
-- **Import Tracking**: Record and view import history for each certificate item with port-specific balances
-- **Balance Sheet Export**: Export MIDA-format XLSX balance sheets per port from certificate details page
-- **Invoice Converter**: Classify invoices with 3-tab UI and K1 export
-- **Certificate Parser**: Upload PDF certificates for OCR parsing with validation warnings
-  - Real-time validation (errors, warnings, info messages)
-  - Missing field detection and highlighting
-  - Quantity discrepancy checks (Approved Qty vs Station Sum)
-  - OCR warning display from backend
-
-## Project Structure
+## Architecture
 
 ```
-MIDA/
-├── frontend/                            # React TypeScript frontend
-│   ├── src/
-│   │   ├── App.tsx                     # Main app with React Router
-│   │   ├── main.tsx                    # Entry point
-│   │   ├── index.css                   # Tailwind CSS styles
-│   │   ├── components/
-│   │   │   ├── Layout.tsx              # App layout with navigation
-│   │   │   └── ui/                     # Reusable UI components
-│   │   ├── pages/
-│   │   │   ├── DatabaseView.tsx        # Certificate list & management
-│   │   │   ├── CertificateDetails.tsx  # Certificate detail view/edit
-│   │   │   ├── ItemImports.tsx         # Import history per item
-│   │   │   ├── InvoiceConverter.tsx    # 3-tab invoice classification
-│   │   │   └── CertificateParser.tsx   # PDF upload & OCR parsing
-│   │   ├── services/
-│   │   │   ├── api.ts                  # Axios instance with base URL
-│   │   │   ├── certificateService.ts   # Certificate API calls
-│   │   │   ├── importService.ts        # Import tracking API calls
-│   │   │   ├── classificationService.ts # Classification & K1 export
-│   │   │   └── companyService.ts       # Company API calls
-│   │   ├── types/
-│   │   │   └── index.ts                # TypeScript interfaces
-│   │   └── utils/
-│   │       └── index.ts                # Utility functions
-│   ├── package.json                    # Dependencies (Vite, React Query)
-│   ├── vite.config.ts                  # Vite config with API proxy
-│   ├── tailwind.config.js              # Tailwind CSS config
-│   └── tsconfig.json                   # TypeScript config
-├── server/                              # FastAPI backend
-│   ├── app/
-│   │   ├── main.py                     # Application entry point
-│   │   ├── config.py                   # Settings (12-factor, env vars)
-│   │   ├── logging_config.py           # Structured JSON logging
-│   │   ├── clients/
-│   │   │   └── mida_client.py          # MIDA API client with caching
-│   │   ├── db/
-│   │   │   ├── base.py                 # SQLAlchemy Base
-│   │   │   ├── mixins.py               # UUID, Timestamp mixins
-│   │   │   └── session.py              # Database session
-│   │   ├── models/
-│   │   │   ├── company.py              # Company model (SST rules)
-│   │   │   ├── hscode_uom_mapping.py   # HSCODE to UOM mapping
-│   │   │   └── mida_certificate.py     # Certificate & items
-│   │   ├── repositories/               # Data access layer
-│   │   │   ├── company_repo.py
-│   │   │   ├── hscode_uom_repo.py
-│   │   │   ├── mida_certificate_repo.py
-│   │   │   └── mida_import_repo.py
-│   │   ├── routers/                    # API endpoints
-│   │   │   ├── convert.py              # Main conversion endpoints
-│   │   │   ├── hscode_uom.py           # HSCODE UOM endpoints
-│   │   │   ├── mida_certificate.py     # Certificate parsing
-│   │   │   ├── mida_certificates.py    # Certificate CRUD
-│   │   │   └── mida_imports.py         # Import tracking
-│   │   ├── schemas/                    # Pydantic schemas
-│   │   │   ├── classification.py       # 3-tab classification schemas
-│   │   │   ├── convert.py              # Conversion schemas
-│   │   │   ├── mida_certificate.py     # Certificate schemas
-│   │   │   └── mida_import.py          # Import schemas
-│   │   └── services/                   # Business logic
-│   │       ├── azure_di_client.py      # Azure Document Intelligence
-│   │       ├── invoice_classification_service.py  # Classification logic
-│   │       ├── k1_export_service.py    # K1 XLS generation
-│   │       ├── mida_certificate_service.py
-│   │       ├── mida_import_service.py
-│   │       ├── mida_matcher.py         # Invoice-to-MIDA matching
-│   │       ├── mida_matching_service.py
-│   │       └── xlsx_export_service.py  # MIDA template XLSX export
-│   ├── alembic/                        # Database migrations
-│   │   └── versions/                   # 11 migration files
-│   ├── templates/
-│   │   └── K1_Import_Template.xls      # K1 export template
-│   ├── tests/                          # Unit and integration tests
-│   ├── tools/
-│   │   └── db_setup/                   # Database setup scripts
-│   ├── run_server.py                   # Quick server startup script
-│   └── requirements.txt
-├── web/                                # Legacy HTML/JS frontend
-│   └── index.html                      # Simple web UI (deprecated)
-├── Makefile                            # Common commands
-├── DEVELOPMENT_PLAN.md                 # Development plan & progress
-├── DEPLOYMENT.md                       # Deployment guide
-└── README.md
++---------------------+     +---------------------+     +--------------+
+|   React Frontend    |---->|   FastAPI Backend    |---->|  PostgreSQL  |
+|   (Vite + TS)       | /api|   (Python 3.10+)    |     |  Database    |
++---------------------+     +----------+----------+     +--------------+
+                                       |
+                                       v
+                            +---------------------+
+                            |  Azure Document      |
+                            |  Intelligence (OCR)  |
+                            +---------------------+
 ```
+
+- **Frontend**: React 18 + TypeScript, Vite, Tailwind CSS, React Query
+- **Backend**: FastAPI with async support, SQLAlchemy ORM, Alembic migrations
+- **Database**: PostgreSQL 15 with port-specific quota tracking
+- **OCR**: Azure Document Intelligence for PDF certificate parsing
+- **Deployment**: Docker Compose with Nginx reverse proxy
+
+---
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.10+
-- Node.js 18+ (for React frontend)
-- PostgreSQL 14+ (for database features)
+- Node.js 18+
+- PostgreSQL 14+ (or Docker)
+- Azure Document Intelligence account
 
-### Using Makefile (Recommended)
-
-```bash
-# Install dependencies
-make install
-
-# Set up environment
-cp .env.example server/.env
-# Edit server/.env with your Azure and database credentials
-
-# Run the server
-make run
-```
-
-### Frontend Setup
+### Option 1: Docker (Recommended)
 
 ```bash
-# Navigate to frontend directory
-cd frontend
+# Configure environment
+cp .env.example .env
+# Edit .env with your Azure credentials and database password
 
-# Install dependencies
-npm install
+# Build and start all services
+docker compose build
+docker compose up -d postgres
+sleep 15
+docker compose run --rm db-migrate
+docker compose up -d mida-api mida-frontend db-backup
 
-# Run development server (proxies API to localhost:8000)
-npm run dev
-
-# Build for production
-npm run build
+# Verify
+docker compose ps
+curl http://localhost:8000/health
 ```
 
-The React frontend runs on `http://localhost:3000` and proxies API requests to `http://localhost:8000`.
+Access the application at:
+- **Frontend**: http://localhost
+- **API Docs**: http://localhost:8000/docs
 
-### Backend Setup
-
-# Run tests
-make test
-
-# Lint code
-make lint
-```
-
-### Manual Setup
+### Option 2: Local Development
 
 ```bash
+# Backend
 cd server
 python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # Mac/Linux
-
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Linux/macOS
 pip install -r requirements.txt
-cp ../.env.example .env
-# Edit .env with your credentials
-
+cp ../.env.example .env        # Edit with your credentials
 uvicorn app.main:app --reload --port 8000
+
+# Frontend (in another terminal)
+cd frontend
+npm install
+npm run dev
 ```
+
+Frontend at http://localhost:3000 (proxies `/api` to backend).
+
+### Option 3: Makefile
+
+```bash
+make install     # Install Python dependencies
+make run         # Run backend in dev mode
+make test        # Run tests
+make lint        # Lint code
+```
+
+---
+
+## Project Structure
+
+```
+MIDA/
++-- frontend/                      # React TypeScript SPA
+|   +-- src/
+|   |   +-- components/            # Layout, UI components
+|   |   +-- pages/                 # Route-level page components
+|   |   +-- services/              # API service layer (Axios)
+|   |   +-- types/                 # TypeScript interfaces
+|   |   +-- utils/                 # Utility functions
+|   +-- nginx.conf                 # Production Nginx config
+|   +-- Dockerfile                 # Multi-stage build
+|   +-- package.json
++-- server/                        # FastAPI backend
+|   +-- app/
+|   |   +-- main.py                # App entry point, middleware
+|   |   +-- config.py              # Environment-based settings
+|   |   +-- clients/               # External API clients
+|   |   +-- db/                    # Database engine, session, mixins
+|   |   +-- models/                # SQLAlchemy ORM models
+|   |   +-- repositories/          # Data access layer
+|   |   +-- routers/               # API endpoint handlers
+|   |   +-- schemas/               # Pydantic request/response schemas
+|   |   +-- services/              # Business logic layer
+|   +-- alembic/                   # Database migrations (11 versions)
+|   +-- templates/                 # K1 export XLS template
+|   +-- tests/                     # Unit and integration tests
+|   +-- Dockerfile
+|   +-- requirements.txt
++-- scripts/                       # Deployment & utility scripts
++-- docker-compose.yml             # Production orchestration
++-- Makefile                       # Development shortcuts
++-- .env.example                   # Environment template
++-- DEPLOYMENT.md                  # Deployment guide
++-- QUICK_DEPLOY.md                # Quick deployment steps
++-- DOCUMENTATION.md               # Technical documentation
+```
+
+---
 
 ## Configuration
 
-All configuration is via environment variables (see `.env.example`):
+All configuration uses environment variables (12-factor app). Copy `.env.example` to `.env` and edit.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AZURE_DI_ENDPOINT` | Azure Document Intelligence endpoint | (required) |
-| `AZURE_DI_KEY` | Azure Document Intelligence API key | (required) |
-| `DATABASE_URL` | PostgreSQL connection URL | (required for features) |
-| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | INFO |
-| `LOG_FORMAT` | Log format (json, text) | json |
-| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | * |
+### Required
 
-## Database Setup
+| Variable | Description |
+|----------|-------------|
+| `AZURE_DI_ENDPOINT` | Azure Document Intelligence endpoint URL |
+| `AZURE_DI_KEY` | Azure Document Intelligence API key |
+| `POSTGRES_PASSWORD` | PostgreSQL password |
 
-The PostgreSQL database tracks certificates, import records, companies, and HSCODE mappings.
+### Optional
 
-```bash
-# Run database migrations
-cd server && alembic upgrade head
-
-# Or use Makefile
-make db-up
-```
-
-### Database Schema
-
-- **mida_certificates**: Certificate master records
-- **mida_certificate_items**: Certificate line items with remaining quantities
-- **mida_import_records**: Import transaction ledger
-- **companies**: HICOM and Hong Leong company configurations
-- **hscode_uom_mappings**: HSCODE to UOM mapping for balance deduction
-
-## API Endpoints
-
-### Main Endpoints
-- `GET /` - Root endpoint
-- `GET /health` - Health check
-- `GET /api/companies` - **List all companies**
-- `POST /api/convert/classify` - **3-Tab Classification** (Form-D, MIDA, Duties Payable)
-- `POST /api/convert/export-classified` - **Export classified items to K1 XLS**
-- `POST /api/convert` - Invoice conversion with MIDA certificate matching
-- `POST /api/convert-multi` - Multi-certificate MIDA matching
-
-### Certificate Endpoints
-- `GET /api/mida/certificates/` - List certificates
-- `GET /api/mida/certificates/{id}` - Get certificate by ID
-- `POST /api/mida/certificates/draft` - Create/update draft certificate
-- `PUT /api/mida/certificates/{id}` - Update draft certificate
-- `POST /api/mida/certificates/{id}/confirm` - Confirm certificate
-- `POST /api/mida/certificate/parse` - Parse certificate PDF
-- `POST /api/mida/certificate/parse-debug` - Parse with debug info
-
-### Import Record Endpoints
-- `POST /api/mida/imports` - Record new import
-- `GET /api/mida/imports/item/{item_id}` - Get import history for item
-- `GET /api/mida/imports/{record_id}` - Get single import record
-- `PUT /api/mida/imports/{record_id}` - Update import record
-- `DELETE /api/mida/imports/{record_id}` - Delete import record
-
-API Docs: `http://localhost:8000/docs`
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | Auto-generated | PostgreSQL connection string |
+| `ENVIRONMENT` | `development` | `development`, `staging`, `production` |
+| `DEBUG` | `false` | Enable debug mode |
+| `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
+| `ALLOWED_NETWORKS` | *(empty)* | Comma-separated CIDR ranges for IP whitelisting |
+| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `LOG_FORMAT` | `json` | `json` (production) or `text` (development) |
+| `WORKERS` | `4` | Number of API workers |
+| `API_PORT` | `8000` | Backend port |
+| `FRONTEND_PORT` | `80` | Frontend port |
+| `BACKUP_RETENTION_DAYS` | `7` | Days to keep database backups |
 
 ---
 
-## 3-Tab Classification System
+## API Reference
 
-The `/api/convert/classify` endpoint classifies invoice items into 3 categories:
+Interactive API documentation is available at `/docs` (Swagger UI) when the server is running.
 
-### Classification Rules
+### Conversion & Classification
 
-| Form-D Flag | MIDA Matched | Result |
-|-------------|--------------|--------|
-| Yes | No | **Form-D** table |
-| No | Yes | **MIDA** table |
-| Yes | Yes | Depends on company |
-| No | No | **Duties Payable** table |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/companies` | List companies for classification |
+| `POST` | `/api/convert/classify` | 3-tab invoice classification |
+| `POST` | `/api/convert/export-classified` | Export items to K1 XLS |
+| `POST` | `/api/convert` | Single-certificate MIDA matching |
+| `POST` | `/api/convert-multi` | Multi-certificate MIDA matching |
 
-### Company-Specific Rules
+### Certificate Management
 
-**HICOM YAMAHA MOTOR SDN BHD:**
-- Dual-flagged items → Form-D table
-- SST exemption ON for all items in all tables
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/mida/certificates/` | List certificates (paginated) |
+| `GET` | `/api/mida/certificates/{id}` | Get certificate with items |
+| `POST` | `/api/mida/certificates/draft` | Create/update draft |
+| `PUT` | `/api/mida/certificates/{id}` | Update draft |
+| `POST` | `/api/mida/certificates/{id}/confirm` | Confirm (lock) certificate |
+| `DELETE` | `/api/mida/certificates/{id}` | Soft-delete certificate |
 
-**HONG LEONG YAMAHA MOTOR SDN BHD:**
-- Dual-flagged items → MIDA table
-- SST exemption ON only for MIDA table items
+### Certificate Parsing (OCR)
 
-### Request Parameters
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/mida/certificate/parse` | Parse certificate PDF via OCR |
+| `POST` | `/api/mida/certificate/parse-debug` | Parse with debug statistics |
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `file` | File | Yes | - | Invoice file (Excel .xls/.xlsx) |
-| `company_id` | UUID | Yes | - | Company UUID for classification rules |
-| `mida_certificate_ids` | string | No | - | Comma-separated certificate UUIDs |
-| `country` | string | No | `JP` | Country of origin code |
-| `port` | string | No | `port_klang` | Import port |
-| `import_date` | string | No | Today's date | Import date (YYYY-MM-DD) |
-| `match_mode` | string | No | `fuzzy` | `exact` or `fuzzy` matching |
-| `match_threshold` | float | No | `0.88` | Minimum similarity score (0.0-1.0) |
+### Import Tracking
 
-### Response Schema
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/mida/imports` | Record new import |
+| `GET` | `/api/mida/imports/item/{item_id}` | Get import history for item |
+| `GET` | `/api/mida/imports/{record_id}` | Get single import record |
+| `PUT` | `/api/mida/imports/{record_id}` | Update record (auto-recalculates) |
+| `DELETE` | `/api/mida/imports/{record_id}` | Delete record (auto-recalculates) |
 
-```json
-{
-  "company": {
-    "id": "uuid",
-    "name": "HICOM YAMAHA MOTOR SDN BHD",
-    "sst_default_behavior": "all_on",
-    "dual_flag_routing": "form_d"
-  },
-  "country": "JP",
-  "port": "port_klang",
-  "import_date": "2025-01-15",
-  "form_d_items": [...],
-  "mida_items": [...],
-  "duties_payable_items": [...],
-  "total_items": 50,
-  "form_d_count": 20,
-  "mida_count": 25,
-  "duties_payable_count": 5,
-  "warnings": []
-}
-```
+### Balance Migration
 
----
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/mida/migration/preview` | Preview XLSX migration |
+| `POST` | `/api/mida/migration/apply` | Apply migration |
 
-## K1 XLS Export
+### HSCODE
 
-The `/api/convert/export-classified` endpoint exports items to K1 Import format.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/hscode-uom/{hs_code}` | Get UOM for HS code |
+| `GET` | `/api/hscode-master/lookup` | Look up HS code description |
 
-### Export Types
+### Health
 
-| Type | Import Duty | SST |
-|------|-------------|-----|
-| `form_d` | Exemption (100%) | Per item's `sst_exempted` |
-| `mida` | Exemption (100%) | Per item's `sst_exempted` |
-| `duties_payable` | Empty (no exemption) | Per item's `sst_exempted` |
-
-### Request Body
-
-```json
-{
-  "items": [
-    {
-      "hs_code": "84713010",
-      "description": "Computer parts",
-      "description2": "100",
-      "quantity": 100,
-      "uom": "UNT",
-      "amount": 5000.00,
-      "net_weight_kg": 50.5,
-      "sst_exempted": true
-    }
-  ],
-  "export_type": "form_d",
-  "country": "MY"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check with DB status |
 
 ---
 
----
-
-## MIDA Matching Mode (Legacy)
-
-The `/api/convert` endpoint enables matching invoice items against MIDA certificate quotas.
-
-### How It Works
-
-1. **Upload Invoice**: Upload an Excel or CSV file containing invoice items
-2. **Specify Certificate**: Provide the MIDA certificate number to match against
-3. **Item Matching**: The system matches each invoice item to MIDA certificate items using:
-   - **Exact mode**: HS codes must match exactly (normalized)
-   - **Fuzzy mode** (default): Uses HS code prefix matching + description similarity
-4. **Quota Checking**: Computes remaining quantities and warns about limits
-5. **Response**: Returns matched items with MIDA details, remaining quantities, and warnings
-
-### Request Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `file` | File | Yes | - | Invoice file (Excel .xls/.xlsx or CSV) |
-| `mida_certificate_number` | string | Yes | - | MIDA certificate number to match against |
-| `match_mode` | string | No | `fuzzy` | `exact` or `fuzzy` matching |
-| `match_threshold` | float | No | `0.88` | Minimum similarity score for fuzzy matches (0.0-1.0) |
-
-### Response Schema
-
-```json
-{
-  "mida_certificate_number": "MIDA/123/2024",
-  "mida_matched_items": [
-    {
-      "line_no": 1,
-      "hs_code": "84715000",
-      "description": "Computer parts",
-      "quantity": 100,
-      "uom": "UNT",
-      "amount": 5000.00,
-      "net_weight_kg": 50.5,
-      "mida_line_no": 3,
-      "mida_hs_code": "84715000",
-      "mida_item_name": "COMPUTER PROCESSING UNIT",
-      "remaining_qty": 400,
-      "remaining_uom": "UNIT",
-      "match_score": 0.92,
-      "approved_qty": 500
-    }
-  ],
-  "warnings": [
-    {
-      "invoice_item": "Line 5: Motor parts",
-      "reason": "Insufficient remaining qty: requested 200, remaining 50",
-      "severity": "error"
-    }
-  ],
-  "total_invoice_items": 10,
-  "matched_item_count": 8,
-  "unmatched_item_count": 2
-}
-```
-
-### Warning Severities
-
-| Severity | Meaning |
-|----------|---------|
-| `info` | Informational (e.g., limit reached after this item) |
-| `warning` | Potential issue (e.g., no matching MIDA item found) |
-| `error` | Critical issue (e.g., insufficient remaining quantity) |
-
-### Example Usage
-
-```bash
-# Using curl
-curl -X POST "http://localhost:8000/api/convert" \
-  -F "file=@invoice.xlsx" \
-  -F "mida_certificate_number=MIDA/123/2024" \
-  -F "match_mode=fuzzy" \
-  -F "match_threshold=0.85"
-
-# Using Python requests
-import requests
-
-files = {"file": open("invoice.xlsx", "rb")}
-data = {
-    "mida_certificate_number": "MIDA/123/2024",
-    "match_mode": "fuzzy",
-    "match_threshold": 0.85
-}
-response = requests.post("http://localhost:8000/api/convert", files=files, data=data)
-print(response.json())
-```
-
-### Error Responses
-
-| Status | Condition |
-|--------|-----------|
-| `422` | Empty certificate number, invalid file, missing required columns |
-| `404` | MIDA certificate not found in database |
-| `500` | Unexpected server error |
-
-## Frontend
-
-### React Frontend (Recommended)
-
-The modern React TypeScript frontend is located in `frontend/`. Start the development server:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Access at `http://localhost:3000`
-
-#### Frontend Pages
+## Frontend Pages
 
 | Page | Route | Description |
 |------|-------|-------------|
-| Database | `/database` | List and manage certificates |
-| Certificate Details | `/database/certificates/:id` | View/edit certificate with inline item add/edit/delete |
-| Item Imports | `/database/certificates/:certId/items/:itemId/imports` | View/add/edit/delete import records |
-| Invoice Converter | `/invoice-converter` | 3-tab classification with K1 export, date entry |
-| Certificate Parser | `/certificate-parser` | Upload PDF for OCR parsing with table/card view toggle |
+| Database View | `/database` | List, search, soft-delete/restore certificates |
+| Certificate Details | `/database/certificates/:id` | View/edit certificate items, port allocation |
+| Item Imports | `/database/certificates/:certId/items/:itemId/imports` | Import history, balance tracking |
+| Balance Migration | `/balance-migration` | Upload historical XLSX balance sheets |
+| Invoice Converter | `/invoice-converter` | 3-tab classification, K1 export |
+| Certificate Parser | `/certificate-parser` | PDF OCR upload, validation, save to DB |
 
-#### Frontend Technologies
+### Frontend Technologies
 
-- **React 18** with TypeScript
-- **Vite** for fast development and building
-- **React Query** (@tanstack/react-query) for server state management
-- **React Router v6** for navigation
-- **Tailwind CSS** for styling
-- **Lucide React** for icons
-- **react-hot-toast** for notifications
+- React 18 with TypeScript
+- Vite for build tooling
+- React Query (`@tanstack/react-query`) for server state
+- React Router v6 for navigation
+- Tailwind CSS for styling
+- Lucide React for icons
 
-#### Key Features
+---
 
-- **Certificate Parser**: Upload PDF, OCR via Azure Document Intelligence, toggle between editable table and card views
-- **Invoice Converter**: 3-tab classification (Form-D, MIDA, Duties Payable) with company dropdown, date entry, and K1 export
-- **Certificate Details**: View/edit certificate with inline item add/edit/delete functionality
-- **Item Imports**: Full CRUD for import records with edit modal and delete confirmation
-- **Database View**: Active/deleted tabs, search, pagination, soft delete with restore
+## Database
 
-### Legacy Frontend
+### Schema Overview
 
-Open `web/index.html` in your browser to use the simple HTML/JS interface (deprecated).
+| Table | Purpose |
+|-------|---------|
+| `mida_certificates` | Certificate headers (number, company, dates, status) |
+| `mida_certificate_items` | Line items with approved & remaining quantities per port |
+| `mida_import_records` | Import ledger with balance tracking |
+| `companies` | Company configuration (SST rules, dual-flag routing) |
+| `hscode_uom_mappings` | HS code to UOM mapping for balance deduction |
+| `hscode_master` | 25,000+ HS code reference entries |
+
+### Migrations
+
+The project uses Alembic with 11 versioned migrations. Run them with:
+
+```bash
+# Local
+cd server && alembic upgrade head
+
+# Docker
+docker compose run --rm db-migrate
+
+# Makefile
+make db-up
+```
+
+---
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions and [QUICK_DEPLOY.md](QUICK_DEPLOY.md) for a step-by-step checklist.
+
+### Docker Compose Services
+
+| Service | Container | Description |
+|---------|-----------|-------------|
+| `mida-api` | `mida-ocr-api` | FastAPI backend |
+| `mida-frontend` | `mida-frontend` | Nginx serving React build |
+| `postgres` | `mida-postgres` | PostgreSQL 15 |
+| `db-backup` | `mida-db-backup` | Automated daily backups |
+| `db-migrate` | `mida-db-migrate` | One-shot migration runner |
+
+### Useful Commands
+
+```bash
+make docker-build      # Build images
+make docker-up         # Start services
+make docker-down       # Stop services
+make docker-logs       # View logs
+make docker-migrate    # Run migrations
+make docker-backup     # Manual backup
+make docker-monitor    # Check health
+```
+
+---
+
+## Development
+
+### Running Tests
+
+```bash
+make test
+# or
+cd server && python -m pytest -v
+```
+
+### Linting & Formatting
+
+```bash
+make lint       # Check with ruff
+make format     # Auto-format with ruff
+```
+
+### Creating Migrations
+
+```bash
+make db-revision MSG="describe your change"
+make db-up
+```
+
+---
+
+## License
+
+Proprietary - All rights reserved.

@@ -1,618 +1,343 @@
-# MIDA OCR API Deployment Guide
+# MIDA OCR API - Deployment Guide
 
-This guide covers deploying the MIDA OCR API with 3-Tab Classification System and React TypeScript frontend following 12-factor app principles.
+This guide covers deploying the MIDA OCR application using Docker Compose.
 
 ## Table of Contents
 
-- [Environment Variables](#environment-variables)
-- [Ports](#ports)
-- [Run Commands](#run-commands)
-- [Frontend Deployment](#frontend-deployment)
-- [Database Migrations](#database-migrations)
+- [Requirements](#requirements)
+- [Environment Configuration](#environment-configuration)
 - [Docker Deployment](#docker-deployment)
-- [Docker Compose](#docker-compose)
-- [Health Check](#health-check)
+- [Database Management](#database-management)
+- [Security](#security)
+- [Monitoring](#monitoring)
 - [Troubleshooting](#troubleshooting)
 
 ---
 
-## Environment Variables
+## Requirements
+
+### Server Requirements
+
+- **OS**: Ubuntu 20.04+ / Debian 11+
+- **CPU**: 2+ cores
+- **RAM**: 4GB minimum, 8GB recommended
+- **Storage**: 20GB+ for application and data
+- **Docker**: 20.10+
+- **Docker Compose**: v2.0+
+
+### External Services
+
+- Azure Document Intelligence account (for OCR)
+- PostgreSQL 14+ (included in Docker Compose)
+
+---
+
+## Environment Configuration
+
+### Create Environment File
+
+```bash
+cp .env.example .env
+nano .env  # or your preferred editor
+```
 
 ### Required Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `AZURE_DI_ENDPOINT` | Azure Document Intelligence endpoint URL | `https://your-resource.cognitiveservices.azure.com/` |
-| `AZURE_DI_KEY` | Azure Document Intelligence API key | `your-api-key` |
-| `DATABASE_URL` | PostgreSQL connection URL | `postgresql://user:pass@host:5432/mida` |
+```env
+# Azure Document Intelligence (required for OCR)
+AZURE_DI_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
+AZURE_DI_KEY=your-api-key
+
+# Database
+POSTGRES_USER=mida
+POSTGRES_PASSWORD=your-secure-password
+POSTGRES_DB=mida
+
+# Application
+ENVIRONMENT=production
+DEBUG=false
+LOG_LEVEL=INFO
+```
 
 ### Optional Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `APP_NAME` | `MIDA OCR API` | Application name |
-| `APP_VERSION` | `1.0.0` | Application version |
-| `ENVIRONMENT` | `development` | Environment: development, staging, production |
-| `DEBUG` | `false` | Enable debug mode |
-| `HOST` | `0.0.0.0` | Server bind host |
-| `PORT` | `8000` | Server bind port |
-| `CORS_ORIGINS` | `*` | Comma-separated allowed CORS origins |
-| `LOG_LEVEL` | `INFO` | Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL |
-| `LOG_FORMAT` | `json` | Log format: json (production) or text (development) |
+```env
+# Server ports
+API_PORT=8000
+FRONTEND_PORT=80
 
-### MIDA API Client Variables (if using external MIDA API)
+# Workers (recommended: 2 * CPU cores + 1)
+WORKERS=4
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MIDA_API_BASE_URL` | - | Base URL of external MIDA API |
-| `MIDA_API_TIMEOUT_SECONDS` | `10` | Request timeout |
-| `MIDA_API_CACHE_TTL_SECONDS` | `60` | Cache TTL for API responses |
+# CORS (use specific origins in production)
+CORS_ORIGINS=https://your-domain.com
 
-### Frontend Variables
+# IP Whitelisting (comma-separated CIDR ranges)
+ALLOWED_NETWORKS=192.168.1.0/24,10.0.0.0/8
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VITE_API_BASE_URL` | `/api` | API base URL for frontend (in production) |
+# Backups
+BACKUP_RETENTION_DAYS=7
+```
 
 ### Security Notes
 
-- **Never commit secrets** to version control
-- Use `.env` files only for local development
-- In production, use proper secret management (Azure Key Vault, AWS Secrets Manager, etc.)
-- The `AZURE_DI_KEY` should always be kept secret
-
----
-
-## Ports
-
-| Port | Protocol | Service | Description |
-|------|----------|---------|-------------|
-| 8000 | HTTP | Backend | FastAPI server (configurable via `PORT` env var) |
-| 3000 | HTTP | Frontend | Vite dev server (development only) |
-
----
-
-## Run Commands
-
-### Local Development
-
-```bash
-# Terminal 1: Run Backend
-cd server
-python -m venv venv
-.\venv\Scripts\activate        # Windows
-# source venv/bin/activate     # Linux/macOS
-pip install -r requirements.txt
-cp ../.env.example .env
-# Edit .env with your values
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Terminal 2: Run Frontend
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend runs on `http://localhost:3000` and proxies `/api` requests to `http://localhost:8000`.
-
-### Production (without Docker)
-
-```bash
-# Backend
-cd server
-pip install -r requirements.txt
-export AZURE_DI_ENDPOINT="https://..."
-export AZURE_DI_KEY="..."
-export LOG_FORMAT=json
-export ENVIRONMENT=production
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
-
-# Frontend (build static files)
-cd frontend
-npm install
-npm run build
-# Serve dist/ folder with nginx or similar
-```
-
----
-
-## Frontend Deployment
-
-### Development
-
-The Vite dev server includes a proxy configuration that forwards all `/api` requests to the FastAPI backend:
-
-```typescript
-// vite.config.ts
-export default defineConfig({
-  server: {
-    port: 3000,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true
-      }
-    }
-  }
-})
-```
-
-### Production Build
-
-```bash
-cd frontend
-npm install
-npm run build
-```
-
-This creates a `dist/` folder with static assets.
-
-### Serving Frontend in Production
-
-**Option 1: Nginx (Recommended)**
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    # Serve static frontend files
-    location / {
-        root /var/www/mida/frontend/dist;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Proxy API requests to backend
-    location /api {
-        proxy_pass http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-**Option 2: Docker Multi-stage Build**
-
-See Docker Compose section below.
-
----
-
-## Database Migrations
-
-**Important:** Migrations are NOT run automatically at startup. You must run them explicitly.
-
-### Migration Files
-
-The project has 9 Alembic migrations:
-
-1. `001_mida_certificates.py` - Certificate and item tables
-2. `002_mida_import_tracking.py` - Import ledger
-3. `003_update_certificate_status.py` - Status column
-4. `004_add_declaration_form_reg_no.py` - Declaration form field
-5. `005_add_model_number.py` - Model number field
-6. `006_add_soft_delete.py` - Soft delete flag
-7. `007_hscode_uom_mappings.py` - HSCODE to UOM mapping table
-8. `008_companies.py` - Companies table (HICOM, Hong Leong)
-9. `009_hscode_master.py` - HSCODE master table with 25,000+ entries
-
-### Before First Deployment
-
-Run migrations to create the database schema:
-
-```bash
-# Using Makefile (from project root)
-make db-up
-
-# Or directly with Alembic (from server/ directory)
-cd server && alembic upgrade head
-```
-
-### Docker / Container Deployment
-
-Run migrations as a one-off command before starting the app:
-
-```bash
-# Run migrations in a temporary container
-docker run --rm \
-    -e DATABASE_URL="postgresql://user:pass@host:5432/mida" \
-    mida-ocr-api:latest \
-    alembic upgrade head
-
-# Then start the application container
-docker run -d ... mida-ocr-api:latest
-```
-
-Or use an init container in Kubernetes/Docker Compose.
-
-### Creating New Migrations
-
-After modifying models:
-
-```bash
-make db-revision MSG="add users table"
-```
+- **Never commit `.env` files** to version control
+- Use strong, unique passwords for the database
+- In production, set `CORS_ORIGINS` to specific domains (not `*`)
+- Configure `ALLOWED_NETWORKS` to restrict API access by IP
 
 ---
 
 ## Docker Deployment
 
-### Dockerfile
-
-Create `server/Dockerfile`:
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY app/ ./app/
-
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash appuser
-USER appuser
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
-
-# Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-### Docker Run
+### Build and Start
 
 ```bash
-# Build image
-docker build -t mida-ocr-api:latest ./server
+# Build Docker images
+docker compose build
 
-# Run container
-docker run -d \
-    --name mida-ocr-api \
-    -p 8000:8000 \
-    -e AZURE_DI_ENDPOINT="https://your-resource.cognitiveservices.azure.com/" \
-    -e AZURE_DI_KEY="your-api-key" \
-    -e ENVIRONMENT=production \
-    -e LOG_FORMAT=json \
-    -e LOG_LEVEL=INFO \
-    mida-ocr-api:latest
+# Start database first
+docker compose up -d postgres
 
-# View logs
-docker logs -f mida-ocr-api
-```
-
----
-
-## Docker Compose
-
-Create `docker-compose.yml` in project root:
-
-```yaml
-version: '3.8'
-
-services:
-  # FastAPI Backend
-  mida-api:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    container_name: mida-ocr-api
-    ports:
-      - "${API_PORT:-8000}:8000"
-    environment:
-      - AZURE_DI_ENDPOINT=${AZURE_DI_ENDPOINT}
-      - AZURE_DI_KEY=${AZURE_DI_KEY}
-      - DATABASE_URL=${DATABASE_URL:-}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-      - LOG_FORMAT=${LOG_FORMAT:-json}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-    restart: unless-stopped
-    networks:
-      - mida-network
-
-  # React Frontend (Production)
-  mida-frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: mida-frontend
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
-    depends_on:
-      - mida-api
-    restart: unless-stopped
-    networks:
-      - mida-network
-
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: mida-postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-mida}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-mida}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mida"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - mida-network
-
-networks:
-  mida-network:
-    driver: bridge
-
-volumes:
-  postgres_data:
-```
-
-### Frontend Dockerfile
-
-Create `frontend/Dockerfile`:
-
-```dockerfile
-# Build stage
-FROM node:18-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Production stage
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-### Frontend Nginx Config
-
-Create `frontend/nginx.conf`:
-
-```nginx
-server {
-    listen 80;
-    server_name localhost;
-    root /usr/share/nginx/html;
-    index index.html;
-
-    # Serve static files
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Proxy API requests to backend
-    location /api {
-        proxy_pass http://mida-api:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-### Docker Compose Commands
-
-```bash
-# Start all services (backend, frontend, database)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# View specific service logs
-docker-compose logs -f mida-frontend
-
-# Stop services
-docker-compose down
-
-# Rebuild and restart
-docker-compose up -d --build
+# Wait for database to be ready (15-30 seconds)
+sleep 15
 
 # Run database migrations
-docker-compose exec mida-api alembic upgrade head
+docker compose run --rm db-migrate
 
-# Scale API workers
-docker-compose up -d --scale mida-api=3
+# Start all services
+docker compose up -d mida-api mida-frontend db-backup
+```
+
+### Verify Deployment
+
+```bash
+# Check container status
+docker compose ps
+
+# Check API health
+curl http://localhost:8000/health
+
+# Check logs
+docker compose logs -f
+```
+
+### Stop Services
+
+```bash
+docker compose down
+```
+
+### Full Deployment (Build + Migrate + Start)
+
+```bash
+make docker-deploy
+```
+
+### Docker Compose Services
+
+| Service | Container | Port | Description |
+|---------|-----------|------|-------------|
+| `mida-api` | `mida-ocr-api` | 8000 | FastAPI backend |
+| `mida-frontend` | `mida-frontend` | 80 | Nginx + React SPA |
+| `postgres` | `mida-postgres` | 5432 (internal) | PostgreSQL 15 |
+| `db-backup` | `mida-db-backup` | — | Daily backup cron |
+| `db-migrate` | `mida-db-migrate` | — | One-shot migration |
+
+---
+
+## Database Management
+
+### Run Migrations
+
+```bash
+# Docker
+docker compose run --rm db-migrate
+
+# Local
+cd server && alembic upgrade head
+
+# Makefile
+make db-up
+```
+
+### Create New Migration
+
+```bash
+make db-revision MSG="description of change"
+```
+
+### Create Backup
+
+```bash
+bash scripts/backup.sh
+# or
+make docker-backup
+```
+
+### Restore Backup
+
+```bash
+bash scripts/restore.sh ./backups/mida_backup_YYYYMMDD_HHMMSS.sql.gz
+# or
+make docker-restore FILE=./backups/mida_backup_YYYYMMDD_HHMMSS.sql.gz
+```
+
+### Connect to Database
+
+```bash
+docker compose exec postgres psql -U mida -d mida
 ```
 
 ---
 
-## Health Check
+## Security
 
-### Endpoint
+### IP Whitelisting
 
-```
-GET /health
-```
+The application supports IP whitelisting at two levels:
 
-### Response
+1. **Application level** (`server/app/main.py`): Configure via `ALLOWED_NETWORKS` env var
+2. **Nginx level** (`frontend/nginx.conf`): Uncomment and configure `allow`/`deny` directives
 
-```json
-{
-    "status": "healthy",
-    "app_name": "MIDA OCR API",
-    "version": "1.0.0",
-    "environment": "production",
-    "timestamp": "2025-12-23T10:30:00.000000+00:00"
-}
+```env
+# .env
+ALLOWED_NETWORKS=192.168.1.0/24,10.0.0.0/8
 ```
 
-### Usage in Load Balancers
+Localhost (`127.0.0.0/8`) and Docker internal networks (`172.28.0.0/16`, `10.0.0.0/8`) are always allowed.
 
-- **AWS ALB/ELB**: Configure health check path as `/health`
-- **Kubernetes**: Use as liveness and readiness probe
-- **Nginx**: Use for upstream health checks
+### Firewall (UFW)
 
-### Kubernetes Probe Example
+```bash
+# Allow SSH
+sudo ufw allow 22/tcp
 
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  initialDelaySeconds: 5
-  periodSeconds: 30
+# Allow HTTP from specific subnets
+sudo ufw allow from <YOUR_SUBNET>/24 to any port 80
+sudo ufw allow from <YOUR_SUBNET>/24 to any port 8000
 
-readinessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  initialDelaySeconds: 5
-  periodSeconds: 10
+# Enable
+sudo ufw enable
+```
+
+### SSL/HTTPS
+
+For production, set up SSL with Let's Encrypt:
+
+```bash
+sudo apt-get install certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com
+```
+
+### Security Checklist
+
+- [ ] Strong, unique database password
+- [ ] Azure API credentials configured
+- [ ] `CORS_ORIGINS` set to specific domains
+- [ ] `ALLOWED_NETWORKS` configured
+- [ ] Server firewall enabled
+- [ ] SSL/HTTPS enabled
+- [ ] Debug mode disabled (`DEBUG=false`)
+
+---
+
+## Monitoring
+
+### View Logs
+
+```bash
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f mida-api
+```
+
+### Health Check
+
+```bash
+curl http://localhost:8000/health
+
+# Or use the monitoring script
+bash scripts/monitor.sh
+```
+
+### Resource Usage
+
+```bash
+docker stats
 ```
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
+### Application Won't Start
 
-#### 1. Application won't start
-
-**Symptoms**: Container exits immediately or fails to start
-
-**Solutions**:
 ```bash
 # Check logs
-docker logs mida-ocr-api
+docker compose logs mida-api
 
 # Verify environment variables
-docker exec mida-ocr-api env | grep -E "(AZURE|DATABASE|LOG)"
+docker compose exec mida-api env | grep -E "(AZURE|DATABASE)"
 
-# Test locally first
-cd server && uvicorn app.main:app --reload
+# Check database connection
+docker compose exec postgres pg_isready -U mida
 ```
 
-#### 2. Azure Document Intelligence errors
+### Azure Document Intelligence Errors
 
-**Symptoms**: `Missing AZURE_DI_ENDPOINT or AZURE_DI_KEY` error
+1. Verify endpoint URL format (should end with `/`)
+2. Check API key is valid and not expired
+3. Ensure resource is active in Azure portal
 
-**Solutions**:
-- Verify environment variables are set correctly
-- Check Azure resource is active and endpoint URL is correct
-- Ensure API key has not expired or been regenerated
+### Database Connection Issues
 
 ```bash
-# Test Azure connection
-curl -X POST "https://your-resource.cognitiveservices.azure.com/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31" \
-    -H "Ocp-Apim-Subscription-Key: your-api-key"
+# Check if PostgreSQL is running
+docker compose ps postgres
+
+# View PostgreSQL logs
+docker compose logs postgres
+
+# Test connection
+docker compose exec postgres psql -U mida -d mida -c "SELECT 1"
 ```
 
-#### 3. Health check failing
+### CORS Errors
 
-**Symptoms**: Container marked as unhealthy, `/health` returns error
+- Set `CORS_ORIGINS` to specific domains including protocol: `https://yourdomain.com`
+- For development: `CORS_ORIGINS=http://localhost,http://localhost:3000`
 
-**Solutions**:
-```bash
-# Check if app is running
-curl http://localhost:8000/health
-
-# Check container health
-docker inspect --format='{{.State.Health.Status}}' mida-ocr-api
-
-# View health check logs
-docker inspect --format='{{range .State.Health.Log}}{{.Output}}{{end}}' mida-ocr-api
-```
-
-#### 4. CORS errors
-
-**Symptoms**: Browser shows CORS policy errors
-
-**Solutions**:
-- Set `CORS_ORIGINS` to specific domains: `https://yourdomain.com,https://app.yourdomain.com`
-- For development, use `CORS_ORIGINS=*`
-- Ensure the origin includes protocol (`https://` not just `yourdomain.com`)
-
-#### 5. Database connection issues
-
-**Symptoms**: `DATABASE_URL` connection errors
-
-**Solutions**:
-- Verify database is running and accessible
-- Check connection string format
-- Ensure network connectivity (especially in Docker networks)
+### Reset Everything
 
 ```bash
-# Test database connectivity
-# PostgreSQL:
-pg_isready -h localhost -p 5432 -U user
-
-# From inside container to compose db:
-docker exec mida-ocr-api python -c "from app.config import get_settings; print(get_settings().database_url)"
+# Warning: This removes all data!
+docker compose down -v
+docker compose up -d postgres
+sleep 15
+docker compose run --rm db-migrate
+docker compose up -d mida-api mida-frontend db-backup
 ```
 
-#### 6. High memory usage
-
-**Symptoms**: Container OOM killed, slow responses
-
-**Solutions**:
-- Increase container memory limits
-- Reduce worker count
-- Check for memory leaks in PDF processing
-
-```yaml
-# docker-compose.yml
-services:
-  mida-api:
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-```
-
-### Log Analysis
+### Log Analysis (Production)
 
 ```bash
-# View JSON logs (production)
-docker logs mida-ocr-api 2>&1 | jq '.'
+# View JSON logs
+docker logs mida-ocr-api 2>&1 | python -m json.tool
 
-# Filter by log level
-docker logs mida-ocr-api 2>&1 | jq 'select(.level == "ERROR")'
-
-# Search for specific messages
-docker logs mida-ocr-api 2>&1 | grep -i "azure"
+# Filter errors
+docker logs mida-ocr-api 2>&1 | grep '"level":"ERROR"'
 ```
 
 ### Debug Mode
 
-For detailed debugging, set:
-```bash
+For detailed debugging, update `.env`:
+```env
 DEBUG=true
 LOG_LEVEL=DEBUG
-LOG_FORMAT=text  # More readable for debugging
+LOG_FORMAT=text
 ```
 
----
-
-## Support
-
-For issues not covered here, check:
-1. Application logs (`docker logs` or stdout)
-2. Azure Document Intelligence metrics in Azure Portal
-3. Container resource usage (`docker stats`)
+Then restart: `docker compose restart mida-api`

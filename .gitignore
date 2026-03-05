@@ -1,33 +1,91 @@
+# ==============================================================================
+# MIDA Certificate Management System - Git Ignore Configuration
+# ==============================================================================
+
+# === Python ===
 venv/
+env/
+.venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# === Node.js ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Environment Files (NEVER commit these) ===
+.env
+.env.local
+.env.production
+.env.*.local
+server/.env
+frontend/.env
+
+# === IDE / Editor ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS Files ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === Uploaded / Generated Files ===
+uploads/
 *.pdf
 *.png
 *.jpg
 *.jpeg
-uploads/
-.DS_Store
-server/.env
-env/
-.env
-.vscode/
-node_modules/
 
-# OCR sample templates (do not commit)
+# === OCR Sample Templates (do not commit originals) ===
 Templates/
 
-# Allow server templates (K1 export template)
-!server/templates/
-
-# Development database setup scripts (contain credentials)
+# === Development Database Scripts (may contain credentials) ===
 server/tools/db_setup/Kagayaku_db.py
 server/tools/db_setup/Kagayaku.session.sql
 server/tools/db_setup/Kagayaku_db.ipynb
 
-# Docker environment files (production secrets)
-.env.production
+# === Docker ===
 docker-compose.override.yml
 
-# Logs
+# === Logs ===
 logs/
 *.log
+
+# === Backup Files ===
+backups/
+*.sql
+*.sql.gz
+*.backup
+
+# === Test / Coverage ===
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
+# === Build Artifacts ===
+frontend/dist/
+
+# ==============================================================================
+# ALLOW SPECIFIC FILES (override ignores above)
+# ==============================================================================
+
+# Allow server templates (K1 export template)
+!server/templates/
+
+# Allow example environment files
+!.env.example
+!server/.env.example

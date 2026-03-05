@@ -1,8 +1,8 @@
 """Test UOM lookup for HS codes from sample invoice."""
 import sys
 import os
-sys.path.insert(0, 'c:/Users/user/Desktop/AgentT/server')
-os.chdir('c:/Users/user/Desktop/AgentT/server')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Need to load .env for database URL
 from dotenv import load_dotenv

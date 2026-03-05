@@ -30,6 +30,8 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:3000}
+      # IP Whitelisting (comma-separated CIDR ranges)
+      - ALLOWED_NETWORKS=${ALLOWED_NETWORKS:-}
       # Worker configuration (adjust based on server resources)
       - WORKERS=${WORKERS:-4}
     depends_on:

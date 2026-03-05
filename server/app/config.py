@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     # === CORS ===
     cors_origins: str = Field(default="*", description="Comma-separated list of allowed CORS origins")
 
+    # === IP Whitelisting ===
+    allowed_networks: str = Field(
+        default="",
+        description="Comma-separated CIDR ranges for IP whitelisting (e.g. 192.168.1.0/24,10.0.0.0/8)"
+    )
+
     # === Logging ===
     log_level: str = Field(default="INFO", description="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL")
     log_format: str = Field(default="json", description="Log format: json or text")

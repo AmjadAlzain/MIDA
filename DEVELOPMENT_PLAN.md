@@ -82,6 +82,54 @@
 - **Types**: Updated `ImportRecord` and `BulkImportRequest` interfaces
 - **Services**: Updated `UpdateImportRequest` type
 
+## ✅ Phase 12.1 Completed: Balance Migration Enhancements (Feb 2026)
+
+### Balance Migration Page
+- **New Page**: Added `BalanceMigration.tsx` for migrating historical balance sheet data
+- **Certificate Mismatch Warning**: Shows warning modal when uploaded XLSX certificate differs from preselected certificate
+- **Certificate Selection**: Allows user to choose which certificate to use for migration
+- **Re-matching Logic**: Re-fetches and re-matches items against chosen certificate
+- **Loading States**: Shows loading indicator during certificate switch
+
+### Performance Improvements
+- **API Timeout Increase**: Increased from 2 to 10 minutes for long balance sheet uploads
+- **Nginx Proxy Timeout**: Updated to 600s for long-running operations
+- **Decimal Parsing Fix**: Strips unit suffixes (KGS, KGM, UNT, etc.) from quantity values
+- **Date Parsing Fix**: Handles comma typos in dates (e.g., '06.08,2024')
+- **Eager Loading**: Added eager loading for certificate items to prevent N+1 queries
+- **Forced Certificate Mode**: Skip validation when using forced certificate for faster processing
+
+### Auto-Recalculate Balances
+- **Edit Trigger**: Automatically recalculates balances when import record quantity, date, or port changes
+- **Delete Trigger**: Restores remaining quantities and fixes balance history for subsequent entries
+- **Balance Chain Fix**: Uses `recalculate_item_port_balances()` to update balance_before/balance_after for all imports
+- **Remaining Quantities**: Uses `recalculate_item_remaining_quantities()` to update port-specific and total remaining
+- **Race Condition Prevention**: Uses `SELECT FOR UPDATE` to lock item row during recalculation
+- **Tie-breaker Logic**: Uses `created_at` as tie-breaker when multiple imports have the same date
+
+## ✅ Phase 12.2 Completed: Certificate Editor Enhancements (Feb 2026)
+
+### Insert Row Feature
+- **Row Insertion**: Add "Insert Row" button between table rows (hover-reveal UI)
+- **Flexible Positioning**: Insert new items at any position, not just at the end
+- **Index-Based Insert**: `handleAddItem` supports optional `insertAtIndex` parameter
+
+### Dummy Entry Feature
+- **is_dummy Field**: Added `is_dummy` boolean to `CertificateItem` type
+- **Ghost Toggle**: Ghost icon button in Actions column to mark/unmark entries as dummy
+- **Value Preservation**: Save/restore dummy values when toggling (preserves remaining balances)
+- **Validation Skip**: Dummy items are skipped during validation
+- **Visual Styling**: Gray styling applied to dummy rows in both edit and read-only views
+- **Confirmation Modal**: Shows confirmation when marking items with existing values as dummy
+- **Save Integration**: `is_dummy` field included in save request payload
+
+### K1 Export Fixes (Jan 2026)
+- **MIDA UOM Fix**: Uses `remaining_uom` from certificate for multi-cert matching
+- **HSCODE '00' Suffix**: Moved appending from K1 export to invoice classification for Form-D items
+- **SST Toggle Fix**: Auto-removes SST mark when changed back to default value
+- **Bulk SST Toggle**: Also auto-removes marks when set to default
+- **Export UOM Fix**: Uses item's stored UOM instead of re-looking up from HSCODE table
+
 ## ✅ Phase 2 Completed: Certificate OCR
 
 ### Implemented Parsers
@@ -151,10 +199,10 @@
 - `last_page_excerpt`: Last 200 chars of last page text
 
 ## Project Goal
-Build the MIDA module for Kagayaku's workflow:
-1) Upload invoice → detect MIDA items → generate ALDEC "purple format" rows (Button 1)
-2) After ALDEC approval → user inputs BXXXXX → update quota ledgers + remaining quota (Button 2)
-3) Rare workflow: upload cleanly scanned MIDA certificate PDF → OCR table → user review/edit → save master + create empty ledgers
+Build the MIDA module for the import duty exemption workflow:
+1) Upload invoice → detect MIDA items → generate K1 format rows
+2) After customs approval → user inputs declaration reference → update quota ledgers + remaining quota
+3) Upload scanned MIDA certificate PDF → OCR table → user review/edit → save master + create empty ledgers
 4) View certificate + per-item balance sheets
 
 ---
@@ -385,7 +433,7 @@ alert('Certificate data will be saved to database...');
 ✅ Created via migration 002:
 - certificate_item_id, port, quantity_imported
 - balance_before, balance_after
-- import_date, declaration_ref, kagayaku_ref
+- import_date, declaration_ref
 
 #### Table 4: `companies` (Company Configuration)
 ✅ Created via migration 008:
@@ -610,16 +658,16 @@ frontend/
 
 ---
 
-## Phase 13: ALDEC Integration (TODO)
+## Phase 13: Post-Approval Integration (TODO)
 
-### 13.1 Post-ALDEC Workflow
-- [ ] After ALDEC approval → user inputs BXXXXX (kagayaku_ref_no)
-- [ ] Link imports to ALDEC declaration reference
-- [ ] Support batch import from ALDEC export file
+### 13.1 Post-Approval Workflow
+- [ ] After customs approval → user inputs declaration reference
+- [ ] Link imports to declaration reference
+- [ ] Support batch import from export file
 
 ### 13.2 Declaration Reference Tracking
 - [ ] Add declaration_reg_no field validation
-- [ ] Auto-generate sequential kagayaku_ref_no
+- [ ] Auto-generate sequential reference numbers
 
 ---
 
@@ -630,7 +678,9 @@ frontend/
 | 10 | React TypeScript Frontend | 🔴 High | Large | ✅ DONE |
 | 11 | UI Enhancements & Validation | 🔴 High | Medium | ✅ DONE |
 | 12 | Balance Sheet Migration & XLSX Export | 🔴 High | Medium | ✅ DONE |
-| 13.1 | ALDEC post-approval workflow | 🟢 Low | Medium | TODO |
+| 12.1 | Balance Migration Enhancements | 🔴 High | Medium | ✅ DONE |
+| 12.2 | Certificate Editor Enhancements | 🔴 High | Small | ✅ DONE |
+| 13.1 | Post-approval workflow | 🟢 Low | Medium | TODO |
 | 13.2 | Declaration reference tracking | 🟢 Low | Small | TODO |
 
 ---
@@ -651,12 +701,14 @@ MIDA/
 │   │   │   ├── DatabaseView.tsx        # Certificate list & management
 │   │   │   ├── CertificateDetails.tsx  # Certificate detail view/edit
 │   │   │   ├── ItemImports.tsx         # Import history per item
+│   │   │   ├── BalanceMigration.tsx    # Historical balance sheet upload
 │   │   │   ├── InvoiceConverter.tsx    # 3-tab invoice classification
 │   │   │   └── CertificateParser.tsx   # PDF upload & OCR parsing
 │   │   ├── services/
 │   │   │   ├── api.ts                  # Axios instance with base URL
 │   │   │   ├── certificateService.ts   # Certificate API calls
 │   │   │   ├── importService.ts        # Import tracking API calls
+│   │   │   ├── migrationService.ts     # Balance sheet migration API
 │   │   │   ├── classificationService.ts
 │   │   │   └── companyService.ts
 │   │   ├── types/
@@ -690,12 +742,14 @@ MIDA/
 │   ├── routers/
 │   │   ├── convert.py                   # Main conversion endpoints
 │   │   ├── hscode_uom.py                # HSCODE UOM endpoints
+│   │   ├── migration.py                 # Balance sheet migration endpoints
 │   │   ├── mida_certificate.py          # Certificate parsing
 │   │   ├── mida_certificates.py         # Certificate CRUD
 │   │   └── mida_imports.py              # Import tracking
 │   ├── schemas/
 │   │   ├── classification.py            # 3-tab classification schemas
 │   │   ├── convert.py                   # Conversion schemas
+│   │   ├── migration.py                 # Migration request/response schemas
 │   │   ├── mida_certificate.py          # Certificate schemas
 │   │   └── mida_import.py               # Import schemas
 │   └── services/
@@ -705,7 +759,9 @@ MIDA/
 │       ├── mida_certificate_service.py  # Certificate CRUD
 │       ├── mida_import_service.py       # Import recording
 │       ├── mida_matcher.py              # Invoice-to-MIDA matching
-│       └── mida_matching_service.py     # Invoice parsing
+│       ├── mida_matching_service.py     # Invoice parsing
+│       ├── migration_service.py         # Balance sheet migration logic
+│       └── xlsx_export_service.py       # MIDA template XLSX export
 ├── alembic/
 │   └── versions/
 │       ├── 001_add_mida_certificates.py
@@ -715,7 +771,10 @@ MIDA/
 │       ├── 005_add_model_number.py
 │       ├── 006_add_soft_delete.py
 │       ├── 007_add_hscode_uom_mappings.py
-│       └── 008_companies.py
+│       ├── 008_companies.py
+│       ├── 009_hscode_master.py
+│       ├── 010_add_dummy_flag.py
+│       └── 011_rename_invoice_to_declaration.py
 ├── templates/
 │   └── K1_Import_Template.xls           # K1 export template
 ├── run_server.py                        # Quick server startup
@@ -755,8 +814,15 @@ web/
 | POST | `/api/mida/imports` | Record import |
 | GET | `/api/mida/imports/item/{item_id}` | Get import history for item |
 | GET | `/api/mida/imports/{record_id}` | Get single import record |
-| PUT | `/api/mida/imports/{record_id}` | Update import record |
-| DELETE | `/api/mida/imports/{record_id}` | Delete import record |
+| PUT | `/api/mida/imports/{record_id}` | Update import record (auto-recalculates balances) |
+| DELETE | `/api/mida/imports/{record_id}` | Delete import record (auto-recalculates balances) |
+
+### Migration Endpoints (`/api/migration/...`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/migration/preview` | Preview balance sheet migration from XLSX |
+| POST | `/api/migration/apply` | Apply migration with conflict resolutions |
+| POST | `/api/migration/fix-remaining-quantities/{id}` | Initialize remaining quantities |
 
 ### Certificate Parsing (`/api/mida/certificate/...`)
 | Method | Endpoint | Description |

@@ -58,10 +58,6 @@ lint:
 format:
 	cd server && python -m ruff format .
 
-# Legacy database setup (tools/db_setup)
-db-setup:
-	cd server/tools/db_setup && python Kagayaku_db.py
-
 # Create new Alembic migration with autogenerate
 # Usage: make db-revision MSG="add users table"
 db-revision:

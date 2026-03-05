@@ -78,17 +78,29 @@ app.add_middleware(
 
 # =============================================================================
 # IP Whitelisting Middleware - Restrict API access to specific IP ranges
+# Configure via ALLOWED_NETWORKS env var (comma-separated CIDR notation)
+# Example: ALLOWED_NETWORKS=192.168.1.0/24,10.0.0.0/8
 # =============================================================================
-ALLOWED_NETWORKS = [
-    ipaddress.ip_network("192.228.152.0/24"),   # Subnet 1
-    ipaddress.ip_network("162.120.184.0/24"),   # Subnet 2
-    ipaddress.ip_network("113.211.214.0/24"),   # Subnet 3
-    ipaddress.ip_network("113.211.213.0/24"),   # Subnet 4
-    ipaddress.ip_network("175.136.240.0/24"),   # Subnet 5
-    ipaddress.ip_network("127.0.0.0/8"),        # Localhost
-    ipaddress.ip_network("172.28.0.0/16"),      # Docker internal network
-    ipaddress.ip_network("10.0.0.0/8"),         # Private network (Docker)
+_DEFAULT_NETWORKS = [
+    "127.0.0.0/8",         # Localhost
+    "172.28.0.0/16",       # Docker internal network
+    "10.0.0.0/8",          # Private network (Docker)
 ]
+
+
+def _build_allowed_networks() -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+    """Build the allowed network list from env var + defaults."""
+    networks = list(_DEFAULT_NETWORKS)
+    env_networks = settings.allowed_networks
+    if env_networks:
+        for cidr in env_networks.split(","):
+            cidr = cidr.strip()
+            if cidr:
+                networks.append(cidr)
+    return [ipaddress.ip_network(n, strict=False) for n in networks]
+
+
+ALLOWED_NETWORKS = _build_allowed_networks()
 
 
 @app.middleware("http")
