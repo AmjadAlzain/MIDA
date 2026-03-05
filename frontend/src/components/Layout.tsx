@@ -39,10 +39,10 @@ export function Layout() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  MIDA Certificate System
+                  Kagayaku Import System
                 </h1>
                 <p className="text-xs text-gray-500">
-                  Import Duty Exemption Management
+                  MIDA Certificate Management
                 </p>
               </div>
             </div>
@@ -85,7 +85,7 @@ export function Layout() {
       <footer className="bg-white border-t border-gray-200 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <p className="text-center text-sm text-gray-500">
-            MIDA Certificate System v2.0 • Built with React & TypeScript
+            Kagayaku Import System v2.0 • Built with React & TypeScript
           </p>
         </div>
       </footer>

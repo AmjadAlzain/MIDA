@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# MIDA OCR - One-Line Server Deployment
+# KIS - Kagayaku Import System - One-Line Server Deployment
 # =============================================================================
 # Run this single command on the server to deploy everything:
 #
@@ -18,7 +18,7 @@ AZURE_DI_ENDPOINT="${AZURE_DI_ENDPOINT:-}"
 AZURE_DI_KEY="${AZURE_DI_KEY:-}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 20)}"
 
-APP_DIR="/opt/mida-ocr"
+APP_DIR="/opt/kis"
 
 # Colors
 RED='\033[0;31m'
@@ -28,7 +28,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${BLUE}============================================${NC}"
-echo -e "${BLUE}  MIDA OCR Application - Remote Deployment ${NC}"
+echo -e "${BLUE}  KIS - Kagayaku Import System - Remote Deployment ${NC}"
 echo -e "${BLUE}============================================${NC}"
 
 # Check for root/sudo
@@ -88,7 +88,7 @@ fi
 
 # Create .env file
 cat > .env << EOF
-# MIDA OCR - Production Environment
+# KIS - Kagayaku Import System - Production Environment
 # Generated: $(date)
 
 # Azure Document Intelligence
@@ -135,7 +135,7 @@ echo -e "\n${YELLOW}Running migrations...${NC}"
 docker compose run --rm db-migrate
 
 echo -e "\n${YELLOW}Starting all services...${NC}"
-docker compose up -d mida-api mida-frontend db-backup
+docker compose up -d kis-api kis-frontend db-backup
 sleep 10
 
 # Verify

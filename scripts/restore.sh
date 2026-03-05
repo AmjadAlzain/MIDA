@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# MIDA OCR Application - Database Restore Script
+# KIS - Kagayaku Import System - Database Restore Script
 # =============================================================================
 # Restore database from backup
 # Usage: ./restore.sh <backup_file>
@@ -19,7 +19,7 @@ if [ -z "$1" ]; then
     echo -e "${RED}Usage: $0 <backup_file>${NC}"
     echo ""
     echo "Available backups:"
-    ls -lh ./backups/mida_backup_*.sql.gz 2>/dev/null || echo "  No backups found in ./backups/"
+    ls -lh ./backups/kis_backup_*.sql.gz 2>/dev/null || echo "  No backups found in ./backups/"
     exit 1
 fi
 
@@ -49,7 +49,7 @@ POSTGRES_DB=${POSTGRES_DB:-mida}
 
 # Stop the API to prevent connections during restore
 echo "Stopping API service..."
-docker compose stop mida-api
+docker compose stop kis-api
 
 # Restore database
 echo "Restoring database from backup..."
@@ -64,6 +64,6 @@ fi
 
 # Restart API
 echo "Restarting API service..."
-docker compose start mida-api
+docker compose start kis-api
 
 echo -e "${GREEN}Restore completed. Services are running.${NC}"

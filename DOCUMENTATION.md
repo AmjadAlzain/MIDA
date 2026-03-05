@@ -1,4 +1,4 @@
-# MIDA Certificate Management System - Technical Documentation
+# Kagayaku Import System (KIS) - Technical Documentation
 
 This document provides comprehensive technical documentation for developers and administrators.
 
@@ -25,7 +25,7 @@ This document provides comprehensive technical documentation for developers and 
 
 ## System Overview
 
-The MIDA Certificate Management System automates the workflow for managing Malaysian Investment Development Authority (MIDA) import duty exemption certificates. The system handles:
+The Kagayaku Import System (KIS) automates the workflow for managing Malaysian Investment Development Authority (MIDA) import duty exemption certificates. The system handles:
 
 1. **Certificate Digitisation**: Upload scanned PDF certificates and extract structured data via Azure Document Intelligence OCR
 2. **Invoice Classification**: Upload invoice spreadsheets and automatically classify items into Form-D, MIDA, or Duties Payable categories
@@ -540,7 +540,7 @@ All configuration is via environment variables, loaded by `app/config.py`.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `APP_NAME` | str | `MIDA OCR API` | Application name |
+| `APP_NAME` | str | `KIS API` | Application name |
 | `APP_VERSION` | str | `1.0.0` | Application version |
 | `ENVIRONMENT` | str | `development` | `development`, `staging`, `production` |
 | `DEBUG` | bool | `false` | Enable debug mode |

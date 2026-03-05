@@ -1,4 +1,4 @@
-# MIDA Certificate Management System
+# Kagayaku Import System (KIS)
 
 A comprehensive system for managing MIDA (Malaysian Investment Development Authority) import duty exemption certificates with automated OCR parsing, invoice classification, K1 export generation, and quota tracking.
 
@@ -79,7 +79,7 @@ docker compose build
 docker compose up -d postgres
 sleep 15
 docker compose run --rm db-migrate
-docker compose up -d mida-api mida-frontend db-backup
+docker compose up -d kis-api kis-frontend db-backup
 
 # Verify
 docker compose ps
@@ -124,7 +124,7 @@ make lint        # Lint code
 ## Project Structure
 
 ```
-MIDA/
+KIS/
 +-- frontend/                      # React TypeScript SPA
 |   +-- src/
 |   |   +-- components/            # Layout, UI components
@@ -316,11 +316,11 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions and [QUICK_DEPLOY.m
 
 | Service | Container | Description |
 |---------|-----------|-------------|
-| `mida-api` | `mida-ocr-api` | FastAPI backend |
-| `mida-frontend` | `mida-frontend` | Nginx serving React build |
-| `postgres` | `mida-postgres` | PostgreSQL 15 |
-| `db-backup` | `mida-db-backup` | Automated daily backups |
-| `db-migrate` | `mida-db-migrate` | One-shot migration runner |
+| `kis-api` | `kis-api` | FastAPI backend |
+| `kis-frontend` | `kis-frontend` | Nginx serving React build |
+| `postgres` | `kis-postgres` | PostgreSQL 15 |
+| `db-backup` | `kis-db-backup` | Automated daily backups |
+| `db-migrate` | `kis-db-migrate` | One-shot migration runner |
 
 ### Useful Commands
 

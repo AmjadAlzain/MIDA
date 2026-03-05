@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# MIDA OCR Application - Server Deployment Script
+# KIS - Kagayaku Import System - Server Deployment Script
 # =============================================================================
 # Run this script on the Debian server after cloning the repository
 # Usage: ./deploy.sh
@@ -33,7 +33,7 @@ else
     SUDO="sudo"
 fi
 
-print_header "MIDA OCR Application - Server Deployment"
+print_header "KIS - Kagayaku Import System - Server Deployment"
 
 # Step 1: Update system and install prerequisites
 print_header "Step 1: System Preparation"
@@ -91,7 +91,7 @@ print_success "Docker is ready"
 # Step 3: Create application directory
 print_header "Step 3: Application Setup"
 
-APP_DIR="/opt/mida-ocr"
+APP_DIR="/opt/kis"
 
 if [ -d "$APP_DIR" ]; then
     print_warning "Application directory exists. Creating backup..."
@@ -171,7 +171,7 @@ print_success "Database migrations completed"
 print_header "Step 9: Start Services"
 
 print_info "Starting all services..."
-docker compose up -d mida-api mida-frontend db-backup
+docker compose up -d kis-api kis-frontend db-backup
 
 print_info "Waiting for services to start..."
 sleep 10
@@ -235,7 +235,7 @@ print_header "Deployment Complete!"
 SERVER_IP=$(hostname -I | awk '{print $1}')
 
 echo ""
-echo "Your MIDA OCR application is now running!"
+echo "Your KIS application is now running!"
 echo ""
 echo "Access URLs:"
 echo "  Frontend:  http://${SERVER_IP}"

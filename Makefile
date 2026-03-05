@@ -92,7 +92,7 @@ docker-build:
 
 # Start all services (detached)
 docker-up:
-	docker compose up -d mida-api mida-frontend db-backup
+	docker compose up -d kis-api kis-frontend db-backup
 	@echo "Services starting... checking health in 10s"
 	@sleep 10
 	docker compose ps
@@ -107,7 +107,7 @@ docker-logs:
 
 # View API logs only
 docker-logs-api:
-	docker compose logs -f mida-api
+	docker compose logs -f kis-api
 
 # Run database migrations
 docker-migrate:
@@ -118,7 +118,7 @@ docker-backup:
 	bash scripts/backup.sh
 
 # Restore database from backup
-# Usage: make docker-restore FILE=./backups/mida_backup_20240101_120000.sql.gz
+# Usage: make docker-restore FILE=./backups/kis_backup_20240101_120000.sql.gz
 docker-restore:
 	bash scripts/restore.sh $(FILE)
 
@@ -132,8 +132,8 @@ docker-deploy: docker-build docker-migrate docker-up
 
 # Restart services
 docker-restart:
-	docker compose restart mida-api mida-frontend
+	docker compose restart kis-api kis-frontend
 
 # View container resource usage
 docker-stats:
-	docker stats mida-ocr-api mida-frontend mida-postgres
+	docker stats kis-api kis-frontend kis-postgres

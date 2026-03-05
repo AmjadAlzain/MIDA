@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
 
     # === Application ===
-    app_name: str = Field(default="MIDA OCR API", description="Application name")
+    app_name: str = Field(default="KIS API", description="Application name")
     app_version: str = Field(default="1.0.0", description="Application version")
     environment: str = Field(default="development", description="Environment: development, staging, production")
     debug: bool = Field(default=False, description="Enable debug mode")

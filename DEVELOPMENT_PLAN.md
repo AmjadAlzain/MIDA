@@ -1,4 +1,4 @@
-# MIDA Project – Development Plan (Azure OCR)
+# KIS – Kagayaku Import System – Development Plan (Azure OCR)
 
 ## What we have so far (Phase 1–10 done)
 - Repo scaffolded similar to Form-D-demo:

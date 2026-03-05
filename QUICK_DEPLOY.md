@@ -1,4 +1,4 @@
-# MIDA OCR Application - Quick Deployment Guide
+# KIS - Quick Deployment Guide
 
 ## Server Requirements
 
@@ -20,9 +20,9 @@ ssh <username>@<server-ip>
 
 ```bash
 # Create app directory
-sudo mkdir -p /opt/mida-ocr
-sudo chown $USER:$USER /opt/mida-ocr
-cd /opt/mida-ocr
+sudo mkdir -p /opt/kis
+sudo chown $USER:$USER /opt/kis
+cd /opt/kis
 
 # Clone from your repository
 git clone <YOUR_REPOSITORY_URL> .
@@ -31,7 +31,7 @@ git clone <YOUR_REPOSITORY_URL> .
 ### 3. Run the Setup Wizard
 
 ```bash
-cd /opt/mida-ocr
+cd /opt/kis
 
 # Make scripts executable
 chmod +x scripts/*.sh
@@ -50,7 +50,7 @@ The setup wizard will prompt you for:
 ### 4. Alternative: Manual Deployment
 
 ```bash
-cd /opt/mida-ocr
+cd /opt/kis
 
 # Create required directories
 mkdir -p backups logs
@@ -72,7 +72,7 @@ sleep 15
 docker compose run --rm db-migrate
 
 # Start all services
-docker compose up -d mida-api mida-frontend db-backup
+docker compose up -d kis-api kis-frontend db-backup
 
 # Check status
 docker compose ps
@@ -161,7 +161,7 @@ docker compose down
 docker compose logs -f
 
 # View specific service logs
-docker compose logs -f mida-api
+docker compose logs -f kis-api
 
 # Restart services
 docker compose restart
@@ -170,7 +170,7 @@ docker compose restart
 bash scripts/backup.sh
 
 # Restore from backup
-bash scripts/restore.sh ./backups/mida_backup_YYYYMMDD_HHMMSS.sql.gz
+bash scripts/restore.sh ./backups/kis_backup_YYYYMMDD_HHMMSS.sql.gz
 
 # Check health
 bash scripts/monitor.sh
@@ -184,7 +184,7 @@ docker stats
 ## Backup Information
 
 - **Automatic backups**: Daily at 2 AM
-- **Location**: `/opt/mida-ocr/backups/`
+- **Location**: `/opt/kis/backups/`
 - **Retention**: 7 days (configurable via `BACKUP_RETENTION_DAYS`)
 
 ---
@@ -193,8 +193,8 @@ docker stats
 
 ### Services not starting
 ```bash
-docker compose logs mida-api
-docker compose logs mida-frontend
+docker compose logs kis-api
+docker compose logs kis-frontend
 ```
 
 ### Database connection issues
@@ -206,10 +206,10 @@ docker compose exec postgres pg_isready -U mida
 ### API returns 500 errors
 ```bash
 # Check environment variables
-docker compose exec mida-api env | grep -E "(AZURE|DATABASE)"
+docker compose exec kis-api env | grep -E "(AZURE|DATABASE)"
 
 # Check logs
-docker compose logs mida-api --tail=100
+docker compose logs kis-api --tail=100
 ```
 
 ### Reset everything

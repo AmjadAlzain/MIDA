@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# MIDA OCR Application - Health Monitor Script
+# KIS - Kagayaku Import System - Health Monitor Script
 # =============================================================================
 # Checks health of all services and sends alerts if issues detected
 # Can be run via cron for continuous monitoring
@@ -85,7 +85,7 @@ check_containers() {
     local failed=0
     
     # Check each container
-    for container in mida-ocr-api mida-frontend mida-postgres; do
+    for container in kis-api kis-frontend kis-postgres; do
         status=$(docker inspect --format='{{.State.Status}}' "$container" 2>/dev/null || echo "not found")
         health=$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "no healthcheck")
         
@@ -153,7 +153,7 @@ check_disk_space() {
 # Check memory usage
 check_memory() {
     # Get memory usage from Docker stats
-    api_mem=$(docker stats --no-stream --format "{{.MemPerc}}" mida-ocr-api 2>/dev/null | tr -d '%' || echo "0")
+    api_mem=$(docker stats --no-stream --format "{{.MemPerc}}" kis-api 2>/dev/null | tr -d '%' || echo "0")
     
     if [ -n "$api_mem" ]; then
         log "INFO" "API memory usage: ${api_mem}%"
@@ -176,7 +176,7 @@ check_database() {
 
 # Check backup status
 check_backups() {
-    latest_backup=$(ls -t ./backups/mida_backup_*.sql.gz 2>/dev/null | head -1)
+    latest_backup=$(ls -t ./backups/kis_backup_*.sql.gz 2>/dev/null | head -1)
     
     if [ -z "$latest_backup" ]; then
         log "WARN" "No backups found"

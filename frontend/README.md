@@ -1,6 +1,6 @@
-# MIDA Certificate System - Frontend
+# Kagayaku Import System (KIS) - Frontend
 
-A modern React-based frontend for the MIDA Certificate System, replacing the monolithic HTML file with a modular, maintainable architecture.
+A modern React-based frontend for the Kagayaku Import System, managing MIDA certificates with a modular, maintainable architecture.
 
 ## 🚀 Tech Stack
 

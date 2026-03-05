@@ -1,6 +1,6 @@
-# MIDA OCR API - Deployment Guide
+# KIS API - Deployment Guide
 
-This guide covers deploying the MIDA OCR application using Docker Compose.
+This guide covers deploying the Kagayaku Import System (KIS) using Docker Compose.
 
 ## Table of Contents
 
@@ -106,7 +106,7 @@ sleep 15
 docker compose run --rm db-migrate
 
 # Start all services
-docker compose up -d mida-api mida-frontend db-backup
+docker compose up -d kis-api kis-frontend db-backup
 ```
 
 ### Verify Deployment
@@ -138,11 +138,11 @@ make docker-deploy
 
 | Service | Container | Port | Description |
 |---------|-----------|------|-------------|
-| `mida-api` | `mida-ocr-api` | 8000 | FastAPI backend |
-| `mida-frontend` | `mida-frontend` | 80 | Nginx + React SPA |
-| `postgres` | `mida-postgres` | 5432 (internal) | PostgreSQL 15 |
-| `db-backup` | `mida-db-backup` | — | Daily backup cron |
-| `db-migrate` | `mida-db-migrate` | — | One-shot migration |
+| `kis-api` | `kis-api` | 8000 | FastAPI backend |
+| `kis-frontend` | `kis-frontend` | 80 | Nginx + React SPA |
+| `postgres` | `kis-postgres` | 5432 (internal) | PostgreSQL 15 |
+| `db-backup` | `kis-db-backup` | — | Daily backup cron |
+| `db-migrate` | `kis-db-migrate` | — | One-shot migration |
 
 ---
 
@@ -178,9 +178,9 @@ make docker-backup
 ### Restore Backup
 
 ```bash
-bash scripts/restore.sh ./backups/mida_backup_YYYYMMDD_HHMMSS.sql.gz
+bash scripts/restore.sh ./backups/kis_backup_YYYYMMDD_HHMMSS.sql.gz
 # or
-make docker-restore FILE=./backups/mida_backup_YYYYMMDD_HHMMSS.sql.gz
+make docker-restore FILE=./backups/kis_backup_YYYYMMDD_HHMMSS.sql.gz
 ```
 
 ### Connect to Database
@@ -251,7 +251,7 @@ sudo certbot --nginx -d your-domain.com
 docker compose logs -f
 
 # Specific service
-docker compose logs -f mida-api
+docker compose logs -f kis-api
 ```
 
 ### Health Check
@@ -277,10 +277,10 @@ docker stats
 
 ```bash
 # Check logs
-docker compose logs mida-api
+docker compose logs kis-api
 
 # Verify environment variables
-docker compose exec mida-api env | grep -E "(AZURE|DATABASE)"
+docker compose exec kis-api env | grep -E "(AZURE|DATABASE)"
 
 # Check database connection
 docker compose exec postgres pg_isready -U mida
@@ -318,17 +318,17 @@ docker compose down -v
 docker compose up -d postgres
 sleep 15
 docker compose run --rm db-migrate
-docker compose up -d mida-api mida-frontend db-backup
+docker compose up -d kis-api kis-frontend db-backup
 ```
 
 ### Log Analysis (Production)
 
 ```bash
 # View JSON logs
-docker logs mida-ocr-api 2>&1 | python -m json.tool
+docker logs kis-api 2>&1 | python -m json.tool
 
 # Filter errors
-docker logs mida-ocr-api 2>&1 | grep '"level":"ERROR"'
+docker logs kis-api 2>&1 | grep '"level":"ERROR"'
 ```
 
 ### Debug Mode
@@ -340,4 +340,4 @@ LOG_LEVEL=DEBUG
 LOG_FORMAT=text
 ```
 
-Then restart: `docker compose restart mida-api`
+Then restart: `docker compose restart kis-api`

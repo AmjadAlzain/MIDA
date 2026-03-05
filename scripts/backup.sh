@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# MIDA OCR Application - Database Backup Script
+# KIS - Kagayaku Import System - Database Backup Script
 # =============================================================================
 # Manual backup script - can be run standalone or via cron
 # Usage: ./backup.sh [backup_dir]
@@ -11,7 +11,7 @@ set -e
 # Configuration
 BACKUP_DIR="${1:-./backups}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/mida_backup_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="${BACKUP_DIR}/kis_backup_${TIMESTAMP}.sql.gz"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 
 # Colors
@@ -43,12 +43,12 @@ if [ $? -eq 0 ] && [ -s "$BACKUP_FILE" ]; then
     
     # Clean up old backups
     echo -e "${YELLOW}Cleaning up backups older than ${RETENTION_DAYS} days...${NC}"
-    DELETED=$(find "$BACKUP_DIR" -name "mida_backup_*.sql.gz" -mtime +${RETENTION_DAYS} -delete -print | wc -l)
+    DELETED=$(find "$BACKUP_DIR" -name "kis_backup_*.sql.gz" -mtime +${RETENTION_DAYS} -delete -print | wc -l)
     echo -e "  Deleted ${DELETED} old backup(s)"
     
     # List current backups
     echo -e "\nCurrent backups:"
-    ls -lh "$BACKUP_DIR"/mida_backup_*.sql.gz 2>/dev/null | tail -5 || echo "  No backups found"
+    ls -lh "$BACKUP_DIR"/kis_backup_*.sql.gz 2>/dev/null | tail -5 || echo "  No backups found"
 else
     echo -e "${RED}[$(date +%Y%m%d_%H%M%S)] Backup FAILED!${NC}"
     rm -f "$BACKUP_FILE"
